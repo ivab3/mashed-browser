@@ -11,8 +11,8 @@
       <section id="viewport" class="viewport" aria-label="Runtime viewport">
         <header class="topbar">
           <div>
-            <span class="eyebrow">Mashed · Runtime foundation</span>
-            <h1>Stage 03</h1>
+            <span class="eyebrow">Mashed · Vehicle foundation</span>
+            <h1>Stage 04</h1>
           </div>
           <div id="state-badge" class="state-badge" data-state="boot">boot</div>
         </header>
@@ -26,17 +26,20 @@
           <div><span>Contacts</span><strong id="metric-contacts">—</strong></div>
           <div><span>Sim step</span><strong id="metric-step">0</strong></div>
           <div><span>Dropped</span><strong id="metric-dropped">0 ms</strong></div>
+          <div><span>Speed</span><strong id="metric-speed">0 km/h</strong></div>
+          <div><span>Wheels</span><strong id="metric-wheels">0 / 4</strong></div>
+          <div class="wide"><span>Surface</span><strong id="metric-surface">airborne</strong></div>
         </aside>
 
-        <div class="hint">The orange proxy is interpolated between 60 Hz Rapier frames.</div>
+        <div class="hint">Ice · asphalt · sand · mud — drive across the four surface strips.</div>
       </section>
 
       <aside class="control-panel">
         <div>
-          <p class="kicker">Deterministic runtime shell</p>
-          <h2>One clock.<br />No surprises.</h2>
+          <p class="kicker">Arcade vehicle prototype</p>
+          <h2>Grip it.<br />Then drift it.</h2>
           <p class="intro">
-            Rendering follows the display. Gameplay advances only in fixed 1/60-second steps.
+            Ray-cast suspension and surface-aware grip run at a fixed 60 Hz simulation step.
           </p>
         </div>
 
@@ -44,7 +47,14 @@
           <button id="start-race" class="primary" type="button">Start simulation</button>
           <button id="finish-race" type="button" disabled>Finish race</button>
           <button id="back-menu" type="button" disabled>Back to menu</button>
-          <button id="reset-demo" type="button">Reset body</button>
+          <button id="reset-demo" type="button">Reset vehicle</button>
+        </section>
+
+        <section class="control-guide" aria-label="Driving controls">
+          <div class="section-label">Drive</div>
+          <p><b>WASD / arrows</b> accelerate, reverse and steer</p>
+          <p><b>Space</b> handbrake · <b>Shift</b> brake · <b>R</b> recover</p>
+          <p><b>Gamepad</b> left stick · triggers · A/B</p>
         </section>
 
         <section class="toggles">
@@ -63,7 +73,7 @@
 
         <footer>
           <span id="runtime-status">Preparing WebAssembly…</span>
-          <span>R resets · D toggles debug</span>
+          <span>C toggles colliders · R recovers</span>
         </footer>
       </aside>
     </main>

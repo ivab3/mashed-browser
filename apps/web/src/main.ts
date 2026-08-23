@@ -6,6 +6,7 @@ import {
   type FixedStepFrame,
   type RuntimeState,
 } from "@mashed/core";
+import { BrowserVehicleInput } from "@mashed/input";
 import { createPhysicsRuntime, type PhysicsRuntime } from "@mashed/physics";
 import { RuntimeRenderer } from "@mashed/renderer";
 
@@ -59,12 +60,16 @@ const metricBodies = element<HTMLElement>("metric-bodies");
 const metricContacts = element<HTMLElement>("metric-contacts");
 const metricStep = element<HTMLElement>("metric-step");
 const metricDropped = element<HTMLElement>("metric-dropped");
+const metricSpeed = element<HTMLElement>("metric-speed");
+const metricWheels = element<HTMLElement>("metric-wheels");
+const metricSurface = element<HTMLElement>("metric-surface");
 
 const events = new RuntimeEventBus();
 const state = new RuntimeStateMachine(events);
 const clock = new FixedStepClock({ stepSeconds: STEP_SECONDS, maxSubSteps: 8, events });
 const audio = new AudioRuntime(events);
 const renderer = new RuntimeRenderer(viewport, events);
+const vehicleInput = new BrowserVehicleInput();
 const assetLoader = new AssetLoadingClient();
 const loadedAssets = new Map<string, LoadedAsset>();
 let physics: PhysicsRuntime | undefined;
@@ -166,9 +171,7 @@ window.addEventListener("blur", resetPresentationClock);
 window.addEventListener("focus", resetPresentationClock);
 window.addEventListener("resize", () => renderer.resize(viewport.clientWidth, viewport.clientHeight));
 window.addEventListener("keydown", (event) => {
-  if (event.code === "KeyR") {
-    physics?.resetDemo();
-  } else if (event.code === "KeyD") {
+  if (event.code === "KeyC") {
     debugColliders.checked = !debugColliders.checked;
   }
 });
@@ -191,7 +194,7 @@ function renderFrame(timestampMilliseconds: number): void {
   if (state.state === "race") {
     frame = clock.advance(timestampMilliseconds / 1000, (stepSeconds) => {
       const startedAt = performance.now();
-      physics?.step(stepSeconds);
+      physics?.step(stepSeconds, vehicleInput.sample());
       physicsMilliseconds += performance.now() - startedAt;
     });
   } else {
@@ -222,6 +225,9 @@ function renderFrame(timestampMilliseconds: number): void {
     metricContacts.textContent = String(physicsMetrics.contacts);
     metricStep.textContent = String(frame.simulationStep);
     metricDropped.textContent = `${(totalDroppedSeconds * 1000).toFixed(0)} ms`;
+    metricSpeed.textContent = `${(physics.telemetry.speedMetersPerSecond * 3.6).toFixed(0)} km/h`;
+    metricWheels.textContent = `${physics.telemetry.groundedWheels} / 4`;
+    metricSurface.textContent = physics.telemetry.surface;
     lastOverlayUpdate = timestampMilliseconds;
   }
   animationFrame = requestAnimationFrame(renderFrame);
@@ -243,6 +249,7 @@ async function boot(): Promise<void> {
 window.addEventListener("pagehide", () => {
   cancelAnimationFrame(animationFrame);
   assetLoader.dispose();
+  vehicleInput.dispose();
   physics?.dispose();
   renderer.dispose();
   void audio.dispose();

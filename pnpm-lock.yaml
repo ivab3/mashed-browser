@@ -54,6 +54,9 @@ importers:
       '@mashed/core':
         specifier: workspace:*
         version: link:../../packages/core
+      '@mashed/input':
+        specifier: workspace:*
+        version: link:../../packages/input
       '@mashed/physics':
         specifier: workspace:*
         version: link:../../packages/physics
@@ -114,6 +117,15 @@ importers:
         specifier: ^2.1.0
         version: 2.1.9(@types/node@20.19.43)
 
+  packages/input:
+    devDependencies:
+      typescript:
+        specifier: ^5.7.0
+        version: 5.9.3
+      vitest:
+        specifier: ^2.1.0
+        version: 2.1.9(@types/node@20.19.43)
+
   packages/physics:
     dependencies:
       '@dimforge/rapier3d-compat':
@@ -122,6 +134,9 @@ importers:
       '@mashed/core':
         specifier: workspace:*
         version: link:../core
+      '@mashed/input':
+        specifier: workspace:*
+        version: link:../input
     devDependencies:
       typescript:
         specifier: ^5.7.0

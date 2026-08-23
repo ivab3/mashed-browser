@@ -1,0 +1,57 @@
+{
+  "id": "arcade-default",
+  "displayName": "Stage 4 arcade prototype",
+  "spawn": { "position": [-4, 1.05, -8], "headingRadians": 0 },
+  "chassis": {
+    "mass": 1050,
+    "halfExtents": [0.86, 0.25, 1.34],
+    "noseHalfExtents": [0.72, 0.17, 0.42],
+    "noseOffset": [0, -0.03, 1.25],
+    "centerOfMass": [0, -0.32, 0.05],
+    "linearDamping": 0.12,
+    "angularDamping": 0.75
+  },
+  "wheels": {
+    "connectionPoints": [[-0.78, -0.12, 0.94], [0.78, -0.12, 0.94], [-0.78, -0.12, -0.92], [0.78, -0.12, -0.92]],
+    "radius": 0.32,
+    "suspensionRestLength": 0.3,
+    "maxSuspensionTravel": 0.2,
+    "suspensionStiffness": 34,
+    "suspensionCompression": 4.4,
+    "suspensionRelaxation": 5.2,
+    "maxSuspensionForce": 18000
+  },
+  "drive": {
+    "engineForce": 5200,
+    "reverseForce": 3300,
+    "serviceBrakeForce": 52,
+    "handbrakeForce": 82,
+    "reverseEngageSpeed": 1.4,
+    "maxForwardSpeed": 29,
+    "maxReverseSpeed": 10,
+    "maxSteeringAngle": 0.5,
+    "steeringResponse": 4.8,
+    "highSpeedSteering": 0.36,
+    "drivenWheels": [0, 1, 2, 3]
+  },
+  "handling": {
+    "baseFrictionSlip": 3.25,
+    "baseSideFriction": 1.15,
+    "handbrakeRearGrip": 0.24,
+    "downforce": 0.5,
+    "uprightStrength": 1900,
+    "uprightDamping": 165
+  },
+  "recovery": {
+    "lift": 1.1,
+    "autoDelaySeconds": 2.25,
+    "maximumUprightDot": 0.18,
+    "maximumAutoSpeed": 1.2
+  },
+  "surfaces": {
+    "asphalt": { "frictionSlip": 1, "sideFriction": 1, "engine": 1, "rollingBrake": 0 },
+    "ice": { "frictionSlip": 0.38, "sideFriction": 0.24, "engine": 0.72, "rollingBrake": 0 },
+    "sand": { "frictionSlip": 0.72, "sideFriction": 0.68, "engine": 0.78, "rollingBrake": 2.5 },
+    "mud": { "frictionSlip": 0.58, "sideFriction": 0.55, "engine": 0.62, "rollingBrake": 4.5 }
+  }
+}

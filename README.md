@@ -4,11 +4,13 @@ Clean-room browser reimplementation of _Mashed: Fully Loaded_. The repository co
 new code, schemas, documentation, and metadata. Original executable and game assets must come
 from a user-owned disc image or installed copy and are always kept below ignored `game-data/`.
 
-Milestone **M0: Asset feasibility** and the Stage 3 runtime foundation are complete. Stage 1 provides
-a reproducible local extraction pipeline; Stage 2 provides RenderWare DFF/TXD readers, full
+Milestone **M0: Asset feasibility** and the Stage 3 runtime foundation are complete. Stage 1
+provides a reproducible local extraction pipeline; Stage 2 provides RenderWare DFF/TXD readers, full
 graphical/collision BSP sector parsing, and a Three.js asset viewer. Stage 3 adds a deterministic
 fixed-step core, replay checks, Rapier/Three.js/Web Audio adapters, debug tooling, and the browser
-runtime shell. [ADR-0001](./reference/ADR-0001-runtime-asset-loading.md) selects direct runtime
+runtime shell. Stage 4 is underway with a playable data-driven ray-cast vehicle, keyboard/gamepad
+controls, four grip surfaces, recovery, and a chase camera.
+[ADR-0001](./reference/ADR-0001-runtime-asset-loading.md) selects direct runtime
 parsing in a loading Worker instead of mandatory pre-conversion.
 
 ## Requirements
@@ -39,6 +41,9 @@ pnpm build
 
 Project direction, gates, and scope live in [`ROADMAP.md`](./ROADMAP.md). Reference-build
 metadata and acceptance scenarios live in [`REFERENCE.md`](./REFERENCE.md).
+
+Vehicle implementation notes and remaining Gate C work live in
+[`reference/VEHICLE_FOUNDATION.md`](./reference/VEHICLE_FOUNDATION.md).
 
 ## Inspect Stage 2 fixtures
 

@@ -13,6 +13,7 @@
     "@mashed/assets": "workspace:*",
     "@mashed/audio": "workspace:*",
     "@mashed/core": "workspace:*",
+    "@mashed/input": "workspace:*",
     "@mashed/physics": "workspace:*",
     "@mashed/renderer": "workspace:*",
     "@mashed/replay": "workspace:*",
