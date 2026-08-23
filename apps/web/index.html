@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#091018" />
+    <title>Mashed Browser Runtime</title>
+  </head>
+  <body>
+    <main>
+      <section id="viewport" class="viewport" aria-label="Runtime viewport">
+        <header class="topbar">
+          <div>
+            <span class="eyebrow">Mashed · Runtime foundation</span>
+            <h1>Stage 03</h1>
+          </div>
+          <div id="state-badge" class="state-badge" data-state="boot">boot</div>
+        </header>
+
+        <aside class="telemetry" aria-label="Runtime telemetry">
+          <div><span>FPS</span><strong id="metric-fps">—</strong></div>
+          <div><span>Frame</span><strong id="metric-frame">—</strong></div>
+          <div><span>Physics</span><strong id="metric-physics">—</strong></div>
+          <div><span>Draw calls</span><strong id="metric-draws">—</strong></div>
+          <div><span>Bodies</span><strong id="metric-bodies">—</strong></div>
+          <div><span>Contacts</span><strong id="metric-contacts">—</strong></div>
+          <div><span>Sim step</span><strong id="metric-step">0</strong></div>
+          <div><span>Dropped</span><strong id="metric-dropped">0 ms</strong></div>
+        </aside>
+
+        <div class="hint">The orange proxy is interpolated between 60 Hz Rapier frames.</div>
+      </section>
+
+      <aside class="control-panel">
+        <div>
+          <p class="kicker">Deterministic runtime shell</p>
+          <h2>One clock.<br />No surprises.</h2>
+          <p class="intro">
+            Rendering follows the display. Gameplay advances only in fixed 1/60-second steps.
+          </p>
+        </div>
+
+        <section class="controls">
+          <button id="start-race" class="primary" type="button">Start simulation</button>
+          <button id="finish-race" type="button" disabled>Finish race</button>
+          <button id="back-menu" type="button" disabled>Back to menu</button>
+          <button id="reset-demo" type="button">Reset body</button>
+        </section>
+
+        <section class="toggles">
+          <label><input id="debug-camera" type="checkbox" /> Debug orbit camera</label>
+          <label><input id="debug-colliders" type="checkbox" /> Rapier colliders</label>
+        </section>
+
+        <section class="asset-loader">
+          <div class="section-label">Worker asset boundary</div>
+          <label class="file-picker">
+            <span>Parse local DFF / TXD / BSP</span>
+            <input id="asset-files" type="file" accept=".dff,.txd,.bsp" multiple />
+          </label>
+          <p id="asset-status">Assets stay local. Typed arrays return from the loading Worker as transferables.</p>
+        </section>
+
+        <footer>
+          <span id="runtime-status">Preparing WebAssembly…</span>
+          <span>R resets · D toggles debug</span>
+        </footer>
+      </aside>
+    </main>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

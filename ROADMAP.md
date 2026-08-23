@@ -1,6 +1,7 @@
 # Mashed: Fully Loaded — browser revival roadmap
 
-Статус: рабочая версия v0.3  
+Статус: рабочая версия v0.4
+
 Цель документа: удерживать техническое направление, границы проекта и измеримые критерии готовности.
 
 ## 1. Цель проекта
@@ -180,22 +181,32 @@ loading Worker во время runtime; обязательная предвар�
 
 ### Этап 3. Каркас runtime — 1–2 недели
 
+Прогресс и проверяемые runtime-контракты: [reference/RUNTIME_FOUNDATION.md](./reference/RUNTIME_FOUNDATION.md).
+
 Задачи:
 
-- Fixed-step simulation с шагом 1/60 секунды.
-- Раздельные render loop и simulation loop.
-- Интерполяция render transforms между physics frames.
-- State machine: boot → loading → menu → race → results.
-- Унифицированная система событий между core, audio и renderer.
-- Debug overlay: FPS, frame time, physics time, draw calls, bodies и contacts.
-- Debug camera и отображение Rapier colliders.
-- Seeded random generator для игрового core.
+- [x] Fixed-step simulation с шагом 1/60 секунды.
+- [x] Раздельные render loop и simulation loop.
+- [x] Интерполяция render transforms между physics frames.
+- [x] State machine: boot → loading → menu → race → results.
+- [x] Унифицированная система событий между core, audio и renderer.
+- [x] Debug overlay: FPS, frame time, physics time, draw calls, bodies и contacts.
+- [x] Debug camera и отображение Rapier colliders.
+- [x] Seeded random generator для игрового core.
 
 Критерий готовности:
 
 - Симуляция не зависит от частоты монитора.
 - При 30, 60 и 120 Hz один replay приводит к одинаковому результату.
 - Потеря фокуса или длинный кадр не вызывает «взрыва» физики.
+
+Статус 2026-08-23: **этап 3 завершён**. Чистое ядро выделено в `@mashed/core`, запись
+input frames — в `@mashed/replay`, Rapier/Web Audio/Three.js подключены через отдельные адаптеры.
+Replay с одним seed и input tape даёт побитово одинаковое итоговое состояние при synthetic
+presentation clocks 30/60/120 Hz. Catch-up ограничен восемью шагами, потерянное время учитывается
+в telemetry, а focus/visibility transitions сбрасывают presentation clock. Browser smoke подтвердил
+WebGL/WASM boot, весь state flow, остановку simulation в results, debug camera/colliders и отсутствие
+ошибок консоли. Loading Worker разбирает DFF/TXD/BSP и возвращает typed arrays как transferables.
 
 ### Этап 4. Управление автомобилем — 3–6 недель
 

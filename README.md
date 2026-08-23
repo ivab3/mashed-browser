@@ -4,10 +4,12 @@ Clean-room browser reimplementation of _Mashed: Fully Loaded_. The repository co
 new code, schemas, documentation, and metadata. Original executable and game assets must come
 from a user-owned disc image or installed copy and are always kept below ignored `game-data/`.
 
-Milestone **M0: Asset feasibility** is complete. Stage 1 provides a reproducible local extraction
-pipeline; Stage 2 provides RenderWare DFF/TXD readers, full graphical/collision BSP sector parsing,
-and a Three.js asset viewer. [ADR-0001](./reference/ADR-0001-runtime-asset-loading.md) selects direct
-runtime parsing in a loading Worker instead of mandatory pre-conversion.
+Milestone **M0: Asset feasibility** and the Stage 3 runtime foundation are complete. Stage 1 provides
+a reproducible local extraction pipeline; Stage 2 provides RenderWare DFF/TXD readers, full
+graphical/collision BSP sector parsing, and a Three.js asset viewer. Stage 3 adds a deterministic
+fixed-step core, replay checks, Rapier/Three.js/Web Audio adapters, debug tooling, and the browser
+runtime shell. [ADR-0001](./reference/ADR-0001-runtime-asset-loading.md) selects direct runtime
+parsing in a loading Worker instead of mandatory pre-conversion.
 
 ## Requirements
 
@@ -32,6 +34,7 @@ An installed directory containing exactly one `MFL.exe` can be used instead of a
 ```bash
 pnpm typecheck
 pnpm test
+pnpm build
 ```
 
 Project direction, gates, and scope live in [`ROADMAP.md`](./ROADMAP.md). Reference-build
@@ -61,3 +64,16 @@ pnpm asset-viewer
 
 Current findings and the remaining Stage 2 questions are tracked in
 [`reference/ASSET_SPIKE.md`](./reference/ASSET_SPIKE.md).
+
+## Run the Stage 3 runtime
+
+```bash
+pnpm web
+```
+
+The shell demonstrates the `boot → loading → menu → race → results` flow, a 60 Hz fixed simulation
+clock with interpolated presentation transforms, a live telemetry overlay, an orbit debug camera,
+and Rapier collider lines. Local DFF/TXD/BSP files can be parsed through the loading Worker; original
+bytes remain local and parsed typed arrays are transferred back without cloning. See
+[`reference/RUNTIME_FOUNDATION.md`](./reference/RUNTIME_FOUNDATION.md) for runtime contracts and
+acceptance evidence.

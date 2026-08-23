@@ -1,0 +1,23 @@
+{
+  "name": "@mashed/renderer",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json",
+    "test": "vitest run --passWithNoTests"
+  },
+  "dependencies": {
+    "@mashed/core": "workspace:*",
+    "@mashed/physics": "workspace:*",
+    "three": "^0.179.1"
+  },
+  "devDependencies": {
+    "@types/three": "^0.179.0",
+    "typescript": "^5.7.0",
+    "vitest": "^2.1.0"
+  }
+}

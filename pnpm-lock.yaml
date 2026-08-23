@@ -43,11 +43,121 @@ importers:
         specifier: ^2.1.0
         version: 2.1.9(@types/node@20.19.43)
 
+  apps/web:
+    dependencies:
+      '@mashed/assets':
+        specifier: workspace:*
+        version: link:../../packages/assets
+      '@mashed/audio':
+        specifier: workspace:*
+        version: link:../../packages/audio
+      '@mashed/core':
+        specifier: workspace:*
+        version: link:../../packages/core
+      '@mashed/physics':
+        specifier: workspace:*
+        version: link:../../packages/physics
+      '@mashed/renderer':
+        specifier: workspace:*
+        version: link:../../packages/renderer
+      '@mashed/replay':
+        specifier: workspace:*
+        version: link:../../packages/replay
+      three:
+        specifier: ^0.179.1
+        version: 0.179.1
+    devDependencies:
+      '@types/three':
+        specifier: ^0.179.0
+        version: 0.179.0
+      typescript:
+        specifier: ^5.7.0
+        version: 5.9.3
+      vite:
+        specifier: ^7.1.3
+        version: 7.3.6(@types/node@20.19.43)(tsx@4.23.12)
+      vitest:
+        specifier: ^2.1.0
+        version: 2.1.9(@types/node@20.19.43)
+
   packages/assets:
     devDependencies:
       '@types/node':
         specifier: ^20.17.0
         version: 20.19.43
+      typescript:
+        specifier: ^5.7.0
+        version: 5.9.3
+      vitest:
+        specifier: ^2.1.0
+        version: 2.1.9(@types/node@20.19.43)
+
+  packages/audio:
+    dependencies:
+      '@mashed/core':
+        specifier: workspace:*
+        version: link:../core
+    devDependencies:
+      typescript:
+        specifier: ^5.7.0
+        version: 5.9.3
+      vitest:
+        specifier: ^2.1.0
+        version: 2.1.9(@types/node@20.19.43)
+
+  packages/core:
+    devDependencies:
+      typescript:
+        specifier: ^5.7.0
+        version: 5.9.3
+      vitest:
+        specifier: ^2.1.0
+        version: 2.1.9(@types/node@20.19.43)
+
+  packages/physics:
+    dependencies:
+      '@dimforge/rapier3d-compat':
+        specifier: ^0.20.0
+        version: 0.20.0
+      '@mashed/core':
+        specifier: workspace:*
+        version: link:../core
+    devDependencies:
+      typescript:
+        specifier: ^5.7.0
+        version: 5.9.3
+      vitest:
+        specifier: ^2.1.0
+        version: 2.1.9(@types/node@20.19.43)
+
+  packages/renderer:
+    dependencies:
+      '@mashed/core':
+        specifier: workspace:*
+        version: link:../core
+      '@mashed/physics':
+        specifier: workspace:*
+        version: link:../physics
+      three:
+        specifier: ^0.179.1
+        version: 0.179.1
+    devDependencies:
+      '@types/three':
+        specifier: ^0.179.0
+        version: 0.179.0
+      typescript:
+        specifier: ^5.7.0
+        version: 5.9.3
+      vitest:
+        specifier: ^2.1.0
+        version: 2.1.9(@types/node@20.19.43)
+
+  packages/replay:
+    dependencies:
+      '@mashed/core':
+        specifier: workspace:*
+        version: link:../core
+    devDependencies:
       typescript:
         specifier: ^5.7.0
         version: 5.9.3
@@ -61,6 +171,9 @@ packages:
 
   '@dimforge/rapier3d-compat@0.12.0':
     resolution: {integrity: sha512-uekIGetywIgopfD97oDL5PfeezkFpNhwlzlaEYNOA0N6ghdsOvh/HYjSMek5Q2O1PYvRSDFcqFVJl4r4ZBwOow==}
+
+  '@dimforge/rapier3d-compat@0.20.0':
+    resolution: {integrity: sha512-X4W9pJBdGRX5CO3c/gUNjBFEFG2fn4nYxp9k8STdBDaLa0/w5XTW2ArpayS+9jGFojTi3uFSOWAElCd4rkpekA==}
 
   '@esbuild/aix-ppc64@0.21.5':
     resolution: {integrity: sha512-1SDgH6ZSPTlggy1yI6+Dbkiz8xzpHJEVAlF/AM1tHPLsf5STom9rwtjE4hKAF20FfXXNTFqEYXyJNWh1GiZedQ==}
@@ -806,6 +919,8 @@ packages:
 snapshots:
 
   '@dimforge/rapier3d-compat@0.12.0': {}
+
+  '@dimforge/rapier3d-compat@0.20.0': {}
 
   '@esbuild/aix-ppc64@0.21.5':
     optional: true
