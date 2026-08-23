@@ -12,11 +12,30 @@ import {
   type RenderWareTrackTextureDictionary,
   type RenderWareTrackWorld,
 } from "./renderware-track.js";
+import {
+  buildRenderWareModel,
+  type RenderWareModel,
+} from "./renderware-model.js";
 
 export type {
   RenderWareTrackTextureDictionary,
   RenderWareTrackWorld,
 } from "./renderware-track.js";
+export type { RenderWareModel } from "./renderware-model.js";
+
+function disposeRenderableRoot(root: THREE.Object3D): void {
+  root.traverse((object) => {
+    if (!(object instanceof THREE.Mesh)) {
+      return;
+    }
+    object.geometry.dispose();
+    if (Array.isArray(object.material)) {
+      object.material.forEach((material) => material.dispose());
+    } else {
+      object.material.dispose();
+    }
+  });
+}
 
 export interface RenderFrame {
   history: PhysicsTransformHistory;
@@ -49,6 +68,19 @@ export interface TrackRenderStats {
   missingTextureNames: readonly string[];
 }
 
+export interface CourseModelSource {
+  name: string;
+  model: RenderWareModel;
+}
+
+export interface CourseRenderStats {
+  models: number;
+  skippedLocalTemplates: number;
+  atomics: number;
+  triangles: number;
+  missingTextureNames: readonly string[];
+}
+
 export class RuntimeRenderer {
   readonly #renderer: THREE.WebGLRenderer;
   readonly #scene = new THREE.Scene();
@@ -68,6 +100,8 @@ export class RuntimeRenderer {
   #debugCameraEnabled = false;
   #trackRoot: THREE.Group | undefined;
   #trackTextures: THREE.DataTexture[] = [];
+  #trackTextureMap: ReadonlyMap<string, THREE.DataTexture> = new Map();
+  #courseRoot: THREE.Group | undefined;
   #trackRoute: THREE.LineLoop | undefined;
 
   constructor(viewport: HTMLElement, events: RuntimeEventBus) {
@@ -241,6 +275,7 @@ export class RuntimeRenderer {
     const track = buildRenderWareTrack(world, dictionary);
     this.#trackRoot = track.root;
     this.#trackTextures = track.textures;
+    this.#trackTextureMap = track.textureMap;
     this.#scene.add(track.root);
     this.#demoRoot.visible = false;
     if (this.#scene.fog instanceof THREE.FogExp2) {
@@ -252,6 +287,49 @@ export class RuntimeRenderer {
       textures: track.textureCount,
       missingTextureNames: track.missingTextureNames,
     };
+  }
+
+  setCourseModels(sources: readonly CourseModelSource[]): CourseRenderStats {
+    this.clearCourseModels();
+    const root = new THREE.Group();
+    root.name = "loaded-course-models";
+    let models = 0;
+    let skippedLocalTemplates = 0;
+    let atomics = 0;
+    let triangles = 0;
+    const missingTextureNames = new Set<string>();
+    for (const source of sources) {
+      const built = buildRenderWareModel(source.model, this.#trackTextureMap);
+      built.root.name = source.name;
+      if (built.placement === "local-template") {
+        disposeRenderableRoot(built.root);
+        skippedLocalTemplates += 1;
+        continue;
+      }
+      root.add(built.root);
+      models += 1;
+      atomics += built.atomics;
+      triangles += built.triangles;
+      built.missingTextureNames.forEach((name) => missingTextureNames.add(name));
+    }
+    this.#courseRoot = root;
+    this.#scene.add(root);
+    return {
+      models,
+      skippedLocalTemplates,
+      atomics,
+      triangles,
+      missingTextureNames: [...missingTextureNames],
+    };
+  }
+
+  clearCourseModels(): void {
+    if (!this.#courseRoot) {
+      return;
+    }
+    this.#scene.remove(this.#courseRoot);
+    disposeRenderableRoot(this.#courseRoot);
+    this.#courseRoot = undefined;
   }
 
   setTrackRoute(points: readonly TrackRoutePoint[]): void {
@@ -279,24 +357,17 @@ export class RuntimeRenderer {
   }
 
   clearTrackGeometry(): void {
+    this.clearCourseModels();
     if (this.#trackRoot) {
       this.#scene.remove(this.#trackRoot);
-      this.#trackRoot.traverse((object) => {
-        if (object instanceof THREE.Mesh) {
-          object.geometry.dispose();
-          if (Array.isArray(object.material)) {
-            object.material.forEach((material) => material.dispose());
-          } else {
-            object.material.dispose();
-          }
-        }
-      });
+      disposeRenderableRoot(this.#trackRoot);
       this.#trackRoot = undefined;
     }
     for (const texture of this.#trackTextures) {
       texture.dispose();
     }
     this.#trackTextures = [];
+    this.#trackTextureMap = new Map();
     this.#demoRoot.visible = true;
     if (this.#scene.fog instanceof THREE.FogExp2) {
       this.#scene.fog.density = 0.025;

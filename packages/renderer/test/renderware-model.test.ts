@@ -1,0 +1,58 @@
+import * as THREE from "three";
+import { describe, expect, it } from "vitest";
+
+import {
+  buildRenderWareModel,
+  renderWareFrameMatrices,
+  type RenderWareModel,
+} from "../src/renderware-model.js";
+
+function model(frameX: number): RenderWareModel {
+  return {
+    frames: [
+      {
+        right: [1, 0, 0],
+        up: [0, 1, 0],
+        at: [0, 0, 1],
+        position: [frameX, 0, 0],
+        parentIndex: -1,
+      },
+      {
+        right: [1, 0, 0],
+        up: [0, 1, 0],
+        at: [0, 0, 1],
+        position: [2, 0, 0],
+        parentIndex: 0,
+      },
+    ],
+    geometries: [{
+      format: 0,
+      vertexCount: 3,
+      triangleCount: 1,
+      uvSets: [],
+      indices: new Uint32Array([0, 1, 2]),
+      triangleMaterialIndices: new Uint16Array([0]),
+      morphTargets: [{
+        positions: new Float32Array([0, 0, 0, 1, 0, 0, 0, 0, 1]),
+      }],
+      materials: [{ color: [255, 255, 255, 255], surfaceProperties: { specular: 0 } }],
+    }],
+    atomics: [{ frameIndex: 1, geometryIndex: 0 }],
+  };
+}
+
+describe("RenderWare DFF model builder", () => {
+  it("resolves frame hierarchies and recognizes authored world placement", () => {
+    const matrices = renderWareFrameMatrices(model(12).frames);
+    expect(new THREE.Vector3().setFromMatrixPosition(matrices[1]!).toArray()).toEqual([14, 0, 0]);
+
+    const built = buildRenderWareModel(model(12), new Map());
+    expect(built).toMatchObject({ atomics: 1, triangles: 1, placement: "world-authored" });
+    const mesh = built.root.children[0] as THREE.Mesh;
+    expect(new THREE.Vector3().setFromMatrixPosition(mesh.matrix).toArray()).toEqual([14, 0, 0]);
+  });
+
+  it("keeps small origin-centered models classified as instance templates", () => {
+    expect(buildRenderWareModel(model(0), new Map()).placement).toBe("local-template");
+  });
+});

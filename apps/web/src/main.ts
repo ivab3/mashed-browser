@@ -1,9 +1,12 @@
 import { AudioRuntime } from "@mashed/audio";
 import {
   deriveTrackDefinition,
+  parseCourseLua,
   parseLapDataLua,
   type BspWorld,
+  type CourseDefinition,
   type DerivedTrackDefinition,
+  type DffModel,
   type LapDataDefinition,
   type PiTextureDictionary,
 } from "@mashed/assets";
@@ -91,7 +94,9 @@ const trackParts: {
   graphics?: BspWorld;
   lapData?: LapDataDefinition;
   textures?: PiTextureDictionary;
+  course?: CourseDefinition;
 } = {};
+const loadedDffs = new Map<string, DffModel>();
 let physics: PhysicsRuntime | undefined;
 let trackDefinition: DerivedTrackDefinition | undefined;
 let lapSession: LapSession | undefined;
@@ -187,6 +192,26 @@ function bindTrackParts(): string[] {
       `${rendered.triangles.toLocaleString()} visible triangles · ${rendered.materials} materials · ${rendered.textures} textures${rendered.missingTextureNames.length > 0 ? ` · ${rendered.missingTextureNames.length} missing maps` : ""}`,
     );
   }
+  if (trackParts.course) {
+    const courseNames = new Map<string, string>();
+    for (const asset of [
+      ...trackParts.course.clumps.map((clump) => clump.fileName),
+      ...trackParts.course.skies.map((sky) => sky.fileName),
+      ...(trackParts.course.lightsFileName ? [trackParts.course.lightsFileName] : []),
+    ]) {
+      courseNames.set(asset.toLocaleLowerCase("en-US"), asset);
+    }
+    const models = [...courseNames].flatMap(([normalized, name]) => {
+      const model = loadedDffs.get(normalized);
+      return model ? [{ name, model }] : [];
+    });
+    const rendered = renderer.setCourseModels(models);
+    if (models.length > 0) {
+      bound.push(
+        `${rendered.models}/${models.length} world-authored DFFs · ${rendered.atomics} atomics · ${rendered.triangles.toLocaleString()} triangles${rendered.skippedLocalTemplates > 0 ? ` · ${rendered.skippedLocalTemplates} local templates skipped` : ""}${rendered.missingTextureNames.length > 0 ? ` · ${rendered.missingTextureNames.length} missing DFF maps` : ""}`,
+      );
+    }
+  }
   if (trackParts.ai && trackParts.lapData && physics) {
     trackDefinition = deriveTrackDefinition(trackParts.ai, trackParts.lapData);
     lapSession = new LapSession(trackDefinition);
@@ -215,8 +240,14 @@ assetInput.addEventListener("change", () => {
             summaries.push(
               `${file.name}: ${trackParts.lapData.line.length} line anchors · ${trackParts.lapData.splitCheckpointIds.length} splits, ${(performance.now() - startedAt).toFixed(1)} ms`,
             );
+          } else if (/course/i.test(file.name)) {
+            const startedAt = performance.now();
+            trackParts.course = parseCourseLua(await file.text());
+            summaries.push(
+              `${file.name}: course ${trackParts.course.id} · ${trackParts.course.clumps.length} clumps · ${trackParts.course.objectTemplates.length} object templates, ${(performance.now() - startedAt).toFixed(1)} ms`,
+            );
           } else {
-            summaries.push(`${file.name}: ignored (only LAPDATA.LUA is declarative track metadata)`);
+            summaries.push(`${file.name}: ignored (supported metadata: COURSE.LUA and LAPDATA.LUA)`);
           }
           continue;
         }
@@ -228,6 +259,9 @@ assetInput.addEventListener("change", () => {
         } else if (result.asset.kind === "txd") {
           trackParts.textures = result.asset.data;
           role = "track textures";
+        } else if (result.asset.kind === "dff") {
+          loadedDffs.set(file.name.toLocaleLowerCase("en-US"), result.asset.data);
+          role = "course model candidate";
         }
         summaries.push(
           `${file.name}: ${assetSummary(result.asset)}, ${result.parseMilliseconds.toFixed(1)} ms, ${formatBytes(result.transferredBytes)} transferred${role ? ` · ${role}` : ""}`,

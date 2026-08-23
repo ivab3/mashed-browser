@@ -70,6 +70,7 @@ export interface RenderWareTrackTextureDictionary {
 export interface RenderWareTrackBuild {
   root: THREE.Group;
   textures: THREE.DataTexture[];
+  textureMap: ReadonlyMap<string, THREE.DataTexture>;
   triangleCount: number;
   materialCount: number;
   textureCount: number;
@@ -150,7 +151,7 @@ function fallbackMaterial(): RenderWareTrackMaterial {
   };
 }
 
-function materialsFor(
+export function buildRenderWareMaterials(
   sourceMaterials: readonly RenderWareTrackMaterial[],
   textures: ReadonlyMap<string, THREE.DataTexture>,
   hasVertexColors: boolean,
@@ -286,7 +287,10 @@ export function groupSectorMaterials(
   geometry.setIndex(new THREE.BufferAttribute(flattened, 1));
 }
 
-function colorAttribute(colors: Uint8Array | undefined, vertexCount: number): Float32Array | undefined {
+export function renderWareColorAttribute(
+  colors: Uint8Array | undefined,
+  vertexCount: number,
+): Float32Array | undefined {
   if (!colors) {
     return undefined;
   }
@@ -318,7 +322,7 @@ export function buildRenderWareTrack(
     } else {
       geometry.computeVertexNormals();
     }
-    const colors = colorAttribute(sector.colors, sector.vertexCount);
+    const colors = renderWareColorAttribute(sector.colors, sector.vertexCount);
     if (colors) {
       geometry.setAttribute("color", new THREE.BufferAttribute(colors, 3));
     }
@@ -328,7 +332,12 @@ export function buildRenderWareTrack(
     if (sector.uvSets[1]) {
       geometry.setAttribute("uv1", new THREE.BufferAttribute(sector.uvSets[1], 2));
     }
-    const materials = materialsFor(world.materials, textureSet.byName, colors !== undefined, world.header.format);
+    const materials = buildRenderWareMaterials(
+      world.materials,
+      textureSet.byName,
+      colors !== undefined,
+      world.header.format,
+    );
     groupSectorMaterials(geometry, sector, materials.length);
     const mesh = new THREE.Mesh(geometry, materials);
     mesh.name = `track-sector-${sector.index}`;
@@ -355,6 +364,7 @@ export function buildRenderWareTrack(
   return {
     root,
     textures: textureSet.owned,
+    textureMap: textureSet.byName,
     triangleCount,
     materialCount: world.materials.length,
     textureCount: textureSet.owned.length,
