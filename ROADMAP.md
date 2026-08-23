@@ -145,16 +145,18 @@ Gate A — продолжать проект только если extraction п
 
 Это главный технический риск проекта, поэтому он идёт до игрового UI и меню.
 
+Прогресс и технические наблюдения: [reference/ASSET_SPIKE.md](./reference/ASSET_SPIKE.md).
+
 Задачи:
 
-- Извлечь внутреннее содержимое одного архива машины и одной трассы.
-- Загрузить DFF-модель машины и TXD-текстуры.
-- Определить RenderWare coordinate system, scale, winding и material flags.
-- Разобрать `GRAPHICS.BSP` хотя бы до вершин, индексов, материалов и текстур.
-- Разобрать `COLLIDE.BSP` до статической collision mesh.
-- Проверить DXT/palette/alpha-варианты текстур.
-- Сделать отдельный asset viewer с сеткой, осями, wireframe и выбором chunks.
-- Решить, читаем ли форматы в runtime или конвертируем заранее в glTF/KTX2/custom binary.
+- [x] Извлечь внутреннее содержимое одного архива машины и одной трассы.
+- [x] Загрузить DFF-модель машины и TXD-текстуры.
+- [x] Определить RenderWare coordinate system, scale, winding и material flags.
+- [x] Разобрать `GRAPHICS.BSP` хотя бы до вершин, индексов, материалов и текстур.
+- [x] Разобрать `COLLIDE.BSP` до статической collision mesh.
+- [x] Проверить DXT/palette/alpha-варианты текстур.
+- [x] Сделать отдельный asset viewer с сеткой, осями, wireframe и выбором chunks.
+- [x] Решить, читаем ли форматы в runtime или конвертируем заранее в glTF/KTX2/custom binary.
 
 Критерий готовности:
 
@@ -167,6 +169,14 @@ Gate B:
 
 - Если BSP разбирается — продолжаем с оригинальными трассами.
 - Если BSP остаётся непрозрачным — отдельно оцениваем ручной конвертер, анализ загрузчика в `MFL.exe` или пересборку трасс. До решения не расширяем игровой код.
+
+Статус 2026-08-23: **Этап 2 и Gate B завершены**. Graphical и collision BSP разбираются и
+совмещаются; coordinate/scale/winding, material/MatFX semantics и texture variants закреплены в
+reader и viewer. Проверены все 78 TXD: PC palette4/palette8/RGBA32 декодируются, alpha/mip
+semantics применяются, DXT/BC в корпусе не найден. По
+[ADR-0001](./reference/ADR-0001-runtime-asset-loading.md) оригинальные PC DFF/TXD/BSP читаются в
+loading Worker во время runtime; обязательная предварительная конвертация отложена до
+подтверждённой profiling-потребности.
 
 ### Этап 3. Каркас runtime — 1–2 недели
 
@@ -322,7 +332,7 @@ Milestone M4: release candidate.
 - Загрузить TXD и показать одну текстуру.
 - Загрузить DFF и показать автомобиль.
 - Добавить axes, orbit camera, wireframe и material inspection.
-- Начать разбор `GRAPHICS.BSP` и `COLLIDE.BSP`.
+- Разобрать `GRAPHICS.BSP` и добавить overlay для `COLLIDE.BSP`.
 
 Результат двух спринтов:
 

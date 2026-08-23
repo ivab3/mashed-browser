@@ -4,8 +4,10 @@ Clean-room browser reimplementation of _Mashed: Fully Loaded_. The repository co
 new code, schemas, documentation, and metadata. Original executable and game assets must come
 from a user-owned disc image or installed copy and are always kept below ignored `game-data/`.
 
-The current milestone is **M0: Asset feasibility**. Stage 1 provides a reproducible local
-extraction pipeline; the renderer and asset viewer begin in Stage 2.
+Milestone **M0: Asset feasibility** is complete. Stage 1 provides a reproducible local extraction
+pipeline; Stage 2 provides RenderWare DFF/TXD readers, full graphical/collision BSP sector parsing,
+and a Three.js asset viewer. [ADR-0001](./reference/ADR-0001-runtime-asset-loading.md) selects direct
+runtime parsing in a loading Worker instead of mandatory pre-conversion.
 
 ## Requirements
 
@@ -34,3 +36,28 @@ pnpm test
 
 Project direction, gates, and scope live in [`ROADMAP.md`](./ROADMAP.md). Reference-build
 metadata and acceptance scenarios live in [`REFERENCE.md`](./REFERENCE.md).
+
+## Inspect Stage 2 fixtures
+
+The probe reads extracted local files without copying them into the repository or web build:
+
+```bash
+pnpm assets:probe --dff ./game-data/expanded/piz/TOASTART/VEHICLES/Wildfire/WILDFIRE4.DFF
+pnpm assets:probe --txd ./game-data/expanded/piz/TOASTART/VEHICLES/Wildfire/WILDFIRE.TXD
+pnpm assets:probe --bsp ./game-data/expanded/piz/TOASTART/TRACKS/Warzone/GRAPHICS.BSP
+```
+
+Probe output includes geometry formats, material/MatFX semantics, texture sampling flags, decoded
+pixel/alpha formats, winding agreement, and frame-basis determinants. For PS2/Xbox native TXD it
+reports platform headers instead of mis-decoding their native rasters. Mashed standalone DFF clumps
+are shown at their confirmed `×5` world scale; BSP coordinates remain unscaled.
+
+Launch the viewer and select either a matching DFF/TXD pair or `GRAPHICS.BSP`, its TXD, and an
+optional `COLLIDE.BSP`/`COLLISIONS.BSP` overlay through the local file controls:
+
+```bash
+pnpm asset-viewer
+```
+
+Current findings and the remaining Stage 2 questions are tracked in
+[`reference/ASSET_SPIKE.md`](./reference/ASSET_SPIKE.md).

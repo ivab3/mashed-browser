@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Mashed Asset Viewer</title>
+  </head>
+  <body>
+    <main>
+      <aside class="panel">
+        <div class="eyebrow">Mashed · Stage 2</div>
+        <h1>Asset viewer</h1>
+        <p class="intro">Open extracted RenderWare models or worlds. Original assets remain local and are never copied into the build.</p>
+
+        <div class="file-pickers">
+          <label class="file-picker">
+            <span>Open DFF</span>
+            <input id="asset-file" type="file" accept=".dff" />
+          </label>
+          <label class="file-picker">
+            <span>Open TXD</span>
+            <input id="texture-file" type="file" accept=".txd" />
+          </label>
+          <label class="file-picker">
+            <span>Open BSP</span>
+            <input id="world-file" type="file" accept=".bsp" />
+          </label>
+          <label class="file-picker">
+            <span>Collision BSP</span>
+            <input id="collision-file" type="file" accept=".bsp" />
+          </label>
+        </div>
+
+        <div class="toolbar" aria-label="Viewport controls">
+          <label><input id="show-grid" type="checkbox" checked /> Grid</label>
+          <label><input id="show-axes" type="checkbox" checked /> Axes</label>
+          <label><input id="wireframe" type="checkbox" /> Wireframe</label>
+          <label><input id="show-collision" type="checkbox" checked disabled /> Collision</label>
+          <button id="reset-camera" type="button">Frame asset</button>
+        </div>
+
+        <section class="summary" aria-live="polite">
+          <div id="asset-name" class="asset-name">No asset loaded</div>
+          <div id="texture-name" class="texture-name">No texture dictionary loaded</div>
+          <div id="collision-name" class="collision-name">No collision world loaded</div>
+          <div id="asset-stats" class="asset-stats">Choose a vehicle DFF or track BSP to inspect it.</div>
+          <div id="asset-error" class="asset-error" hidden></div>
+        </section>
+
+        <section>
+          <h2 id="chunk-title">Chunks</h2>
+          <div id="chunk-list" class="chunk-list"><div class="empty">Nothing to show yet.</div></div>
+        </section>
+      </aside>
+      <section id="viewport" class="viewport" aria-label="3D asset viewport"></section>
+    </main>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

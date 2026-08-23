@@ -9,6 +9,8 @@
   "scripts": {
     "extract": "node --import tsx tools/extractor/src/cli.ts extract",
     "assets:inspect": "node --import tsx tools/extractor/src/cli.ts inspect",
+    "assets:probe": "node --import tsx packages/assets/src/probe.ts",
+    "asset-viewer": "pnpm --filter @mashed/asset-viewer dev",
     "typecheck": "pnpm -r typecheck",
     "test": "pnpm -r test"
   },
