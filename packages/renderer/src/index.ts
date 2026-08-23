@@ -7,6 +7,17 @@ import type {
 import * as THREE from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 
+import {
+  buildRenderWareTrack,
+  type RenderWareTrackTextureDictionary,
+  type RenderWareTrackWorld,
+} from "./renderware-track.js";
+
+export type {
+  RenderWareTrackTextureDictionary,
+  RenderWareTrackWorld,
+} from "./renderware-track.js";
+
 export interface RenderFrame {
   history: PhysicsTransformHistory;
   interpolationAlpha: number;
@@ -31,6 +42,13 @@ export interface TrackRoutePoint {
   center: readonly [number, number, number];
 }
 
+export interface TrackRenderStats {
+  triangles: number;
+  materials: number;
+  textures: number;
+  missingTextureNames: readonly string[];
+}
+
 export class RuntimeRenderer {
   readonly #renderer: THREE.WebGLRenderer;
   readonly #scene = new THREE.Scene();
@@ -49,6 +67,7 @@ export class RuntimeRenderer {
   #flashRemainingSeconds = 0;
   #debugCameraEnabled = false;
   #trackRoot: THREE.Group | undefined;
+  #trackTextures: THREE.DataTexture[] = [];
   #trackRoute: THREE.LineLoop | undefined;
 
   constructor(viewport: HTMLElement, events: RuntimeEventBus) {
@@ -214,6 +233,27 @@ export class RuntimeRenderer {
     return triangleCount;
   }
 
+  setTrackWorld(
+    world: RenderWareTrackWorld,
+    dictionary?: RenderWareTrackTextureDictionary,
+  ): TrackRenderStats {
+    this.clearTrackGeometry();
+    const track = buildRenderWareTrack(world, dictionary);
+    this.#trackRoot = track.root;
+    this.#trackTextures = track.textures;
+    this.#scene.add(track.root);
+    this.#demoRoot.visible = false;
+    if (this.#scene.fog instanceof THREE.FogExp2) {
+      this.#scene.fog.density = 0.008;
+    }
+    return {
+      triangles: track.triangleCount,
+      materials: track.materialCount,
+      textures: track.textureCount,
+      missingTextureNames: track.missingTextureNames,
+    };
+  }
+
   setTrackRoute(points: readonly TrackRoutePoint[]): void {
     if (this.#trackRoute) {
       this.#scene.remove(this.#trackRoute);
@@ -253,6 +293,10 @@ export class RuntimeRenderer {
       });
       this.#trackRoot = undefined;
     }
+    for (const texture of this.#trackTextures) {
+      texture.dispose();
+    }
+    this.#trackTextures = [];
     this.#demoRoot.visible = true;
     if (this.#scene.fog instanceof THREE.FogExp2) {
       this.#scene.fog.density = 0.025;

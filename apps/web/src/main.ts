@@ -5,6 +5,7 @@ import {
   type BspWorld,
   type DerivedTrackDefinition,
   type LapDataDefinition,
+  type PiTextureDictionary,
 } from "@mashed/assets";
 import {
   FixedStepClock,
@@ -89,6 +90,7 @@ const trackParts: {
   collision?: BspWorld;
   graphics?: BspWorld;
   lapData?: LapDataDefinition;
+  textures?: PiTextureDictionary;
 } = {};
 let physics: PhysicsRuntime | undefined;
 let trackDefinition: DerivedTrackDefinition | undefined;
@@ -180,8 +182,10 @@ function bindTrackParts(): string[] {
     bound.push(`${triangles.toLocaleString()} collision triangles`);
   }
   if (trackParts.graphics) {
-    const triangles = renderer.setTrackGeometry(trackParts.graphics.worldSectors);
-    bound.push(`${triangles.toLocaleString()} visible triangles`);
+    const rendered = renderer.setTrackWorld(trackParts.graphics, trackParts.textures);
+    bound.push(
+      `${rendered.triangles.toLocaleString()} visible triangles · ${rendered.materials} materials · ${rendered.textures} textures${rendered.missingTextureNames.length > 0 ? ` · ${rendered.missingTextureNames.length} missing maps` : ""}`,
+    );
   }
   if (trackParts.ai && trackParts.lapData && physics) {
     trackDefinition = deriveTrackDefinition(trackParts.ai, trackParts.lapData);
@@ -218,7 +222,13 @@ assetInput.addEventListener("change", () => {
         }
         const result = await assetLoader.load(file);
         loadedAssets.set(file.name.toLocaleLowerCase("en-US"), result.asset);
-        const role = result.asset.kind === "bsp" ? rememberBsp(file.name, result.asset.data) : undefined;
+        let role: string | undefined;
+        if (result.asset.kind === "bsp") {
+          role = rememberBsp(file.name, result.asset.data);
+        } else if (result.asset.kind === "txd") {
+          trackParts.textures = result.asset.data;
+          role = "track textures";
+        }
         summaries.push(
           `${file.name}: ${assetSummary(result.asset)}, ${result.parseMilliseconds.toFixed(1)} ms, ${formatBytes(result.transferredBytes)} transferred${role ? ` · ${role}` : ""}`,
         );
