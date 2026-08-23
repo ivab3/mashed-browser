@@ -1,0 +1,52 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://mashed-browser.local/schema/asset-manifest-v1.json",
+  "title": "Mashed extracted asset manifest",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "tool", "source", "files", "summary"],
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "tool": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "version"],
+      "properties": {
+        "name": { "const": "@mashed/extractor" },
+        "version": { "type": "string" }
+      }
+    },
+    "source": {
+      "type": "object",
+      "required": ["kind"],
+      "properties": {
+        "kind": { "enum": ["disc-image", "installed-directory"] }
+      }
+    },
+    "files": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["path", "type", "sizeBytes", "sha256", "origin"],
+        "properties": {
+          "path": { "type": "string", "pattern": "^(?!/)(?!.*(?:^|/)\\.\\.(?:/|$)).+$" },
+          "type": { "type": "string" },
+          "sizeBytes": { "type": "integer", "minimum": 0 },
+          "sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+          "origin": { "type": "object" },
+          "container": { "type": "object" }
+        }
+      }
+    },
+    "summary": {
+      "type": "object",
+      "required": ["fileCount", "totalSizeBytes", "byType", "required"],
+      "properties": {
+        "fileCount": { "type": "integer", "minimum": 0 },
+        "totalSizeBytes": { "type": "integer", "minimum": 0 },
+        "byType": { "type": "object" },
+        "required": { "type": "object" }
+      }
+    }
+  }
+}

@@ -1,0 +1,12 @@
+{
+  "name": "@mashed/extractor",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "extract": "node --import tsx src/cli.ts extract",
+    "assets:inspect": "node --import tsx src/cli.ts inspect",
+    "typecheck": "tsc -p tsconfig.json",
+    "test": "vitest run"
+  }
+}

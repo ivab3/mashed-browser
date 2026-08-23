@@ -1,0 +1,13 @@
+# Original game images and extracted data must never be committed.
+/Mashed - Fully Loaded*/
+game-data/
+/reference/captures/
+*.iso
+
+# Local/editor output.
+.DS_Store
+node_modules/
+dist/
+coverage/
+playwright-report/
+test-results/

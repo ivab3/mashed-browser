@@ -1,0 +1,39 @@
+{
+  "schemaVersion": 1,
+  "game": {
+    "title": "Mashed: Fully Loaded",
+    "edition": "Europe (En,Fr,De,Es,It)",
+    "languages": [
+      "English",
+      "French",
+      "German",
+      "Spanish",
+      "Italian"
+    ]
+  },
+  "discImage": {
+    "cue": {
+      "fileName": "Mashed - Fully Loaded (Europe) (En,Fr,De,Es,It).cue",
+      "sizeBytes": 113,
+      "sha256": "648ef84a0c2b8e417dc8d241f48bb62cc99e2a589612a22a0a65e3e606e5a248"
+    },
+    "bin": {
+      "fileName": "Mashed - Fully Loaded (Europe) (En,Fr,De,Es,It).bin",
+      "sizeBytes": 408876384,
+      "sha256": "a1a5c47132d0c3046ca6c8b864dfb2aa95d99c85931643f6691e49274a938e92"
+    },
+    "trackMode": "MODE1/2352",
+    "sectorCount": 173842,
+    "iso9660": {
+      "volumeId": "MFL",
+      "logicalBlockSize": 2048
+    }
+  },
+  "executable": {
+    "installerPath": "App Executables/MFL.exe",
+    "sizeBytes": 3129344,
+    "sha256": "442eaf35f7fd23f4a3da34de7db8594a2c90aaeeee07ace252793647579e0b65",
+    "format": "PE32",
+    "machine": "Intel 80386"
+  }
+}

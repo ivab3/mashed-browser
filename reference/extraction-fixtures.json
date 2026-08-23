@@ -1,0 +1,157 @@
+{
+  "schemaVersion": 1,
+  "sourceBuildSha256": "a1a5c47132d0c3046ca6c8b864dfb2aa95d99c85931643f6691e49274a938e92",
+  "fixtures": [
+    {
+      "id": "wildfire",
+      "archive": {
+        "path": "TOASTART/VEHICLES/Wildfire.piz",
+        "sizeBytes": 2498560,
+        "sha256": "a385086dcc4f93d6bb0a1d8ae3fc0de884216e035accf38a58c81f738d7461bf",
+        "entryCount": 16,
+        "appendix": "zero"
+      },
+      "entries": [
+        "WILDFIRE.TXD",
+        "WILDFIRE4.DFF",
+        "DEBRIS1.DFF",
+        "DEBRIS2.DFF",
+        "DEBRIS3.DFF",
+        "DEBRIS4.DFF",
+        "DEBRIS5.DFF",
+        "WILDFIRE0.DFF",
+        "WILDFIRE1.DFF",
+        "WILDFIRE2.DFF",
+        "WILDFIRE3.DFF",
+        "DEBRIS0.DFF",
+        "WILDFIRE5.DFF",
+        "WILDFIRELIGHTS.DFF",
+        "GHOST.DFF",
+        "PS2/WILDFIRE.TXD"
+      ],
+      "keyFiles": {
+        "WILDFIRE.TXD": {
+          "sizeBytes": 389244,
+          "sha256": "5acb1c2535de3a5ecb5a9ca3b8bc5d20ab2eed554b0275d1b62691da1542ce1d"
+        },
+        "WILDFIRE4.DFF": {
+          "sizeBytes": 280670,
+          "sha256": "f796c3a508d6f4caa74198da6cc614c702e3fce56458234abb0e2df9aded22f5"
+        }
+      }
+    },
+    {
+      "id": "warzone",
+      "archive": {
+        "path": "TOASTART/TRACKS/Warzone.piz",
+        "sizeBytes": 2983936,
+        "sha256": "99e4af82a52e6b687ba8622f1ac40bc70224605aadf17864f34eac0428dc0948",
+        "entryCount": 79,
+        "appendix": "cc"
+      },
+      "entries": [
+        "COLLIDE.BSP",
+        "GRAPHICS.BSP",
+        "AI1.BSP",
+        "WARZONE.TXD",
+        "LIGHTS.DFF",
+        "LAPDATA.LUA",
+        "COURSE.LUA",
+        "BOAT.DFF",
+        "RIVER.DFF",
+        "TOWER.DFF",
+        "TOWER.MTS",
+        "DECK.DFF",
+        "DECK.MTS",
+        "H_ANIM_1.ANM",
+        "H_ANIM_2.ANM",
+        "H_ANIM_3.ANM",
+        "H_ANIM_4.ANM",
+        "H_ANIM_5.ANM",
+        "CROSSTREE.DFF",
+        "CROSS.DFF",
+        "HSTONE.DFF",
+        "CROSS.MTS",
+        "HSTONE.MTS",
+        "OAKLEAF.MTS",
+        "OAKLEAF.MTS.TXT",
+        "OAKTRUNK.DFF",
+        "OAKTREES_1.MTS",
+        "OAKTREES_2.MTS",
+        "OAKTREES_2.MTS.TXT",
+        "OAKTREES_1.MTS.TXT",
+        "BLOCK.DFF",
+        "BLOCKS.MTS",
+        "BLOCKS.MTS.TXT",
+        "HORDOME.DFF",
+        "SKYDOME.DFF",
+        "CROSSTREES.MTS.TXT",
+        "CROSSTREES.MTS",
+        "GUNS.MTS.TXT",
+        "GUNS.MTS",
+        "CRATER_1.DFF",
+        "CRATER_2.DFF",
+        "CRATER_3.DFF",
+        "CRATER_4.DFF",
+        "CRATER_5.DFF",
+        "CRATER_6.DFF",
+        "CRATER_7.DFF",
+        "CRATER_8.DFF",
+        "CHUNK.DFF",
+        "HUT01.DFF",
+        "RBARREL.DFF",
+        "POST_A.DFF",
+        "POST_A.MTS",
+        "ADS.DFF",
+        "PYLON_H.DFF",
+        "PYLON_L.DFF",
+        "PYLON.MTS",
+        "FENCE_1.DFF",
+        "FENCE_2.DFF",
+        "FENCE_2.MTS",
+        "FENCE_2.MTS.TXT",
+        "POWERUPS_GOLD.DFF",
+        "BOATANIM.ANM",
+        "INTACTROOF.DFF",
+        "ROOFS.MTS",
+        "ROOFS.MTS.TXT",
+        "RBARREL.MTS",
+        "FADE_6.DFF",
+        "FADE_5.DFF",
+        "FADE_4.DFF",
+        "FADE_3.DFF",
+        "FADE_2.DFF",
+        "FADE_1.DFF",
+        "FADE_11.DFF",
+        "FADE_10.DFF",
+        "FADE_9.DFF",
+        "FADE_8.DFF",
+        "FADE_7.DFF",
+        "HUT01.MTS",
+        "BAATANIM.ANM"
+      ],
+      "keyFiles": {
+        "COLLIDE.BSP": {
+          "sizeBytes": 223030,
+          "sha256": "626e63a89fe8893502e27fb25f921506815c0ee1969cf220b946f50dd222f597"
+        },
+        "GRAPHICS.BSP": {
+          "sizeBytes": 1231680,
+          "sha256": "80d74eacabb962ac5c533e92b6d86787a660ee6c797a297074aecb9ac8f6a15c"
+        },
+        "WARZONE.TXD": {
+          "sizeBytes": 1101364,
+          "sha256": "dff7c797e6941dc654866c319f39ab8adf4851ef26354fcc16d236ba9803f477"
+        },
+        "COURSE.LUA": {
+          "sizeBytes": 8968,
+          "sha256": "5f237e42265842d715b6cfb9e029227234b2e7764be7af259c29eb285542a571"
+        },
+        "LAPDATA.LUA": {
+          "sizeBytes": 328,
+          "sha256": "f7e4bd446b751b95182eb89ea5f8067b653ce49140705c2ae537aa3079ea4ac3"
+        }
+      }
+    }
+  ]
+}
