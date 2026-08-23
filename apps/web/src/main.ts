@@ -63,6 +63,8 @@ const metricDropped = element<HTMLElement>("metric-dropped");
 const metricSpeed = element<HTMLElement>("metric-speed");
 const metricWheels = element<HTMLElement>("metric-wheels");
 const metricSurface = element<HTMLElement>("metric-surface");
+const metricObjects = element<HTMLElement>("metric-objects");
+const metricTrack = element<HTMLElement>("metric-track");
 
 const events = new RuntimeEventBus();
 const state = new RuntimeStateMachine(events);
@@ -142,8 +144,11 @@ assetInput.addEventListener("change", () => {
       for (const file of files) {
         const result = await assetLoader.load(file);
         loadedAssets.set(file.name, result.asset);
+        const collisionTriangles = result.asset.kind === "bsp" && /collide|collisions/i.test(file.name)
+          ? physics?.setTrackCollision(result.asset.data.worldSectors) ?? 0
+          : 0;
         summaries.push(
-          `${file.name}: ${assetSummary(result.asset)}, ${result.parseMilliseconds.toFixed(1)} ms, ${formatBytes(result.transferredBytes)} transferred`,
+          `${file.name}: ${assetSummary(result.asset)}, ${result.parseMilliseconds.toFixed(1)} ms, ${formatBytes(result.transferredBytes)} transferred${collisionTriangles > 0 ? `, ${collisionTriangles} collision triangles bound` : ""}`,
         );
       }
       assetStatus.textContent = summaries.join(" · ");
@@ -209,6 +214,7 @@ function renderFrame(timestampMilliseconds: number): void {
   }
   renderer.render({
     history: physics.transformHistory,
+    objects: physics.sceneObjects,
     interpolationAlpha: frame.interpolationAlpha,
     frameDeltaSeconds: renderDeltaSeconds,
     ...(debugColliders.checked ? { debugLines: physics.debugLines() } : {}),
@@ -228,6 +234,8 @@ function renderFrame(timestampMilliseconds: number): void {
     metricSpeed.textContent = `${(physics.telemetry.speedMetersPerSecond * 3.6).toFixed(0)} km/h`;
     metricWheels.textContent = `${physics.telemetry.groundedWheels} / 4`;
     metricSurface.textContent = physics.telemetry.surface;
+    metricObjects.textContent = `${physicsMetrics.activeObjects} / ${physicsMetrics.destroyedObjects}`;
+    metricTrack.textContent = physicsMetrics.trackTriangles.toLocaleString();
     lastOverlayUpdate = timestampMilliseconds;
   }
   animationFrame = requestAnimationFrame(renderFrame);

@@ -1,12 +1,22 @@
-import { RuntimeEventBus } from "@mashed/core";
+import { RuntimeEventBus, type RuntimeEvent } from "@mashed/core";
 import { describe, expect, it } from "vitest";
 
 import { createPhysicsRuntime, DEFAULT_VEHICLE_CONFIG } from "../src/index.js";
 
 describe("PhysicsRuntime", () => {
   it("uses a fixed timestep and repeats the same controlled vehicle simulation", async () => {
-    const first = await createPhysicsRuntime(new RuntimeEventBus());
-    const second = await createPhysicsRuntime(new RuntimeEventBus());
+    const first = await createPhysicsRuntime(
+      new RuntimeEventBus(),
+      1 / 60,
+      DEFAULT_VEHICLE_CONFIG,
+      { collisionObjects: false },
+    );
+    const second = await createPhysicsRuntime(
+      new RuntimeEventBus(),
+      1 / 60,
+      DEFAULT_VEHICLE_CONFIG,
+      { collisionObjects: false },
+    );
     try {
       for (let step = 0; step < 300; step += 1) {
         const input = {
@@ -66,5 +76,53 @@ describe("PhysicsRuntime", () => {
     expect(DEFAULT_VEHICLE_CONFIG.surfaces.ice.sideFriction)
       .toBeLessThan(DEFAULT_VEHICLE_CONFIG.surfaces.asphalt.sideFriction);
     expect(DEFAULT_VEHICLE_CONFIG.surfaces.mud.rollingBrake).toBeGreaterThan(0);
+  });
+
+  it("binds validated BSP-style triangle sectors as static track collision", async () => {
+    const physics = await createPhysicsRuntime(new RuntimeEventBus());
+    try {
+      expect(physics.setTrackCollision([{
+        positions: new Float32Array([-2, 0, -2, 2, 0, -2, 0, 0, 2]),
+        indices: new Uint32Array([0, 1, 2]),
+      }])).toBe(1);
+      expect(physics.metrics.trackTriangles).toBe(1);
+      expect(() => physics.setTrackCollision([{
+        positions: new Float32Array([0, 0, 0]),
+        indices: new Uint32Array([0, 1, 2]),
+      }])).toThrow("references vertex");
+      expect(physics.metrics.trackTriangles).toBe(1);
+      physics.clearTrackCollision();
+      expect(physics.metrics.trackTriangles).toBe(0);
+    } finally {
+      physics.dispose();
+    }
+  });
+
+  it("moves dynamic props, destroys breakable ones, and restores them on reset", async () => {
+    const events = new RuntimeEventBus();
+    const received: RuntimeEvent[] = [];
+    events.subscribe((event) => received.push(event));
+    const physics = await createPhysicsRuntime(events);
+    try {
+      const heavyStart = physics.sceneObjects.find((object) => object.id === "block-heavy")!;
+      for (let step = 0; step < 300; step += 1) {
+        physics.step(1 / 60, { drive: 1, steer: 0, brake: 0, handbrake: 0, recover: false });
+      }
+      const destroyedIds = received.flatMap((event) => (
+        event.type === "physics:object-destroyed" ? [event.id] : []
+      ));
+      expect(destroyedIds)
+        .toEqual(["crate-a", "crate-b", "barrel-a"]);
+      expect(physics.metrics.destroyedObjects).toBe(3);
+      const heavyFinish = physics.sceneObjects.find((object) => object.id === "block-heavy")!;
+      expect(heavyFinish.history.current.position[2]).toBeGreaterThan(heavyStart.history.current.position[2]);
+
+      physics.resetDemo();
+      expect(physics.metrics.activeObjects).toBe(4);
+      expect(physics.metrics.destroyedObjects).toBe(0);
+      expect(physics.sceneObjects.every((object) => object.active)).toBe(true);
+    } finally {
+      physics.dispose();
+    }
   });
 });

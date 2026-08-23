@@ -1,5 +1,9 @@
 import { interpolateTransform, type RuntimeEventBus } from "@mashed/core";
-import type { PhysicsDebugLines, PhysicsTransformHistory } from "@mashed/physics";
+import type {
+  PhysicsDebugLines,
+  PhysicsSceneObject,
+  PhysicsTransformHistory,
+} from "@mashed/physics";
 import * as THREE from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 
@@ -7,6 +11,7 @@ export interface RenderFrame {
   history: PhysicsTransformHistory;
   interpolationAlpha: number;
   frameDeltaSeconds: number;
+  objects?: readonly PhysicsSceneObject[];
   debugLines?: PhysicsDebugLines;
 }
 
@@ -21,6 +26,7 @@ export class RuntimeRenderer {
   readonly #camera = new THREE.PerspectiveCamera(48, 1, 0.05, 500);
   readonly #controls: OrbitControls;
   readonly #vehicle: THREE.Group;
+  readonly #sceneObjects = new Map<string, THREE.Mesh>();
   readonly #cameraTarget = new THREE.Vector3(-4, 0.8, -5);
   readonly #debugGeometry = new THREE.BufferGeometry();
   readonly #debugMaterial = new THREE.LineBasicMaterial({ vertexColors: true });
@@ -168,6 +174,7 @@ export class RuntimeRenderer {
     );
     this.#vehicle.position.fromArray(transform.position);
     this.#vehicle.quaternion.fromArray(transform.rotation);
+    this.#syncSceneObjects(frame.objects ?? [], frame.interpolationAlpha);
 
     if (this.#debugCameraEnabled) {
       this.#controls.update();
@@ -220,6 +227,54 @@ export class RuntimeRenderer {
     this.#debugGeometry.computeBoundingSphere();
   }
 
+  #syncSceneObjects(objects: readonly PhysicsSceneObject[], interpolationAlpha: number): void {
+    const present = new Set<string>();
+    for (const object of objects) {
+      present.add(object.id);
+      let mesh = this.#sceneObjects.get(object.id);
+      if (!mesh) {
+        mesh = this.#createSceneObject(object);
+        this.#sceneObjects.set(object.id, mesh);
+        this.#scene.add(mesh);
+      }
+      mesh.visible = object.active;
+      if (!object.active) {
+        continue;
+      }
+      const transform = interpolateTransform(
+        object.history.previous,
+        object.history.current,
+        interpolationAlpha,
+      );
+      mesh.position.fromArray(transform.position);
+      mesh.quaternion.fromArray(transform.rotation);
+    }
+    for (const [id, mesh] of this.#sceneObjects) {
+      if (!present.has(id)) {
+        mesh.visible = false;
+      }
+    }
+  }
+
+  #createSceneObject(object: PhysicsSceneObject): THREE.Mesh {
+    const geometry = object.kind === "barrel"
+      ? new THREE.CylinderGeometry(0.42, 0.42, 1.1, 18)
+      : object.kind === "block"
+        ? new THREE.BoxGeometry(1.6, 1.5, 1.6)
+        : new THREE.BoxGeometry(1.1, 1.1, 1.1);
+    const color = object.kind === "barrel" ? 0xd94b3d : object.kind === "block" ? 0x718087 : 0xe0a43b;
+    const material = new THREE.MeshStandardMaterial({
+      color,
+      roughness: object.destructible ? 0.68 : 0.9,
+      metalness: object.kind === "barrel" ? 0.28 : 0.05,
+    });
+    const mesh = new THREE.Mesh(geometry, material);
+    mesh.name = object.id;
+    mesh.castShadow = true;
+    mesh.receiveShadow = true;
+    return mesh;
+  }
+
   dispose(): void {
     this.#unsubscribe();
     this.#controls.dispose();
@@ -234,6 +289,15 @@ export class RuntimeRenderer {
         object.material.dispose();
       }
     });
+    for (const mesh of this.#sceneObjects.values()) {
+      mesh.geometry.dispose();
+      if (Array.isArray(mesh.material)) {
+        mesh.material.forEach((material) => material.dispose());
+      } else {
+        mesh.material.dispose();
+      }
+    }
+    this.#sceneObjects.clear();
     this.#debugGeometry.dispose();
     this.#debugMaterial.dispose();
     this.#renderer.dispose();

@@ -1,6 +1,6 @@
 export type RuntimeState = "boot" | "loading" | "menu" | "race" | "results";
 
-export type AudioCue = "menu" | "race-start" | "race-finish" | "impact";
+export type AudioCue = "menu" | "race-start" | "race-finish" | "impact" | "break";
 
 export type RuntimeEvent =
   | {
@@ -23,6 +23,12 @@ export type RuntimeEvent =
       colliderA: number;
       colliderB: number;
       started: boolean;
+    }
+  | {
+      type: "physics:object-destroyed";
+      id: string;
+      impactForce: number;
+      position: readonly [number, number, number];
     }
   | {
       type: "audio:cue";

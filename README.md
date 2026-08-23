@@ -9,7 +9,8 @@ provides a reproducible local extraction pipeline; Stage 2 provides RenderWare D
 graphical/collision BSP sector parsing, and a Three.js asset viewer. Stage 3 adds a deterministic
 fixed-step core, replay checks, Rapier/Three.js/Web Audio adapters, debug tooling, and the browser
 runtime shell. Stage 4 is underway with a playable data-driven ray-cast vehicle, keyboard/gamepad
-controls, four grip surfaces, recovery, and a chase camera.
+controls, four grip surfaces, recovery, a chase camera, collision BSP binding, dynamic/destructible
+props, and a reproducible tuning harness.
 [ADR-0001](./reference/ADR-0001-runtime-asset-loading.md) selects direct runtime
 parsing in a loading Worker instead of mandatory pre-conversion.
 
@@ -37,6 +38,7 @@ An installed directory containing exactly one `MFL.exe` can be used instead of a
 pnpm typecheck
 pnpm test
 pnpm build
+pnpm vehicle:tune
 ```
 
 Project direction, gates, and scope live in [`ROADMAP.md`](./ROADMAP.md). Reference-build

@@ -1,0 +1,25 @@
+{
+  "version": 1,
+  "stepSeconds": 0.016666666666666666,
+  "settleSteps": 60,
+  "acceleration": {
+    "durationSteps": 240,
+    "targetSpeedKmh": 50
+  },
+  "braking": {
+    "accelerationSteps": 180,
+    "maximumBrakingSteps": 240,
+    "stoppedSpeedKmh": 1
+  },
+  "slalom": {
+    "durationSteps": 360,
+    "switchEverySteps": 45,
+    "steering": 0.52
+  },
+  "drift": {
+    "accelerationSteps": 120,
+    "turnSteps": 90,
+    "steering": 0.48,
+    "handbrake": 0.82
+  }
+}

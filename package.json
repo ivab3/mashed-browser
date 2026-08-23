@@ -12,6 +12,7 @@
     "assets:probe": "node --import tsx packages/assets/src/probe.ts",
     "asset-viewer": "pnpm --filter @mashed/asset-viewer dev",
     "web": "pnpm --filter @mashed/web dev",
+    "vehicle:tune": "pnpm --filter @mashed/physics tune",
     "build": "pnpm -r --if-present build",
     "typecheck": "pnpm -r typecheck",
     "test": "pnpm -r test"

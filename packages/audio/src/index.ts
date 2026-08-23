@@ -5,6 +5,7 @@ const CUE_FREQUENCIES: Readonly<Record<AudioCue, number>> = {
   "race-start": 660,
   "race-finish": 440,
   impact: 110,
+  break: 180,
 };
 
 /** Event-driven Web Audio shell. Original game sound decoding starts in a later stage. */
@@ -35,7 +36,7 @@ export class AudioRuntime {
     const oscillator = context.createOscillator();
     const gain = context.createGain();
     const now = context.currentTime;
-    oscillator.type = cue === "impact" ? "square" : "sine";
+    oscillator.type = cue === "impact" ? "square" : cue === "break" ? "sawtooth" : "sine";
     oscillator.frequency.setValueAtTime(CUE_FREQUENCIES[cue], now);
     gain.gain.setValueAtTime(Math.max(0, Math.min(0.3, gainValue)), now);
     gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.09);

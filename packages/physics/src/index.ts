@@ -38,6 +38,9 @@ export interface PhysicsMetrics {
   bodies: number;
   colliders: number;
   contacts: number;
+  activeObjects: number;
+  destroyedObjects: number;
+  trackTriangles: number;
 }
 
 export interface PhysicsDebugLines {
@@ -47,18 +50,100 @@ export interface PhysicsDebugLines {
 
 export interface VehicleTelemetry {
   speedMetersPerSecond: number;
+  forwardSpeedMetersPerSecond: number;
+  lateralSpeedMetersPerSecond: number;
+  headingRadians: number;
   groundedWheels: number;
   steeringRadians: number;
   surface: SurfaceType | "airborne";
+}
+
+export type PhysicsSceneObjectKind = "crate" | "barrel" | "block";
+
+export interface PhysicsSceneObject {
+  id: string;
+  kind: PhysicsSceneObjectKind;
+  destructible: boolean;
+  active: boolean;
+  history: PhysicsTransformHistory;
+}
+
+export interface StaticCollisionSector {
+  positions: Float32Array;
+  indices: Uint32Array;
+}
+
+export interface PhysicsRuntimeOptions {
+  collisionObjects?: boolean;
 }
 
 interface SurfaceBodyData {
   surface: SurfaceType;
 }
 
+interface ArenaObject {
+  id: string;
+  kind: PhysicsSceneObjectKind;
+  destructible: boolean;
+  active: boolean;
+  breakForce: number;
+  colliderHandle: number;
+  body: RapierRigidBody;
+  initialPosition: readonly [number, number, number];
+  history: PhysicsTransformHistory;
+}
+
+interface ArenaObjectSpec {
+  id: string;
+  kind: PhysicsSceneObjectKind;
+  position: readonly [number, number, number];
+  halfExtents: readonly [number, number, number];
+  mass: number;
+  destructible: boolean;
+  breakForce: number;
+}
+
 const SURFACE_ORDER: readonly SurfaceType[] = ["ice", "asphalt", "sand", "mud"];
 const FRONT_WHEELS = new Set([0, 1]);
 const REAR_WHEELS = new Set([2, 3]);
+const ARENA_OBJECT_SPECS: readonly ArenaObjectSpec[] = [
+  {
+    id: "crate-a",
+    kind: "crate",
+    position: [-4, 0.55, 7],
+    halfExtents: [0.55, 0.55, 0.55],
+    mass: 48,
+    destructible: true,
+    breakForce: 8_500,
+  },
+  {
+    id: "crate-b",
+    kind: "crate",
+    position: [-3.2, 0.55, 12],
+    halfExtents: [0.55, 0.55, 0.55],
+    mass: 55,
+    destructible: true,
+    breakForce: 10_000,
+  },
+  {
+    id: "barrel-a",
+    kind: "barrel",
+    position: [-4.4, 0.55, 16],
+    halfExtents: [0.42, 0.55, 0.42],
+    mass: 32,
+    destructible: true,
+    breakForce: 7_000,
+  },
+  {
+    id: "block-heavy",
+    kind: "block",
+    position: [-4, 0.75, 23],
+    halfExtents: [0.8, 0.75, 0.8],
+    mass: 260,
+    destructible: false,
+    breakForce: Number.POSITIVE_INFINITY,
+  },
+];
 
 function transformOf(body: RapierRigidBody): SimulationTransform {
   const position = body.translation();
@@ -125,6 +210,7 @@ function cuboidInertia(mass: number, halfExtents: readonly [number, number, numb
 
 /** Fixed-step, data-driven arcade vehicle runtime. */
 export class PhysicsRuntime {
+  readonly #RAPIER: RapierModule;
   readonly #events: RuntimeEventBus;
   readonly #world: RapierWorld;
   readonly #eventQueue: RapierEventQueue;
@@ -132,12 +218,19 @@ export class PhysicsRuntime {
   readonly #vehicle: RapierVehicleController;
   readonly #config: VehicleConfig;
   readonly #contacts = new Set<string>();
+  readonly #arenaObjects: ArenaObject[] = [];
+  readonly #objectByCollider = new Map<number, ArenaObject>();
+  #trackBody: RapierRigidBody | undefined;
+  #trackTriangles = 0;
   #history: PhysicsTransformHistory;
   #steeringRadians = 0;
   #upsideDownSeconds = 0;
   #recoveryWasPressed = false;
   #telemetry: VehicleTelemetry = {
     speedMetersPerSecond: 0,
+    forwardSpeedMetersPerSecond: 0,
+    lateralSpeedMetersPerSecond: 0,
+    headingRadians: 0,
     groundedWheels: 0,
     steeringRadians: 0,
     surface: "airborne",
@@ -148,7 +241,9 @@ export class PhysicsRuntime {
     events: RuntimeEventBus,
     stepSeconds: number,
     config: VehicleConfig = DEFAULT_VEHICLE_CONFIG,
+    options: PhysicsRuntimeOptions = {},
   ) {
+    this.#RAPIER = RAPIER;
     this.#events = events;
     this.#config = structuredClone(config);
     this.#world = new RAPIER.World({ x: 0, y: -18, z: 0 });
@@ -213,6 +308,9 @@ export class PhysicsRuntime {
       this.#vehicle.setWheelFrictionSlip(wheel, this.#config.handling.baseFrictionSlip);
       this.#vehicle.setWheelSideFrictionStiffness(wheel, this.#config.handling.baseSideFriction);
     }
+    if (options.collisionObjects !== false) {
+      this.#createCollisionObjects();
+    }
     const initial = transformOf(this.#body);
     this.#history = { previous: cloneTransform(initial), current: initial };
   }
@@ -225,12 +323,74 @@ export class PhysicsRuntime {
     return { ...this.#telemetry };
   }
 
+  get sceneObjects(): readonly PhysicsSceneObject[] {
+    return this.#arenaObjects.map((object) => ({
+      id: object.id,
+      kind: object.kind,
+      destructible: object.destructible,
+      active: object.active,
+      history: {
+        previous: cloneTransform(object.history.previous),
+        current: cloneTransform(object.history.current),
+      },
+    }));
+  }
+
   get metrics(): PhysicsMetrics {
     return {
       bodies: this.#world.bodies.len(),
       colliders: this.#world.colliders.len(),
       contacts: this.#contacts.size,
+      activeObjects: this.#arenaObjects.filter((object) => object.active).length,
+      destroyedObjects: this.#arenaObjects.filter((object) => !object.active).length,
+      trackTriangles: this.#trackTriangles,
     };
+  }
+
+  setTrackCollision(sectors: readonly StaticCollisionSector[]): number {
+    const validSectors = sectors.filter((sector, index) => {
+      if (sector.positions.length % 3 !== 0) {
+        throw new Error(`Track collision sector ${index} has an invalid position array`);
+      }
+      if (sector.indices.length % 3 !== 0) {
+        throw new Error(`Track collision sector ${index} has an invalid index array`);
+      }
+      const vertexCount = sector.positions.length / 3;
+      for (const vertexIndex of sector.indices) {
+        if (vertexIndex >= vertexCount) {
+          throw new Error(`Track collision sector ${index} references vertex ${vertexIndex}/${vertexCount}`);
+        }
+      }
+      return sector.indices.length > 0;
+    });
+    this.clearTrackCollision();
+    if (validSectors.length === 0) {
+      return 0;
+    }
+
+    this.#trackBody = this.#world.createRigidBody(
+      this.#RAPIER.RigidBodyDesc.fixed().setUserData({ surface: "asphalt" } satisfies SurfaceBodyData),
+    );
+    const activeEvents = this.#RAPIER.ActiveEvents.COLLISION_EVENTS;
+    for (const sector of validSectors) {
+      this.#world.createCollider(
+        this.#RAPIER.ColliderDesc.trimesh(sector.positions, sector.indices)
+          .setFriction(0.9)
+          .setRestitution(0.03)
+          .setActiveEvents(activeEvents),
+        this.#trackBody,
+      );
+      this.#trackTriangles += sector.indices.length / 3;
+    }
+    return this.#trackTriangles;
+  }
+
+  clearTrackCollision(): void {
+    if (this.#trackBody) {
+      this.#world.removeRigidBody(this.#trackBody);
+      this.#trackBody = undefined;
+    }
+    this.#trackTriangles = 0;
   }
 
   step(stepSeconds: number, rawInput: VehicleInputFrame = NEUTRAL_VEHICLE_INPUT): void {
@@ -248,6 +408,12 @@ export class PhysicsRuntime {
       previous: cloneTransform(this.#history.current),
       current: this.#history.current,
     };
+    for (const object of this.#arenaObjects) {
+      object.history = {
+        previous: cloneTransform(object.history.current),
+        current: object.history.current,
+      };
+    }
     this.#applyVehicleControls(input, stepSeconds);
     this.#vehicle.updateVehicle(stepSeconds, undefined, undefined, (collider) => (
       collider.parent()?.handle !== this.#body.handle
@@ -259,12 +425,21 @@ export class PhysicsRuntime {
       previous: this.#history.previous,
       current: transformOf(this.#body),
     };
+    for (const object of this.#arenaObjects) {
+      if (object.active) {
+        object.history = {
+          previous: object.history.previous,
+          current: transformOf(object.body),
+        };
+      }
+    }
     this.#updateTelemetry(stepSeconds);
   }
 
   resetDemo(): void {
     const { spawn } = this.#config;
     this.#placeVehicle(spawn.position, spawn.headingRadians);
+    this.#resetCollisionObjects();
   }
 
   recover(): void {
@@ -324,6 +499,64 @@ export class PhysicsRuntime {
         wallBody,
       );
     }
+  }
+
+  #createCollisionObjects(): void {
+    const collisionEvents = this.#RAPIER.ActiveEvents.COLLISION_EVENTS;
+    const contactEvents = this.#RAPIER.ActiveEvents.CONTACT_FORCE_EVENTS;
+    for (const spec of ARENA_OBJECT_SPECS) {
+      const body = this.#world.createRigidBody(
+        this.#RAPIER.RigidBodyDesc.dynamic()
+          .setTranslation(...spec.position)
+          .setLinearDamping(0.18)
+          .setAngularDamping(0.28)
+          .setCcdEnabled(true),
+      );
+      const colliderDesc = spec.kind === "barrel"
+        ? this.#RAPIER.ColliderDesc.cylinder(spec.halfExtents[1], spec.halfExtents[0])
+        : this.#RAPIER.ColliderDesc.cuboid(...spec.halfExtents);
+      colliderDesc
+        .setMass(spec.mass)
+        .setFriction(0.62)
+        .setRestitution(spec.kind === "barrel" ? 0.28 : 0.12)
+        .setActiveEvents(collisionEvents | (spec.destructible ? contactEvents : 0));
+      if (spec.destructible) {
+        colliderDesc.setContactForceEventThreshold(spec.breakForce);
+      }
+      const collider = this.#world.createCollider(colliderDesc, body);
+      const initial = transformOf(body);
+      const object: ArenaObject = {
+        id: spec.id,
+        kind: spec.kind,
+        destructible: spec.destructible,
+        active: true,
+        breakForce: spec.breakForce,
+        colliderHandle: collider.handle,
+        body,
+        initialPosition: spec.position,
+        history: { previous: cloneTransform(initial), current: initial },
+      };
+      this.#arenaObjects.push(object);
+      this.#objectByCollider.set(collider.handle, object);
+    }
+  }
+
+  #resetCollisionObjects(): void {
+    for (const object of this.#arenaObjects) {
+      object.body.setEnabled(true);
+      object.body.setTranslation({
+        x: object.initialPosition[0],
+        y: object.initialPosition[1],
+        z: object.initialPosition[2],
+      }, true);
+      object.body.setRotation({ x: 0, y: 0, z: 0, w: 1 }, true);
+      object.body.setLinvel({ x: 0, y: 0, z: 0 }, true);
+      object.body.setAngvel({ x: 0, y: 0, z: 0 }, true);
+      object.active = true;
+      const initial = transformOf(object.body);
+      object.history = { previous: cloneTransform(initial), current: initial };
+    }
+    this.#world.propagateModifiedBodyPositionsToColliders();
   }
 
   #applyVehicleControls(input: VehicleInputFrame, stepSeconds: number): void {
@@ -430,7 +663,10 @@ export class PhysicsRuntime {
     }
     const velocity = this.#body.linvel();
     const speed = Math.hypot(velocity.x, velocity.z);
-    const up = rotateVector({ x: 0, y: 1, z: 0 }, this.#body.rotation());
+    const rotation = this.#body.rotation();
+    const forward = rotateVector({ x: 0, y: 0, z: 1 }, rotation);
+    const right = rotateVector({ x: 1, y: 0, z: 0 }, rotation);
+    const up = rotateVector({ x: 0, y: 1, z: 0 }, rotation);
     const upsideDown = up.y < this.#config.recovery.maximumUprightDot
       && speed < this.#config.recovery.maximumAutoSpeed;
     this.#upsideDownSeconds = upsideDown ? this.#upsideDownSeconds + stepSeconds : 0;
@@ -448,6 +684,9 @@ export class PhysicsRuntime {
     }
     this.#telemetry = {
       speedMetersPerSecond: speed,
+      forwardSpeedMetersPerSecond: velocity.x * forward.x + velocity.z * forward.z,
+      lateralSpeedMetersPerSecond: velocity.x * right.x + velocity.z * right.z,
+      headingRadians: headingOf(rotation),
       groundedWheels,
       steeringRadians: this.#steeringRadians,
       surface: dominantSurface,
@@ -468,6 +707,44 @@ export class PhysicsRuntime {
         this.#events.emit({ type: "renderer:flash", color: 0xff7a42, durationSeconds: 0.12 });
       }
     });
+    const impacts = new Map<ArenaObject, number>();
+    this.#eventQueue.drainContactForceEvents((event) => {
+      const first = this.#objectByCollider.get(event.collider1());
+      const second = this.#objectByCollider.get(event.collider2());
+      const force = event.totalForceMagnitude();
+      for (const object of [first, second]) {
+        if (object?.active && object.destructible && force >= object.breakForce) {
+          impacts.set(object, Math.max(impacts.get(object) ?? 0, force));
+        }
+      }
+    });
+    for (const [object, impactForce] of impacts) {
+      this.#destroyObject(object, impactForce);
+    }
+  }
+
+  #destroyObject(object: ArenaObject, impactForce: number): void {
+    const position = object.body.translation();
+    object.history = {
+      previous: object.history.previous,
+      current: transformOf(object.body),
+    };
+    object.active = false;
+    object.body.setEnabled(false);
+    for (const key of [...this.#contacts]) {
+      const [first, second] = key.split(":").map(Number);
+      if (first === object.colliderHandle || second === object.colliderHandle) {
+        this.#contacts.delete(key);
+      }
+    }
+    this.#events.emit({
+      type: "physics:object-destroyed",
+      id: object.id,
+      impactForce,
+      position: [position.x, position.y, position.z],
+    });
+    this.#events.emit({ type: "audio:cue", cue: "break", gain: 0.16 });
+    this.#events.emit({ type: "renderer:flash", color: 0xffd35c, durationSeconds: 0.18 });
   }
 
   #placeVehicle(position: readonly [number, number, number], headingRadians: number): void {
@@ -489,8 +766,9 @@ export async function createPhysicsRuntime(
   events: RuntimeEventBus,
   stepSeconds = 1 / 60,
   config: VehicleConfig = DEFAULT_VEHICLE_CONFIG,
+  options: PhysicsRuntimeOptions = {},
 ): Promise<PhysicsRuntime> {
   const RAPIER = await import("@dimforge/rapier3d-compat");
   await RAPIER.init();
-  return new PhysicsRuntime(RAPIER, events, stepSeconds, config);
+  return new PhysicsRuntime(RAPIER, events, stepSeconds, config, options);
 }
