@@ -660,10 +660,11 @@ export class PhysicsRuntime {
     const up = rotateVector({ x: 0, y: 1, z: 0 }, rotation);
     const speedSquared = velocity.x * velocity.x + velocity.z * velocity.z;
     this.#body.addForce({ x: 0, y: -speedSquared * this.#config.handling.downforce, z: 0 }, true);
+    // up × worldUp points along the shortest restoring pitch/roll axis.
     this.#body.addTorque({
-      x: up.z * this.#config.handling.uprightStrength - angularVelocity.x * this.#config.handling.uprightDamping,
+      x: -up.z * this.#config.handling.uprightStrength - angularVelocity.x * this.#config.handling.uprightDamping,
       y: 0,
-      z: -up.x * this.#config.handling.uprightStrength - angularVelocity.z * this.#config.handling.uprightDamping,
+      z: up.x * this.#config.handling.uprightStrength - angularVelocity.z * this.#config.handling.uprightDamping,
     }, true);
   }
 

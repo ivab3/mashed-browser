@@ -4,6 +4,31 @@ import { describe, expect, it } from "vitest";
 import { createPhysicsRuntime, DEFAULT_VEHICLE_CONFIG } from "../src/index.js";
 
 describe("PhysicsRuntime", () => {
+  it("keeps a neutral vehicle upright and stationary during an idle soak", async () => {
+    const physics = await createPhysicsRuntime(
+      new RuntimeEventBus(),
+      1 / 60,
+      DEFAULT_VEHICLE_CONFIG,
+      { collisionObjects: false },
+    );
+    try {
+      const start = physics.transformHistory.current.position;
+      let minimumUprightDot = 1;
+      for (let step = 0; step < 900; step += 1) {
+        physics.step(1 / 60);
+        const [x, , z] = physics.transformHistory.current.rotation;
+        minimumUprightDot = Math.min(minimumUprightDot, 1 - 2 * (x * x + z * z));
+      }
+      const finish = physics.transformHistory.current.position;
+      expect(minimumUprightDot).toBeGreaterThan(0.995);
+      expect(Math.hypot(finish[0] - start[0], finish[2] - start[2])).toBeLessThan(0.01);
+      expect(physics.telemetry.speedMetersPerSecond).toBeLessThan(0.01);
+      expect(physics.telemetry.groundedWheels).toBe(4);
+    } finally {
+      physics.dispose();
+    }
+  });
+
   it("uses a fixed timestep and repeats the same controlled vehicle simulation", async () => {
     const first = await createPhysicsRuntime(
       new RuntimeEventBus(),

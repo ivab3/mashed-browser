@@ -91,9 +91,9 @@ pnpm vehicle:tune
 It uses the real fixed-step Rapier vehicle without collision props and reports acceleration,
 braking, slalom, and handbrake-turn metrics. The current regression baseline is stored in
 [`reference/vehicle-tuning-baseline.json`](./vehicle-tuning-baseline.json); it describes the browser
-prototype and is not presented as a measurement of the original game. The first baseline reaches
-50 km/h in 3.433 s and brakes from 44.879 km/h in 6.033 m. The handbrake scenario increases heading
-change from 1.575 to 1.882 radians over the same 90-frame turn.
+prototype and is not presented as a measurement of the original game. The corrected stability
+baseline reaches 50 km/h in 3.433 s and brakes from 44.879 km/h in 5.985 m. The handbrake scenario
+increases heading change from 1.575 to 1.88 radians over the same 90-frame turn.
 
 The collision suite verifies three force-threshold destruction events in a stable order, movement
 of the non-destructible dynamic block, and full restoration on reset. The BSP adapter rejects
@@ -102,15 +102,18 @@ created 16 sector colliders containing 5,661 triangles.
 
 A browser smoke with Warzone plus `CRUSADER0.DFF`/`CRUSADER.TXD` bound 13 intact atomics and 3,037
 vehicle triangles, retained the 23,077-triangle textured track and 5,661-triangle collision mesh,
-held 60 FPS, and reported no console errors. An idle soak also reproduced a pre-existing spontaneous
-rollover with both the original proxy and the DFF model; it is therefore a physics issue, not a
-renderer regression, and must be fixed before Gate C closes.
+held 60 FPS, and reported no console errors. A later idle soak exposed an inverted upright-torque
+sign: infinitesimal pitch/roll errors were amplified until the chassis overturned. The restoring
+torque now follows `up × worldUp`; a 15-second neutral-input regression keeps all four wheels down,
+the upright dot above `0.995`, and planar drift below one centimeter. Separate 16-second browser
+smokes with the debug proxy and Crusader DFF both held `4/4`, `0 km/h`, asphalt, 60 FPS, zero dropped
+time, and a clean console.
 
 Still required before Gate C:
 
 - tune against repeatable acceleration, braking, slalom, drift, impact, and rollover scenarios in
   the reference game;
-- eliminate the idle suspension rollover and complete a full lap on the bound collision mesh;
+- complete a full lap on the bound collision mesh;
 - add a second vehicle and vehicle/vehicle collision cases;
 - add the shared multiplayer camera after multiple active vehicles exist;
 - record a representative vehicle replay and verify it in every supported browser.
