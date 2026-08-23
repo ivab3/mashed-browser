@@ -98,6 +98,21 @@ describe("PhysicsRuntime", () => {
     }
   });
 
+  it("uses a track-provided race spawn for resets and recovery height", async () => {
+    const physics = await createPhysicsRuntime(new RuntimeEventBus());
+    try {
+      physics.setRaceSpawn({ position: [40, 2, 6], headingRadians: -Math.PI / 2 });
+      expect(physics.transformHistory.current.position).toEqual([40, 2, 6]);
+      physics.step(1 / 60, { drive: 1, steer: 0, brake: 0, handbrake: 0, recover: false });
+      physics.resetDemo();
+      expect(physics.transformHistory.current.position).toEqual([40, 2, 6]);
+      expect(() => physics.setRaceSpawn({ position: [Number.NaN, 0, 0], headingRadians: 0 }))
+        .toThrow("finite coordinates");
+    } finally {
+      physics.dispose();
+    }
+  });
+
   it("moves dynamic props, destroys breakable ones, and restores them on reset", async () => {
     const events = new RuntimeEventBus();
     const received: RuntimeEvent[] = [];

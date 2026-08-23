@@ -30,10 +30,12 @@
           <div><span>Wheels</span><strong id="metric-wheels">0 / 4</strong></div>
           <div><span>Objects A / X</span><strong id="metric-objects">4 / 0</strong></div>
           <div><span>Track tris</span><strong id="metric-track">0</strong></div>
+          <div><span>Lap</span><strong id="metric-lap">—</strong></div>
+          <div><span>Checkpoint</span><strong id="metric-checkpoint">—</strong></div>
           <div class="wide"><span>Surface</span><strong id="metric-surface">airborne</strong></div>
         </aside>
 
-        <div class="hint">Four surfaces · breakable props · heavy dynamic block · optional COLLIDE.BSP.</div>
+        <div class="hint">Load GRAPHICS.BSP · COLLIDE.BSP · AI1.BSP · LAPDATA.LUA, then drive one ordered lap.</div>
       </section>
 
       <aside class="control-panel">
@@ -65,12 +67,12 @@
         </section>
 
         <section class="asset-loader">
-          <div class="section-label">Worker asset boundary</div>
+          <div class="section-label">Playable track bundle</div>
           <label class="file-picker">
-            <span>Parse local DFF / TXD / BSP</span>
-            <input id="asset-files" type="file" accept=".dff,.txd,.bsp" multiple />
+            <span>Load BSP + LAPDATA.LUA</span>
+            <input id="asset-files" type="file" accept=".dff,.txd,.bsp,.lua" multiple />
           </label>
-          <p id="asset-status">Assets stay local. Typed arrays return from the loading Worker as transferables.</p>
+          <p id="asset-status">Select GRAPHICS.BSP, COLLIDE.BSP, AI1.BSP, and LAPDATA.LUA together. Assets stay local.</p>
         </section>
 
         <footer>

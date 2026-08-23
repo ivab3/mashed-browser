@@ -1,6 +1,14 @@
 import { AudioRuntime } from "@mashed/audio";
 import {
+  deriveTrackDefinition,
+  parseLapDataLua,
+  type BspWorld,
+  type DerivedTrackDefinition,
+  type LapDataDefinition,
+} from "@mashed/assets";
+import {
   FixedStepClock,
+  LapSession,
   RuntimeEventBus,
   RuntimeStateMachine,
   type FixedStepFrame,
@@ -65,6 +73,8 @@ const metricWheels = element<HTMLElement>("metric-wheels");
 const metricSurface = element<HTMLElement>("metric-surface");
 const metricObjects = element<HTMLElement>("metric-objects");
 const metricTrack = element<HTMLElement>("metric-track");
+const metricLap = element<HTMLElement>("metric-lap");
+const metricCheckpoint = element<HTMLElement>("metric-checkpoint");
 
 const events = new RuntimeEventBus();
 const state = new RuntimeStateMachine(events);
@@ -74,7 +84,15 @@ const renderer = new RuntimeRenderer(viewport, events);
 const vehicleInput = new BrowserVehicleInput();
 const assetLoader = new AssetLoadingClient();
 const loadedAssets = new Map<string, LoadedAsset>();
+const trackParts: {
+  ai?: BspWorld;
+  collision?: BspWorld;
+  graphics?: BspWorld;
+  lapData?: LapDataDefinition;
+} = {};
 let physics: PhysicsRuntime | undefined;
+let trackDefinition: DerivedTrackDefinition | undefined;
+let lapSession: LapSession | undefined;
 let animationFrame = 0;
 let lastRenderTimestamp: number | undefined;
 let smoothedFps = 60;
@@ -86,7 +104,9 @@ function applyState(next: RuntimeState): void {
   stateBadge.textContent = next;
   stateBadge.dataset["state"] = next;
   startButton.disabled = next !== "menu" && next !== "results";
-  startButton.textContent = next === "results" ? "Race again" : "Start simulation";
+  startButton.textContent = next === "results"
+    ? "Race again"
+    : trackDefinition ? "Start lap" : "Start simulation";
   finishButton.disabled = next !== "race";
   menuButton.disabled = next !== "race" && next !== "results";
   assetInput.disabled = next === "loading" || next === "race";
@@ -108,6 +128,7 @@ async function startRace(): Promise<void> {
   }
   await audio.unlock();
   physics.resetDemo();
+  lapSession?.reset();
   clock.restart(performance.now() / 1000);
   totalDroppedSeconds = 0;
   state.transition("race", "Fixed-step simulation running");
@@ -129,8 +150,49 @@ menuButton.addEventListener("click", () => {
     events.emit({ type: "audio:cue", cue: "menu", gain: 0.05 });
   }
 });
-resetButton.addEventListener("click", () => physics?.resetDemo());
+resetButton.addEventListener("click", () => {
+  physics?.resetDemo();
+  lapSession?.reset();
+});
 debugCamera.addEventListener("change", () => renderer.setDebugCamera(debugCamera.checked));
+
+function rememberBsp(fileName: string, world: BspWorld): string | undefined {
+  const normalized = fileName.toLocaleLowerCase("en-US");
+  if (/^ai\d*\.bsp$/.test(normalized)) {
+    trackParts.ai = world;
+    return "AI route";
+  }
+  if (/collid/.test(normalized)) {
+    trackParts.collision = world;
+    return "collision";
+  }
+  if (/graphics|world/.test(normalized)) {
+    trackParts.graphics = world;
+    return "graphics";
+  }
+  return undefined;
+}
+
+function bindTrackParts(): string[] {
+  const bound: string[] = [];
+  if (trackParts.collision && physics) {
+    const triangles = physics.setTrackCollision(trackParts.collision.worldSectors);
+    bound.push(`${triangles.toLocaleString()} collision triangles`);
+  }
+  if (trackParts.graphics) {
+    const triangles = renderer.setTrackGeometry(trackParts.graphics.worldSectors);
+    bound.push(`${triangles.toLocaleString()} visible triangles`);
+  }
+  if (trackParts.ai && trackParts.lapData && physics) {
+    trackDefinition = deriveTrackDefinition(trackParts.ai, trackParts.lapData);
+    lapSession = new LapSession(trackDefinition);
+    physics.setRaceSpawn(trackDefinition.spawn);
+    renderer.setTrackRoute(trackDefinition.checkpoints);
+    bound.push(`${trackDefinition.checkpoints.length} ordered checkpoints`);
+    applyState(state.state);
+  }
+  return bound;
+}
 
 assetInput.addEventListener("change", () => {
   const files = [...(assetInput.files ?? [])];
@@ -142,17 +204,33 @@ assetInput.addEventListener("change", () => {
     try {
       const summaries: string[] = [];
       for (const file of files) {
+        if (file.name.toLocaleLowerCase("en-US").endsWith(".lua")) {
+          if (/lapdata/i.test(file.name)) {
+            const startedAt = performance.now();
+            trackParts.lapData = parseLapDataLua(await file.text());
+            summaries.push(
+              `${file.name}: ${trackParts.lapData.line.length} line anchors · ${trackParts.lapData.splitCheckpointIds.length} splits, ${(performance.now() - startedAt).toFixed(1)} ms`,
+            );
+          } else {
+            summaries.push(`${file.name}: ignored (only LAPDATA.LUA is declarative track metadata)`);
+          }
+          continue;
+        }
         const result = await assetLoader.load(file);
-        loadedAssets.set(file.name, result.asset);
-        const collisionTriangles = result.asset.kind === "bsp" && /collide|collisions/i.test(file.name)
-          ? physics?.setTrackCollision(result.asset.data.worldSectors) ?? 0
-          : 0;
+        loadedAssets.set(file.name.toLocaleLowerCase("en-US"), result.asset);
+        const role = result.asset.kind === "bsp" ? rememberBsp(file.name, result.asset.data) : undefined;
         summaries.push(
-          `${file.name}: ${assetSummary(result.asset)}, ${result.parseMilliseconds.toFixed(1)} ms, ${formatBytes(result.transferredBytes)} transferred${collisionTriangles > 0 ? `, ${collisionTriangles} collision triangles bound` : ""}`,
+          `${file.name}: ${assetSummary(result.asset)}, ${result.parseMilliseconds.toFixed(1)} ms, ${formatBytes(result.transferredBytes)} transferred${role ? ` · ${role}` : ""}`,
         );
       }
-      assetStatus.textContent = summaries.join(" · ");
-      state.transition("menu", `${loadedAssets.size} asset${loadedAssets.size === 1 ? "" : "s"} cached in memory`);
+      const bound = bindTrackParts();
+      assetStatus.textContent = [...summaries, ...(bound.length > 0 ? [`Track bound: ${bound.join(" · ")}`] : [])].join(" · ");
+      state.transition(
+        "menu",
+        trackDefinition
+          ? `Playable track ready · ${trackDefinition.checkpoints.length} checkpoints`
+          : `${loadedAssets.size} asset${loadedAssets.size === 1 ? "" : "s"} cached in memory`,
+      );
     } catch (error) {
       assetStatus.textContent = error instanceof Error ? error.message : String(error);
       state.transition("menu", "Asset parsing failed; runtime remains available");
@@ -195,11 +273,15 @@ function renderFrame(timestampMilliseconds: number): void {
   }
 
   physicsMilliseconds = 0;
+  let completedLapThisFrame = false;
   let frame: FixedStepFrame;
   if (state.state === "race") {
     frame = clock.advance(timestampMilliseconds / 1000, (stepSeconds) => {
       const startedAt = performance.now();
       physics?.step(stepSeconds, vehicleInput.sample());
+      if (physics && lapSession?.update(physics.transformHistory.current.position).lapCompleted) {
+        completedLapThisFrame = true;
+      }
       physicsMilliseconds += performance.now() - startedAt;
     });
   } else {
@@ -211,6 +293,10 @@ function renderFrame(timestampMilliseconds: number): void {
       interpolationAlpha: 0,
       droppedSeconds: 0,
     };
+  }
+  if (completedLapThisFrame && state.state === "race") {
+    state.transition("results", "Lap completed through every ordered checkpoint");
+    events.emit({ type: "audio:cue", cue: "race-finish", gain: 0.08 });
   }
   renderer.render({
     history: physics.transformHistory,
@@ -236,6 +322,11 @@ function renderFrame(timestampMilliseconds: number): void {
     metricSurface.textContent = physics.telemetry.surface;
     metricObjects.textContent = `${physicsMetrics.activeObjects} / ${physicsMetrics.destroyedObjects}`;
     metricTrack.textContent = physicsMetrics.trackTriangles.toLocaleString();
+    const lapProgress = lapSession?.progress;
+    metricLap.textContent = lapProgress ? `${Math.min(lapProgress.completedLaps + 1, 1)} / 1` : "—";
+    metricCheckpoint.textContent = lapProgress
+      ? `${lapProgress.passedCheckpoints} / ${lapProgress.totalCheckpoints} → ${lapProgress.nextCheckpointId}`
+      : "—";
     lastOverlayUpdate = timestampMilliseconds;
   }
   animationFrame = requestAnimationFrame(renderFrame);

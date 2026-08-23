@@ -20,12 +20,24 @@ export interface RendererMetrics {
   triangles: number;
 }
 
+export interface TrackRenderSector {
+  positions: Float32Array;
+  normals?: Float32Array;
+  colors?: Uint8Array;
+  indices: Uint32Array;
+}
+
+export interface TrackRoutePoint {
+  center: readonly [number, number, number];
+}
+
 export class RuntimeRenderer {
   readonly #renderer: THREE.WebGLRenderer;
   readonly #scene = new THREE.Scene();
   readonly #camera = new THREE.PerspectiveCamera(48, 1, 0.05, 500);
   readonly #controls: OrbitControls;
   readonly #vehicle: THREE.Group;
+  readonly #demoRoot = new THREE.Group();
   readonly #sceneObjects = new Map<string, THREE.Mesh>();
   readonly #cameraTarget = new THREE.Vector3(-4, 0.8, -5);
   readonly #debugGeometry = new THREE.BufferGeometry();
@@ -36,6 +48,8 @@ export class RuntimeRenderer {
   readonly #flashColor = new THREE.Color(0xff7a42);
   #flashRemainingSeconds = 0;
   #debugCameraEnabled = false;
+  #trackRoot: THREE.Group | undefined;
+  #trackRoute: THREE.LineLoop | undefined;
 
   constructor(viewport: HTMLElement, events: RuntimeEventBus) {
     this.#renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: "high-performance" });
@@ -58,6 +72,7 @@ export class RuntimeRenderer {
     key.position.set(5, 10, 4);
     key.castShadow = true;
     this.#scene.add(key);
+    this.#scene.add(this.#demoRoot);
 
     const surfaceColors = [0x9bc5e5, 0x293b40, 0xb99052, 0x574836];
     for (let index = 0; index < surfaceColors.length; index += 1) {
@@ -71,11 +86,11 @@ export class RuntimeRenderer {
       );
       ground.position.set(-12 + index * 8, -0.2, 0);
       ground.receiveShadow = true;
-      this.#scene.add(ground);
+      this.#demoRoot.add(ground);
     }
     const grid = new THREE.GridHelper(64, 64, 0x78909a, 0x263d43);
     grid.position.y = 0.008;
-    this.#scene.add(grid);
+    this.#demoRoot.add(grid);
     const wallMaterial = new THREE.MeshStandardMaterial({ color: 0x3b4d53, roughness: 0.7 });
     const wallSpecs: ReadonlyArray<readonly [number, number, number, number, number, number]> = [
       [-16.25, 0.8, 0, 0.5, 2, 70],
@@ -88,7 +103,7 @@ export class RuntimeRenderer {
       wall.position.set(x, y, z);
       wall.castShadow = true;
       wall.receiveShadow = true;
-      this.#scene.add(wall);
+      this.#demoRoot.add(wall);
     }
 
     this.#vehicle = new THREE.Group();
@@ -147,6 +162,101 @@ export class RuntimeRenderer {
       drawCalls: this.#renderer.info.render.calls,
       triangles: this.#renderer.info.render.triangles,
     };
+  }
+
+  setTrackGeometry(sectors: readonly TrackRenderSector[]): number {
+    this.clearTrackGeometry();
+    const root = new THREE.Group();
+    root.name = "loaded-track";
+    let triangleCount = 0;
+    for (const [index, sector] of sectors.entries()) {
+      if (sector.positions.length === 0 || sector.indices.length === 0) {
+        continue;
+      }
+      const geometry = new THREE.BufferGeometry();
+      geometry.setAttribute("position", new THREE.BufferAttribute(sector.positions, 3));
+      geometry.setIndex(new THREE.BufferAttribute(sector.indices, 1));
+      if (sector.normals) {
+        geometry.setAttribute("normal", new THREE.BufferAttribute(sector.normals, 3));
+      } else {
+        geometry.computeVertexNormals();
+      }
+      if (sector.colors) {
+        const colors = new Float32Array((sector.colors.length / 4) * 3);
+        for (let source = 0, destination = 0; source < sector.colors.length; source += 4, destination += 3) {
+          colors[destination] = sector.colors[source]! / 255;
+          colors[destination + 1] = sector.colors[source + 1]! / 255;
+          colors[destination + 2] = sector.colors[source + 2]! / 255;
+        }
+        geometry.setAttribute("color", new THREE.BufferAttribute(colors, 3));
+      }
+      const mesh = new THREE.Mesh(
+        geometry,
+        new THREE.MeshStandardMaterial({
+          color: sector.colors ? 0xffffff : 0x78909a,
+          vertexColors: sector.colors !== undefined,
+          roughness: 0.88,
+          metalness: 0.02,
+          side: THREE.DoubleSide,
+        }),
+      );
+      mesh.name = `track-sector-${index}`;
+      mesh.receiveShadow = true;
+      root.add(mesh);
+      triangleCount += sector.indices.length / 3;
+    }
+    this.#trackRoot = root;
+    this.#scene.add(root);
+    this.#demoRoot.visible = false;
+    if (this.#scene.fog instanceof THREE.FogExp2) {
+      this.#scene.fog.density = 0.008;
+    }
+    return triangleCount;
+  }
+
+  setTrackRoute(points: readonly TrackRoutePoint[]): void {
+    if (this.#trackRoute) {
+      this.#scene.remove(this.#trackRoute);
+      this.#trackRoute.geometry.dispose();
+      (this.#trackRoute.material as THREE.Material).dispose();
+      this.#trackRoute = undefined;
+    }
+    if (points.length < 2) {
+      return;
+    }
+    const positions = new Float32Array(points.length * 3);
+    points.forEach((point, index) => {
+      positions.set([point.center[0], point.center[1] + 0.12, point.center[2]], index * 3);
+    });
+    const geometry = new THREE.BufferGeometry();
+    geometry.setAttribute("position", new THREE.BufferAttribute(positions, 3));
+    const material = new THREE.LineBasicMaterial({ color: 0xff8a4c, transparent: true, opacity: 0.72 });
+    this.#trackRoute = new THREE.LineLoop(geometry, material);
+    this.#trackRoute.name = "track-route";
+    this.#trackRoute.frustumCulled = false;
+    this.#scene.add(this.#trackRoute);
+    this.#demoRoot.visible = false;
+  }
+
+  clearTrackGeometry(): void {
+    if (this.#trackRoot) {
+      this.#scene.remove(this.#trackRoot);
+      this.#trackRoot.traverse((object) => {
+        if (object instanceof THREE.Mesh) {
+          object.geometry.dispose();
+          if (Array.isArray(object.material)) {
+            object.material.forEach((material) => material.dispose());
+          } else {
+            object.material.dispose();
+          }
+        }
+      });
+      this.#trackRoot = undefined;
+    }
+    this.#demoRoot.visible = true;
+    if (this.#scene.fog instanceof THREE.FogExp2) {
+      this.#scene.fog.density = 0.025;
+    }
   }
 
   setDebugCamera(enabled: boolean): void {
@@ -278,6 +388,13 @@ export class RuntimeRenderer {
   dispose(): void {
     this.#unsubscribe();
     this.#controls.dispose();
+    this.clearTrackGeometry();
+    if (this.#trackRoute) {
+      this.#scene.remove(this.#trackRoute);
+      this.#trackRoute.geometry.dispose();
+      (this.#trackRoute.material as THREE.Material).dispose();
+      this.#trackRoute = undefined;
+    }
     this.#vehicle.traverse((object) => {
       if (!(object instanceof THREE.Mesh)) {
         return;

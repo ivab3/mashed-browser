@@ -73,6 +73,11 @@ export interface StaticCollisionSector {
   indices: Uint32Array;
 }
 
+export interface VehicleSpawn {
+  position: readonly [number, number, number];
+  headingRadians: number;
+}
+
 export interface PhysicsRuntimeOptions {
   collisionObjects?: boolean;
 }
@@ -222,6 +227,7 @@ export class PhysicsRuntime {
   readonly #objectByCollider = new Map<number, ArenaObject>();
   #trackBody: RapierRigidBody | undefined;
   #trackTriangles = 0;
+  #activeSpawn: VehicleSpawn;
   #history: PhysicsTransformHistory;
   #steeringRadians = 0;
   #upsideDownSeconds = 0;
@@ -246,6 +252,10 @@ export class PhysicsRuntime {
     this.#RAPIER = RAPIER;
     this.#events = events;
     this.#config = structuredClone(config);
+    this.#activeSpawn = {
+      position: [...this.#config.spawn.position],
+      headingRadians: this.#config.spawn.headingRadians,
+    };
     this.#world = new RAPIER.World({ x: 0, y: -18, z: 0 });
     this.#world.timestep = stepSeconds;
     this.#eventQueue = new RAPIER.EventQueue(true);
@@ -393,6 +403,20 @@ export class PhysicsRuntime {
     this.#trackTriangles = 0;
   }
 
+  setRaceSpawn(spawn: VehicleSpawn): void {
+    if (
+      spawn.position.some((component) => !Number.isFinite(component))
+      || !Number.isFinite(spawn.headingRadians)
+    ) {
+      throw new Error("Vehicle spawn must contain finite coordinates and heading");
+    }
+    this.#activeSpawn = {
+      position: [...spawn.position],
+      headingRadians: spawn.headingRadians,
+    };
+    this.resetDemo();
+  }
+
   step(stepSeconds: number, rawInput: VehicleInputFrame = NEUTRAL_VEHICLE_INPUT): void {
     if (Math.abs(this.#world.timestep - stepSeconds) > 1e-7) {
       throw new Error(`Physics timestep changed from ${this.#world.timestep} to ${stepSeconds}`);
@@ -437,7 +461,7 @@ export class PhysicsRuntime {
   }
 
   resetDemo(): void {
-    const { spawn } = this.#config;
+    const spawn = this.#activeSpawn;
     this.#placeVehicle(spawn.position, spawn.headingRadians);
     this.#resetCollisionObjects();
   }
@@ -445,7 +469,7 @@ export class PhysicsRuntime {
   recover(): void {
     const position = this.#body.translation();
     this.#placeVehicle(
-      [position.x, Math.max(position.y + this.#config.recovery.lift, this.#config.spawn.position[1]), position.z],
+      [position.x, Math.max(position.y + this.#config.recovery.lift, this.#activeSpawn.position[1]), position.z],
       headingOf(this.#body.rotation()),
     );
   }
