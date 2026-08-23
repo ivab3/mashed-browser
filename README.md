@@ -10,7 +10,8 @@ graphical/collision BSP sector parsing, and a Three.js asset viewer. Stage 3 add
 fixed-step core, replay checks, Rapier/Three.js/Web Audio adapters, debug tooling, and the browser
 runtime shell. Stage 4 is underway with a playable data-driven ray-cast vehicle, keyboard/gamepad
 controls, four grip surfaces, recovery, a chase camera, collision BSP binding, dynamic/destructible
-props, and a reproducible tuning harness.
+props, a reproducible tuning harness, playable original track sessions, and runtime-bound original
+vehicle DFF/TXD models.
 [ADR-0001](./reference/ADR-0001-runtime-asset-loading.md) selects direct runtime
 parsing in a loading Worker instead of mandatory pre-conversion.
 
@@ -72,7 +73,7 @@ pnpm asset-viewer
 Current findings and the remaining Stage 2 questions are tracked in
 [`reference/ASSET_SPIKE.md`](./reference/ASSET_SPIKE.md).
 
-## Run the Stage 3 runtime
+## Run the Stage 4 runtime
 
 ```bash
 pnpm web
@@ -83,4 +84,5 @@ clock with interpolated presentation transforms, a live telemetry overlay, an or
 and Rapier collider lines. Local DFF/TXD/BSP files can be parsed through the loading Worker; original
 bytes remain local and parsed typed arrays are transferred back without cloning. See
 [`reference/RUNTIME_FOUNDATION.md`](./reference/RUNTIME_FOUNDATION.md) for runtime contracts and
-acceptance evidence.
+acceptance evidence. Loading a numbered vehicle DFF such as `CRUSADER0.DFF` together with its shared
+`CRUSADER.TXD` replaces the debug car proxy with the intact original model.

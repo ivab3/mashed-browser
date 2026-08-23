@@ -19,6 +19,7 @@ export const RW_CHUNK_IDS = {
   image: 0x18,
   geometryList: 0x1a,
   piTextureDictionary: 0x23,
+  userData: 0x11f,
   materialEffects: 0x120,
 } as const;
 

@@ -1,8 +1,10 @@
 import { AudioRuntime } from "@mashed/audio";
 import {
   deriveTrackDefinition,
+  parseVehicleDffName,
   parseCourseLua,
   parseLapDataLua,
+  selectVehicleAssetPair,
   type BspWorld,
   type CourseDefinition,
   type DerivedTrackDefinition,
@@ -93,10 +95,10 @@ const trackParts: {
   collision?: BspWorld;
   graphics?: BspWorld;
   lapData?: LapDataDefinition;
-  textures?: PiTextureDictionary;
   course?: CourseDefinition;
 } = {};
 const loadedDffs = new Map<string, DffModel>();
+const loadedTextureDictionaries = new Map<string, PiTextureDictionary>();
 let physics: PhysicsRuntime | undefined;
 let trackDefinition: DerivedTrackDefinition | undefined;
 let lapSession: LapSession | undefined;
@@ -180,6 +182,33 @@ function rememberBsp(fileName: string, world: BspWorld): string | undefined {
   return undefined;
 }
 
+function trackTextureDictionary(): PiTextureDictionary | undefined {
+  const declaredName = trackParts.course?.textureDictionaryFileName?.toLocaleLowerCase("en-US");
+  if (declaredName) {
+    return loadedTextureDictionaries.get(declaredName);
+  }
+  const vehicleTextureNames = new Set([...loadedDffs.keys()].flatMap((fileName) => {
+    const vehicle = parseVehicleDffName(fileName);
+    return vehicle ? [vehicle.textureDictionaryFileName.toLocaleLowerCase("en-US")] : [];
+  }));
+  const candidates = [...loadedTextureDictionaries].filter(([fileName]) => !vehicleTextureNames.has(fileName));
+  return candidates.length === 1 ? candidates[0]![1] : undefined;
+}
+
+function bindVehicleModel(): string | undefined {
+  const pair = selectVehicleAssetPair(loadedDffs.keys(), loadedTextureDictionaries.keys());
+  if (!pair) {
+    return undefined;
+  }
+  const model = loadedDffs.get(pair.fileName.toLocaleLowerCase("en-US"));
+  const textures = loadedTextureDictionaries.get(pair.textureFileName.toLocaleLowerCase("en-US"));
+  if (!model || !textures) {
+    return undefined;
+  }
+  const rendered = renderer.setVehicleModel(model, textures);
+  return `${pair.vehicleName} skin ${pair.variant} · ${rendered.atomics} intact atomics · ${rendered.triangles.toLocaleString()} triangles · ${rendered.textures} textures${rendered.missingTextureNames.length > 0 ? ` · ${rendered.missingTextureNames.length} missing vehicle maps` : ""}`;
+}
+
 function bindTrackParts(): string[] {
   const bound: string[] = [];
   if (trackParts.collision && physics) {
@@ -187,7 +216,7 @@ function bindTrackParts(): string[] {
     bound.push(`${triangles.toLocaleString()} collision triangles`);
   }
   if (trackParts.graphics) {
-    const rendered = renderer.setTrackWorld(trackParts.graphics, trackParts.textures);
+    const rendered = renderer.setTrackWorld(trackParts.graphics, trackTextureDictionary());
     bound.push(
       `${rendered.triangles.toLocaleString()} visible triangles · ${rendered.materials} materials · ${rendered.textures} textures${rendered.missingTextureNames.length > 0 ? ` · ${rendered.missingTextureNames.length} missing maps` : ""}`,
     );
@@ -219,6 +248,10 @@ function bindTrackParts(): string[] {
     renderer.setTrackRoute(trackDefinition.checkpoints);
     bound.push(`${trackDefinition.checkpoints.length} ordered checkpoints`);
     applyState(state.state);
+  }
+  const vehicle = bindVehicleModel();
+  if (vehicle) {
+    bound.push(`vehicle ${vehicle}`);
   }
   return bound;
 }
@@ -257,11 +290,11 @@ assetInput.addEventListener("change", () => {
         if (result.asset.kind === "bsp") {
           role = rememberBsp(file.name, result.asset.data);
         } else if (result.asset.kind === "txd") {
-          trackParts.textures = result.asset.data;
-          role = "track textures";
+          loadedTextureDictionaries.set(file.name.toLocaleLowerCase("en-US"), result.asset.data);
+          role = "texture dictionary candidate";
         } else if (result.asset.kind === "dff") {
           loadedDffs.set(file.name.toLocaleLowerCase("en-US"), result.asset.data);
-          role = "course model candidate";
+          role = parseVehicleDffName(file.name) ? "vehicle skin candidate" : "course model candidate";
         }
         summaries.push(
           `${file.name}: ${assetSummary(result.asset)}, ${result.parseMilliseconds.toFixed(1)} ms, ${formatBytes(result.transferredBytes)} transferred${role ? ` · ${role}` : ""}`,

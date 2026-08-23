@@ -28,6 +28,11 @@ export interface RenderWareModelGeometry {
     normals?: Float32Array;
   }>;
   materials: readonly RenderWareTrackMaterial[];
+  userData?: ReadonlyArray<{
+    name: string;
+    type: "int" | "float" | "string";
+    values: readonly (number | string)[];
+  }>;
 }
 
 export interface RenderWareModelAtomic {
@@ -47,6 +52,11 @@ export interface RenderWareModelBuild {
   triangles: number;
   missingTextureNames: readonly string[];
   placement: "world-authored" | "local-template";
+}
+
+export interface RenderWareModelBuildOptions {
+  scale?: number;
+  atomicIndices?: ReadonlySet<number>;
 }
 
 function frameMatrix(frame: RenderWareModelFrame): THREE.Matrix4 {
@@ -100,6 +110,36 @@ function referencedTextures(materials: readonly RenderWareTrackMaterial[]): Set<
   }));
 }
 
+function vehiclePartId(geometry: RenderWareModelGeometry): number | undefined {
+  const entry = geometry.userData?.find((data) => data.name === "0.tv_part_id" && data.type === "int");
+  const value = entry?.values[0];
+  return typeof value === "number" ? value : undefined;
+}
+
+/**
+ * Selects the intact high-detail vehicle pieces used by Mashed DFFs. Parts 59–62 are
+ * collision hulls, 100–103 are low-detail full-car shells, 77 is broken glass, and
+ * untextured one-triangle atomics are attachment markers rather than visible bodywork.
+ */
+export function selectIntactVehicleAtomicIndices(model: RenderWareModel): ReadonlySet<number> {
+  const hasPartMetadata = model.geometries.some((geometry) => vehiclePartId(geometry) !== undefined);
+  if (!hasPartMetadata) {
+    return new Set(model.atomics.map((_, index) => index));
+  }
+  return new Set(model.atomics.flatMap((atomic, atomicIndex) => {
+    const geometry = model.geometries[atomic.geometryIndex];
+    if (!geometry) {
+      return [];
+    }
+    const partId = vehiclePartId(geometry);
+    const textureNames = referencedTextures(geometry.materials);
+    const isHighDetailPart = partId !== undefined
+      && (partId <= 58 || partId === 75 || partId === 76);
+    const isBrokenGlass = textureNames.has("brokenglass") || partId === 77;
+    return isHighDetailPart && textureNames.size > 0 && !isBrokenGlass ? [atomicIndex] : [];
+  }));
+}
+
 function hasWorldPlacement(model: RenderWareModel, matrices: readonly THREE.Matrix4[]): boolean {
   const translation = new THREE.Vector3();
   for (const atomic of model.atomics) {
@@ -123,14 +163,19 @@ function hasWorldPlacement(model: RenderWareModel, matrices: readonly THREE.Matr
 export function buildRenderWareModel(
   model: RenderWareModel,
   textures: ReadonlyMap<string, THREE.DataTexture>,
-  scale = 1,
+  options: number | RenderWareModelBuildOptions = 1,
 ): RenderWareModelBuild {
+  const scale = typeof options === "number" ? options : options.scale ?? 1;
+  const atomicIndices = typeof options === "number" ? undefined : options.atomicIndices;
   const root = new THREE.Group();
   const matrices = renderWareFrameMatrices(model.frames);
   const textureNames = new Set<string>();
   let atomics = 0;
   let triangles = 0;
   model.atomics.forEach((atomic, atomicIndex) => {
+    if (atomicIndices && !atomicIndices.has(atomicIndex)) {
+      return;
+    }
     const source = model.geometries[atomic.geometryIndex];
     const morph = source?.morphTargets[0];
     if (!source || !morph?.positions || source.vertexCount === 0 || source.triangleCount === 0) {

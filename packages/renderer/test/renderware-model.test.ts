@@ -4,6 +4,7 @@ import { describe, expect, it } from "vitest";
 import {
   buildRenderWareModel,
   renderWareFrameMatrices,
+  selectIntactVehicleAtomicIndices,
   type RenderWareModel,
 } from "../src/renderware-model.js";
 
@@ -54,5 +55,33 @@ describe("RenderWare DFF model builder", () => {
 
   it("keeps small origin-centered models classified as instance templates", () => {
     expect(buildRenderWareModel(model(0), new Map()).placement).toBe("local-template");
+  });
+
+  it("keeps intact textured vehicle parts and removes helpers, broken glass, and LOD shells", () => {
+    const vehicle = model(0);
+    const geometry = vehicle.geometries[0]!;
+    const part = (partId: number, texture?: string): typeof geometry => ({
+      ...geometry,
+      materials: [{
+        color: [255, 255, 255, 255],
+        surfaceProperties: { specular: 0 },
+        ...(texture ? { texture: { name: texture } } : {}),
+      }],
+      userData: [{ name: "0.tv_part_id", type: "int", values: [partId] }],
+    });
+    vehicle.geometries = [
+      part(21, "Body"),
+      part(76, "Glass"),
+      part(77, "BrokenGlass"),
+      part(25),
+      part(100, "BodySmall"),
+    ];
+    vehicle.atomics = vehicle.geometries.map((_, geometryIndex) => ({ frameIndex: 1, geometryIndex }));
+    const selected = selectIntactVehicleAtomicIndices(vehicle);
+    expect([...selected]).toEqual([0, 1]);
+    expect(buildRenderWareModel(vehicle, new Map(), { atomicIndices: selected })).toMatchObject({
+      atomics: 2,
+      triangles: 2,
+    });
   });
 });

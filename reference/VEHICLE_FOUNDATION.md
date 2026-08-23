@@ -16,15 +16,32 @@ The runtime now replaces the falling Stage 3 proxy with a fixed-step arcade vehi
   speed;
 - keyboard and standard-gamepad input sampled once per simulation step;
 - asphalt, ice, sand, and mud handling profiles selected from the collider under each wheel;
-- a damped chase camera with the Stage 3 orbit/debug camera still available.
+- a damped chase camera with the Stage 3 orbit/debug camera still available;
 - dynamic crates, a barrel, and a heavy block; force-threshold props emit deterministic destruction
   events and are restored with the race reset;
-- a validated plain-data boundary that turns parsed collision BSP world sectors into Rapier trimeshes.
+- a validated plain-data boundary that turns parsed collision BSP world sectors into Rapier trimeshes;
+- a playable track session assembled from graphical/collision/AI BSP, TXD, COURSE/LAPDATA metadata,
+  world-authored DFF clumps, ordered checkpoints, and the original track spawn;
+- runtime replacement of the debug car proxy by a matching `NAME0.DFF`–`NAME5.DFF` plus `NAME.TXD`
+  pair, rendered at the confirmed DFF `×5` world scale.
 
 The four surfaces are exposed as adjacent strips in the test arena. This is deliberately a tuning
 lab rather than a race track. The collision binding is live: selecting a local
 `COLLIDE.BSP`/`COLLISIONS.BSP` in the runtime
-creates one static collider per non-empty sector. Track spawn/orientation and lap flow remain open.
+creates one static collider per non-empty sector. Track spawn/orientation and lap flow are connected;
+driving and validating a complete lap remains open.
+
+## Original vehicle rendering
+
+Vehicle geometry extensions contain RenderWare User Data plugin `0x11f` arrays named
+`0.tv_part_id`. The DFF reader now preserves those values. The intact high-detail selector keeps
+the 13 textured body/wheel/glass atomics, uses intact `Glass` instead of `BrokenGlass`, and excludes
+attachment markers, collision hulls (`59`–`62`), and complete low-detail shells (`100`–`103`). The
+same selector produced the expected atomic indices on both Crusader and Wildfire.
+
+The runtime matches numbered vehicle DFF names to their shared TXD case-insensitively, preferring
+skin zero when several variants are loaded. Vehicle textures are owned separately from the track
+dictionary, so loading `CRUSADER.TXD` no longer replaces `WARZONE.TXD`.
 
 ## Data contract
 
@@ -83,11 +100,17 @@ of the non-destructible dynamic block, and full restoration on reset. The BSP ad
 malformed indices before reaching WASM. A local smoke with the extracted Warzone collision file
 created 16 sector colliders containing 5,661 triangles.
 
+A browser smoke with Warzone plus `CRUSADER0.DFF`/`CRUSADER.TXD` bound 13 intact atomics and 3,037
+vehicle triangles, retained the 23,077-triangle textured track and 5,661-triangle collision mesh,
+held 60 FPS, and reported no console errors. An idle soak also reproduced a pre-existing spontaneous
+rollover with both the original proxy and the DFF model; it is therefore a physics issue, not a
+renderer regression, and must be fixed before Gate C closes.
+
 Still required before Gate C:
 
 - tune against repeatable acceleration, braking, slalom, drift, impact, and rollover scenarios in
   the reference game;
-- choose track spawn/orientation and complete a full lap on the bound collision mesh;
+- eliminate the idle suspension rollover and complete a full lap on the bound collision mesh;
 - add a second vehicle and vehicle/vehicle collision cases;
 - add the shared multiplayer camera after multiple active vehicles exist;
 - record a representative vehicle replay and verify it in every supported browser.

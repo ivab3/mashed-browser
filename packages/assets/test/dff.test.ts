@@ -34,8 +34,24 @@ function struct(payload: Uint8Array): Uint8Array {
   return chunk(RW_CHUNK_IDS.struct, payload);
 }
 
-function extension(): Uint8Array {
-  return chunk(RW_CHUNK_IDS.extension);
+function extension(...payload: Uint8Array[]): Uint8Array {
+  return chunk(RW_CHUNK_IDS.extension, ...payload);
+}
+
+function integerUserData(name: string, value: number): Uint8Array {
+  const encodedName = new TextEncoder().encode(`${name}\0`);
+  return chunk(
+    RW_CHUNK_IDS.userData,
+    bytes(4 + 4 + encodedName.length + 8 + 4, (view) => {
+      view.setUint32(0, 1, true);
+      view.setUint32(4, encodedName.length, true);
+      new Uint8Array(view.buffer).set(encodedName, 8);
+      const typeOffset = 8 + encodedName.length;
+      view.setUint32(typeOffset, 1, true);
+      view.setUint32(typeOffset + 4, 1, true);
+      view.setInt32(typeOffset + 8, value, true);
+    }),
+  );
 }
 
 function minimalDff(): Uint8Array {
@@ -86,7 +102,12 @@ function minimalDff(): Uint8Array {
     }),
   );
   const materialList = chunk(RW_CHUNK_IDS.materialList, materialListStruct, material);
-  const geometry = chunk(RW_CHUNK_IDS.geometry, geometryStruct, materialList, extension());
+  const geometry = chunk(
+    RW_CHUNK_IDS.geometry,
+    geometryStruct,
+    materialList,
+    extension(integerUserData("0.tv_part_id", 76)),
+  );
   const geometryList = chunk(
     RW_CHUNK_IDS.geometryList,
     struct(bytes(4, (view) => view.setUint32(0, 1, true))),
@@ -124,6 +145,9 @@ describe("DFF parser", () => {
     expect([...model.geometries[0]!.indices]).toEqual([0, 1, 2]);
     expect([...model.geometries[0]!.morphTargets[0]!.positions!]).toEqual([0, 0, 0, 1, 0, 0, 0, 1, 0]);
     expect(model.geometries[0]!.materials[0]!.color).toEqual([255, 128, 64, 255]);
+    expect(model.geometries[0]!.userData).toEqual([
+      { name: "0.tv_part_id", type: "int", values: [76] },
+    ]);
   });
 
   it("reports a useful error for a non-clump root", () => {

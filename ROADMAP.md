@@ -247,8 +247,10 @@ data-driven chassis, compound colliders, четыре ray-cast колеса, п�
 surface-aware grip, ручник, стабилизация/recovery и chase camera. Тестовая арена позволяет сразу
 сравнивать асфальт, лёд, песок и грязь. Второй срез добавил воспроизводимые acceleration/braking/
 slalom/drift-метрики, динамические и разрушаемые props и runtime binding parsed `COLLIDE.BSP` в
-Rapier trimeshes. Следующий приоритет — замеры против оригинала, track spawn/полный круг и
-столкновение двух машин.
+Rapier trimeshes. Следующие срезы собрали playable Warzone из BSP/TXD/COURSE/LAPDATA/DFF, подключили
+оригинальный track spawn и заменили debug proxy на intact-геометрию и текстуры исходной машины.
+Следующий приоритет — устранить воспроизводимый idle rollover подвески, провести замеры против
+оригинала, завершить полный круг и добавить столкновение двух машин.
 
 ### Этап 5. Вертикальный срез — 4–6 недель
 

@@ -27,6 +27,11 @@ export interface DffMorphTarget {
 
 export type DffMaterial = RenderWareMaterial;
 
+export type DffUserData =
+  | { name: string; type: "int"; values: number[] }
+  | { name: string; type: "float"; values: number[] }
+  | { name: string; type: "string"; values: string[] };
+
 export interface DffGeometry {
   format: number;
   vertexCount: number;
@@ -37,6 +42,7 @@ export interface DffGeometry {
   triangleMaterialIndices: Uint16Array;
   morphTargets: DffMorphTarget[];
   materials: DffMaterial[];
+  userData: DffUserData[];
 }
 
 export interface DffAtomic {
@@ -184,14 +190,77 @@ function parseGeometryStruct(view: BinaryView, chunk: RenderWareChunkHeader): Om
     indices,
     triangleMaterialIndices,
     morphTargets,
+    userData: [],
   };
+}
+
+function parseUserData(view: BinaryView, chunk: RenderWareChunkHeader): DffUserData[] {
+  requireLength(chunk, 4, "User data plugin");
+  const count = view.u32(chunk.dataOffset, "user data array count");
+  let offset = chunk.dataOffset + 4;
+  const result: DffUserData[] = [];
+  for (let arrayIndex = 0; arrayIndex < count; arrayIndex += 1) {
+    const nameLength = view.u32(offset, `user data ${arrayIndex} name length`);
+    offset += 4;
+    const name = view.ascii(offset, nameLength, `user data ${arrayIndex} name`);
+    offset += nameLength;
+    const dataType = view.u32(offset, `user data ${arrayIndex} type`);
+    const valueCount = view.u32(offset + 4, `user data ${arrayIndex} value count`);
+    offset += 8;
+    if (dataType === 1 || dataType === 2) {
+      const values: number[] = [];
+      for (let valueIndex = 0; valueIndex < valueCount; valueIndex += 1) {
+        values.push(dataType === 1
+          ? view.i32(offset, `user data ${arrayIndex} integer ${valueIndex}`)
+          : view.f32(offset, `user data ${arrayIndex} float ${valueIndex}`));
+        offset += 4;
+      }
+      result.push(dataType === 1
+        ? { name, type: "int", values }
+        : { name, type: "float", values });
+      continue;
+    }
+    if (dataType === 3) {
+      const values: string[] = [];
+      for (let valueIndex = 0; valueIndex < valueCount; valueIndex += 1) {
+        const valueLength = view.u32(offset, `user data ${arrayIndex} string ${valueIndex} length`);
+        offset += 4;
+        values.push(view.ascii(offset, valueLength, `user data ${arrayIndex} string ${valueIndex}`));
+        offset += valueLength;
+      }
+      result.push({ name, type: "string", values });
+      continue;
+    }
+    throw new RenderWareParseError(`User data ${arrayIndex} uses unsupported type ${dataType}`);
+  }
+  if (offset !== chunk.endOffset) {
+    throw new RenderWareParseError(
+      `User data parsing ended at 0x${offset.toString(16)}, expected 0x${chunk.endOffset.toString(16)}`,
+    );
+  }
+  return result;
+}
+
+function parseGeometryExtension(
+  view: BinaryView,
+  extension: RenderWareChunkHeader,
+): DffUserData[] {
+  const cursor = new ChunkCursor(view, extension.dataOffset, extension.endOffset, "geometry extension");
+  const userData: DffUserData[] = [];
+  while (!cursor.done) {
+    const child = cursor.next();
+    if (child.id === RW_CHUNK_IDS.userData) {
+      userData.push(...parseUserData(view, child));
+    }
+  }
+  return userData;
 }
 
 function parseGeometry(view: BinaryView, chunk: RenderWareChunkHeader): DffGeometry {
   const cursor = new ChunkCursor(view, chunk.dataOffset, chunk.endOffset, "geometry");
   const geometry = parseGeometryStruct(view, cursor.expect(RW_CHUNK_IDS.struct, "geometry struct"));
   const materials = parseMaterialList(view, cursor.expect(RW_CHUNK_IDS.materialList, "geometry material list"));
-  cursor.expect(RW_CHUNK_IDS.extension, "geometry extension");
+  const extension = cursor.expect(RW_CHUNK_IDS.extension, "geometry extension");
   if (!cursor.done) {
     throw new RenderWareParseError("Geometry contains unexpected trailing chunks");
   }
@@ -201,7 +270,7 @@ function parseGeometry(view: BinaryView, chunk: RenderWareChunkHeader): DffGeome
       throw new RenderWareParseError(`Triangle ${triangleIndex} references missing material ${materialIndex}`);
     }
   }
-  return { ...geometry, materials };
+  return { ...geometry, materials, userData: parseGeometryExtension(view, extension) };
 }
 
 function parseGeometries(view: BinaryView, chunk: RenderWareChunkHeader): DffGeometry[] {

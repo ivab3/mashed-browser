@@ -8,12 +8,14 @@ import * as THREE from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 
 import {
+  buildRenderWareTextures,
   buildRenderWareTrack,
   type RenderWareTrackTextureDictionary,
   type RenderWareTrackWorld,
 } from "./renderware-track.js";
 import {
   buildRenderWareModel,
+  selectIntactVehicleAtomicIndices,
   type RenderWareModel,
 } from "./renderware-model.js";
 
@@ -81,12 +83,20 @@ export interface CourseRenderStats {
   missingTextureNames: readonly string[];
 }
 
+export interface VehicleRenderStats {
+  atomics: number;
+  triangles: number;
+  textures: number;
+  missingTextureNames: readonly string[];
+}
+
 export class RuntimeRenderer {
   readonly #renderer: THREE.WebGLRenderer;
   readonly #scene = new THREE.Scene();
   readonly #camera = new THREE.PerspectiveCamera(48, 1, 0.05, 500);
   readonly #controls: OrbitControls;
   readonly #vehicle: THREE.Group;
+  readonly #vehicleProxy = new THREE.Group();
   readonly #demoRoot = new THREE.Group();
   readonly #sceneObjects = new Map<string, THREE.Mesh>();
   readonly #cameraTarget = new THREE.Vector3(-4, 0.8, -5);
@@ -102,6 +112,8 @@ export class RuntimeRenderer {
   #trackTextures: THREE.DataTexture[] = [];
   #trackTextureMap: ReadonlyMap<string, THREE.DataTexture> = new Map();
   #courseRoot: THREE.Group | undefined;
+  #vehicleModelRoot: THREE.Group | undefined;
+  #vehicleTextures: THREE.DataTexture[] = [];
   #trackRoute: THREE.LineLoop | undefined;
 
   constructor(viewport: HTMLElement, events: RuntimeEventBus) {
@@ -160,6 +172,7 @@ export class RuntimeRenderer {
     }
 
     this.#vehicle = new THREE.Group();
+    this.#vehicleProxy.name = "vehicle-proxy";
     const bodyMaterial = new THREE.MeshStandardMaterial({
       color: 0xff6a32,
       roughness: 0.34,
@@ -168,18 +181,18 @@ export class RuntimeRenderer {
     const body = new THREE.Mesh(new THREE.BoxGeometry(1.72, 0.5, 2.68), bodyMaterial);
     body.castShadow = true;
     body.receiveShadow = true;
-    this.#vehicle.add(body);
+    this.#vehicleProxy.add(body);
     const nose = new THREE.Mesh(new THREE.BoxGeometry(1.44, 0.34, 0.84), bodyMaterial);
     nose.position.set(0, -0.03, 1.25);
     nose.castShadow = true;
-    this.#vehicle.add(nose);
+    this.#vehicleProxy.add(nose);
     const cabin = new THREE.Mesh(
       new THREE.BoxGeometry(1.3, 0.38, 1.05),
       new THREE.MeshStandardMaterial({ color: 0x172a33, roughness: 0.2, metalness: 0.5 }),
     );
     cabin.position.set(0, 0.4, -0.18);
     cabin.castShadow = true;
-    this.#vehicle.add(cabin);
+    this.#vehicleProxy.add(cabin);
     const wheelGeometry = new THREE.CylinderGeometry(0.32, 0.32, 0.22, 16);
     wheelGeometry.rotateZ(Math.PI / 2);
     const wheelMaterial = new THREE.MeshStandardMaterial({ color: 0x101417, roughness: 0.96 });
@@ -192,8 +205,9 @@ export class RuntimeRenderer {
       const wheel = new THREE.Mesh(wheelGeometry, wheelMaterial);
       wheel.position.set(x, y, z);
       wheel.castShadow = true;
-      this.#vehicle.add(wheel);
+      this.#vehicleProxy.add(wheel);
     }
+    this.#vehicle.add(this.#vehicleProxy);
     this.#scene.add(this.#vehicle);
 
     this.#debugLines = new THREE.LineSegments(this.#debugGeometry, this.#debugMaterial);
@@ -330,6 +344,39 @@ export class RuntimeRenderer {
     this.#scene.remove(this.#courseRoot);
     disposeRenderableRoot(this.#courseRoot);
     this.#courseRoot = undefined;
+  }
+
+  setVehicleModel(
+    model: RenderWareModel,
+    dictionary?: RenderWareTrackTextureDictionary,
+    scale = 5,
+  ): VehicleRenderStats {
+    this.clearVehicleModel();
+    const textureSet = buildRenderWareTextures(dictionary);
+    const atomicIndices = selectIntactVehicleAtomicIndices(model);
+    const built = buildRenderWareModel(model, textureSet.byName, { scale, atomicIndices });
+    built.root.name = "loaded-vehicle-model";
+    this.#vehicleModelRoot = built.root;
+    this.#vehicleTextures = textureSet.owned;
+    this.#vehicle.add(built.root);
+    this.#vehicleProxy.visible = false;
+    return {
+      atomics: built.atomics,
+      triangles: built.triangles,
+      textures: textureSet.owned.length,
+      missingTextureNames: built.missingTextureNames,
+    };
+  }
+
+  clearVehicleModel(): void {
+    if (this.#vehicleModelRoot) {
+      this.#vehicle.remove(this.#vehicleModelRoot);
+      disposeRenderableRoot(this.#vehicleModelRoot);
+      this.#vehicleModelRoot = undefined;
+    }
+    this.#vehicleTextures.forEach((texture) => texture.dispose());
+    this.#vehicleTextures = [];
+    this.#vehicleProxy.visible = true;
   }
 
   setTrackRoute(points: readonly TrackRoutePoint[]): void {
@@ -504,6 +551,7 @@ export class RuntimeRenderer {
     this.#unsubscribe();
     this.#controls.dispose();
     this.clearTrackGeometry();
+    this.clearVehicleModel();
     if (this.#trackRoute) {
       this.#scene.remove(this.#trackRoute);
       this.#trackRoute.geometry.dispose();
