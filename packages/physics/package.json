@@ -9,6 +9,7 @@
   "scripts": {
     "typecheck": "tsc -p tsconfig.json",
     "test": "vitest run",
+    "lap:validate": "node --import tsx src/lap-validation-cli.ts",
     "tune": "node --import tsx src/tuning-cli.ts"
   },
   "dependencies": {
@@ -17,6 +18,8 @@
     "@mashed/input": "workspace:*"
   },
   "devDependencies": {
+    "@mashed/assets": "workspace:*",
+    "@types/node": "^20.17.0",
     "tsx": "^4.19.0",
     "typescript": "^5.7.0",
     "vitest": "^2.1.0"

@@ -14,12 +14,12 @@
   "wheels": {
     "connectionPoints": [[-0.78, -0.12, 0.94], [0.78, -0.12, 0.94], [-0.78, -0.12, -0.92], [0.78, -0.12, -0.92]],
     "radius": 0.32,
-    "suspensionRestLength": 0.3,
-    "maxSuspensionTravel": 0.2,
-    "suspensionStiffness": 34,
-    "suspensionCompression": 4.4,
-    "suspensionRelaxation": 5.2,
-    "maxSuspensionForce": 18000
+    "suspensionRestLength": 0.46,
+    "maxSuspensionTravel": 0.32,
+    "suspensionStiffness": 60,
+    "suspensionCompression": 6,
+    "suspensionRelaxation": 7,
+    "maxSuspensionForce": 35000
   },
   "drive": {
     "engineForce": 5200,

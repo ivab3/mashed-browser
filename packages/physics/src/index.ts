@@ -15,6 +15,12 @@ export {
   type SurfaceType,
   type VehicleConfig,
 } from "./vehicle-config.js";
+export {
+  deriveRouteCollisionLayers,
+  type RouteCollisionLayers,
+  type RouteCollisionSector,
+} from "./route-collision.js";
+import type { RouteCollisionLayers } from "./route-collision.js";
 import {
   DEFAULT_VEHICLE_CONFIG,
   type SurfaceType,
@@ -84,6 +90,7 @@ export interface PhysicsRuntimeOptions {
 
 interface SurfaceBodyData {
   surface: SurfaceType;
+  wheelSurface?: boolean;
 }
 
 interface ArenaObject {
@@ -223,9 +230,10 @@ export class PhysicsRuntime {
   readonly #vehicle: RapierVehicleController;
   readonly #config: VehicleConfig;
   readonly #contacts = new Set<string>();
+  readonly #arenaBodies: RapierRigidBody[] = [];
   readonly #arenaObjects: ArenaObject[] = [];
   readonly #objectByCollider = new Map<number, ArenaObject>();
-  #trackBody: RapierRigidBody | undefined;
+  readonly #trackBodies: RapierRigidBody[] = [];
   #trackTriangles = 0;
   #activeSpawn: VehicleSpawn;
   #history: PhysicsTransformHistory;
@@ -282,7 +290,8 @@ export class PhysicsRuntime {
     this.#world.createCollider(
       RAPIER.ColliderDesc.cuboid(...chassis.halfExtents)
         .setMass(0)
-        .setFriction(0.22)
+        .setFriction(0)
+        .setFrictionCombineRule(RAPIER.CoefficientCombineRule.Min)
         .setRestitution(0.08)
         .setActiveEvents(collisionEvents),
       this.#body,
@@ -291,7 +300,8 @@ export class PhysicsRuntime {
       RAPIER.ColliderDesc.cuboid(...chassis.noseHalfExtents)
         .setTranslation(...chassis.noseOffset)
         .setMass(0)
-        .setFriction(0.2)
+        .setFriction(0)
+        .setFrictionCombineRule(RAPIER.CoefficientCombineRule.Min)
         .setRestitution(0.12)
         .setActiveEvents(collisionEvents),
       this.#body,
@@ -357,7 +367,11 @@ export class PhysicsRuntime {
     };
   }
 
-  setTrackCollision(sectors: readonly StaticCollisionSector[]): number {
+  setTrackCollision(source: readonly StaticCollisionSector[] | RouteCollisionLayers): number {
+    const layers = (Array.isArray(source)
+      ? { drive: source, scenery: [] }
+      : source) as RouteCollisionLayers;
+    const sectors = [...layers.drive, ...layers.scenery];
     const validSectors = sectors.filter((sector, index) => {
       if (sector.positions.length % 3 !== 0) {
         throw new Error(`Track collision sector ${index} has an invalid position array`);
@@ -377,30 +391,59 @@ export class PhysicsRuntime {
     if (validSectors.length === 0) {
       return 0;
     }
+    this.#setArenaEnabled(false);
 
-    this.#trackBody = this.#world.createRigidBody(
-      this.#RAPIER.RigidBodyDesc.fixed().setUserData({ surface: "asphalt" } satisfies SurfaceBodyData),
-    );
-    const activeEvents = this.#RAPIER.ActiveEvents.COLLISION_EVENTS;
-    for (const sector of validSectors) {
+    const createLayer = (layerSectors: readonly StaticCollisionSector[], wheelSurface: boolean): void => {
+      const filtered = validSectors.filter((sector) => layerSectors.includes(sector));
+      if (filtered.length === 0) {
+        return;
+      }
+      const body = this.#world.createRigidBody(
+        this.#RAPIER.RigidBodyDesc.fixed().setUserData({
+          surface: "asphalt",
+          wheelSurface,
+        } satisfies SurfaceBodyData),
+      );
+      this.#trackBodies.push(body);
+      const positions = new Float32Array(filtered.reduce((total, sector) => total + sector.positions.length, 0));
+      const indices = new Uint32Array(filtered.reduce((total, sector) => total + sector.indices.length, 0));
+      let positionOffset = 0;
+      let indexOffset = 0;
+      let vertexOffset = 0;
+      for (const sector of filtered) {
+        positions.set(sector.positions, positionOffset);
+        for (const index of sector.indices) {
+          indices[indexOffset] = index + vertexOffset;
+          indexOffset += 1;
+        }
+        positionOffset += sector.positions.length;
+        vertexOffset += sector.positions.length / 3;
+      }
       this.#world.createCollider(
-        this.#RAPIER.ColliderDesc.trimesh(sector.positions, sector.indices)
+        this.#RAPIER.ColliderDesc.trimesh(
+          positions,
+          indices,
+          this.#RAPIER.TriMeshFlags.FIX_INTERNAL_EDGES,
+        )
           .setFriction(0.9)
           .setRestitution(0.03)
-          .setActiveEvents(activeEvents),
-        this.#trackBody,
+          .setActiveEvents(this.#RAPIER.ActiveEvents.COLLISION_EVENTS),
+        body,
       );
-      this.#trackTriangles += sector.indices.length / 3;
-    }
+    };
+    createLayer(layers.drive, true);
+    createLayer(layers.scenery, false);
+    this.#trackTriangles = validSectors.reduce((total, sector) => total + sector.indices.length / 3, 0);
     return this.#trackTriangles;
   }
 
   clearTrackCollision(): void {
-    if (this.#trackBody) {
-      this.#world.removeRigidBody(this.#trackBody);
-      this.#trackBody = undefined;
+    for (const body of this.#trackBodies) {
+      this.#world.removeRigidBody(body);
     }
+    this.#trackBodies.length = 0;
     this.#trackTriangles = 0;
+    this.#setArenaEnabled(true);
   }
 
   setRaceSpawn(spawn: VehicleSpawn): void {
@@ -438,9 +481,12 @@ export class PhysicsRuntime {
         current: object.history.current,
       };
     }
+    this.#body.resetForces(true);
+    this.#body.resetTorques(true);
     this.#applyVehicleControls(input, stepSeconds);
     this.#vehicle.updateVehicle(stepSeconds, undefined, undefined, (collider) => (
       collider.parent()?.handle !== this.#body.handle
+      && (collider.parent()?.userData as SurfaceBodyData | undefined)?.wheelSurface !== false
     ));
     this.#applyStability();
     this.#world.step(this.#eventQueue);
@@ -497,6 +543,7 @@ export class PhysicsRuntime {
           .setTranslation(-12 + index * 8, -0.2, 0)
           .setUserData({ surface } satisfies SurfaceBodyData),
       );
+      this.#arenaBodies.push(body);
       this.#world.createCollider(
         RAPIER.ColliderDesc.cuboid(4, 0.2, 35)
           .setFriction(0.9)
@@ -507,6 +554,7 @@ export class PhysicsRuntime {
     }
 
     const wallBody = this.#world.createRigidBody(RAPIER.RigidBodyDesc.fixed());
+    this.#arenaBodies.push(wallBody);
     const walls: ReadonlyArray<readonly [number, number, number, number, number, number]> = [
       [-16.25, 0.8, 0, 0.25, 1, 35],
       [16.25, 0.8, 0, 0.25, 1, 35],
@@ -523,6 +571,10 @@ export class PhysicsRuntime {
         wallBody,
       );
     }
+  }
+
+  #setArenaEnabled(enabled: boolean): void {
+    this.#arenaBodies.forEach((body) => body.setEnabled(enabled));
   }
 
   #createCollisionObjects(): void {
@@ -598,7 +650,27 @@ export class PhysicsRuntime {
 
     let drive = input.drive;
     let serviceBrake = input.brake * this.#config.drive.serviceBrakeForce;
-    if (Math.abs(forwardSpeed) > this.#config.drive.reverseEngageSpeed
+    let groundedWheels = 0;
+    for (let wheel = 0; wheel < this.#vehicle.numWheels(); wheel += 1) {
+      groundedWheels += this.#vehicle.wheelIsInContact(wheel) ? 1 : 0;
+    }
+    const up = rotateVector({ x: 0, y: 1, z: 0 }, this.#body.rotation());
+    const horizontalSpeed = Math.hypot(velocity.x, velocity.z);
+    const counteringBackwardRoll = drive > 0
+      && forwardSpeed < 0
+      && forwardSpeed > -5
+      && horizontalSpeed < 6
+      && groundedWheels >= 2
+      && up.y > 0.8;
+    if (counteringBackwardRoll) {
+      this.#body.addForce({
+        x: forward.x * this.#config.drive.engineForce * 2,
+        y: forward.y * this.#config.drive.engineForce * 2,
+        z: forward.z * this.#config.drive.engineForce * 2,
+      }, true);
+    }
+    if (!counteringBackwardRoll
+      && Math.abs(forwardSpeed) > this.#config.drive.reverseEngageSpeed
       && Math.sign(drive) !== 0
       && Math.sign(drive) !== Math.sign(forwardSpeed)) {
       serviceBrake = Math.max(serviceBrake, Math.abs(drive) * this.#config.drive.serviceBrakeForce);
@@ -658,13 +730,42 @@ export class PhysicsRuntime {
     const velocity = this.#body.linvel();
     const angularVelocity = this.#body.angvel();
     const up = rotateVector({ x: 0, y: 1, z: 0 }, rotation);
+    const targetUp = { x: 0, y: 0, z: 0 };
+    let groundedWheels = 0;
+    for (let wheel = 0; wheel < this.#vehicle.numWheels(); wheel += 1) {
+      if (!this.#vehicle.wheelIsInContact(wheel)) {
+        continue;
+      }
+      const normal = this.#vehicle.wheelContactNormal(wheel);
+      if (!normal) {
+        continue;
+      }
+      targetUp.x += normal.x;
+      targetUp.y += normal.y;
+      targetUp.z += normal.z;
+      groundedWheels += 1;
+    }
+    if (groundedWheels === 0) {
+      targetUp.y = 1;
+    } else {
+      const targetLength = Math.hypot(targetUp.x, targetUp.y, targetUp.z);
+      if (targetLength > 1e-5) {
+        targetUp.x /= targetLength;
+        targetUp.y /= targetLength;
+        targetUp.z /= targetLength;
+      } else {
+        targetUp.y = 1;
+      }
+    }
     const speedSquared = velocity.x * velocity.x + velocity.z * velocity.z;
     this.#body.addForce({ x: 0, y: -speedSquared * this.#config.handling.downforce, z: 0 }, true);
-    // up × worldUp points along the shortest restoring pitch/roll axis.
+    // up × surfaceUp points along the shortest restoring pitch/roll axis.
     this.#body.addTorque({
-      x: -up.z * this.#config.handling.uprightStrength - angularVelocity.x * this.#config.handling.uprightDamping,
+      x: (up.y * targetUp.z - up.z * targetUp.y) * this.#config.handling.uprightStrength
+        - angularVelocity.x * this.#config.handling.uprightDamping,
       y: 0,
-      z: up.x * this.#config.handling.uprightStrength - angularVelocity.z * this.#config.handling.uprightDamping,
+      z: (up.x * targetUp.y - up.y * targetUp.x) * this.#config.handling.uprightStrength
+        - angularVelocity.z * this.#config.handling.uprightDamping,
     }, true);
   }
 

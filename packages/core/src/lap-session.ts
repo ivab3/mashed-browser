@@ -27,28 +27,107 @@ export interface LapUpdate {
   lapCompleted: boolean;
 }
 
-function signedArea(
-  point: TrackVector3,
-  start: TrackVector3,
-  finish: TrackVector3,
-): number {
-  return (point[0] - finish[0]) * (start[2] - finish[2])
-    - (start[0] - finish[0]) * (point[2] - finish[2]);
+const CHECKPOINT_PLANE_TOLERANCE_METERS = 0.25;
+
+function subtract(left: TrackVector3, right: TrackVector3): TrackVector3 {
+  return [left[0] - right[0], left[1] - right[1], left[2] - right[2]];
 }
 
-function pointInTriangle(point: TrackVector3, triangle: TrackTriangle): boolean {
-  const [first, second, third] = triangle;
-  const areaA = signedArea(point, first, second);
-  const areaB = signedArea(point, second, third);
-  const areaC = signedArea(point, third, first);
-  const epsilon = 1e-5;
-  const hasNegative = areaA < -epsilon || areaB < -epsilon || areaC < -epsilon;
-  const hasPositive = areaA > epsilon || areaB > epsilon || areaC > epsilon;
-  return !(hasNegative && hasPositive);
+function cross(left: TrackVector3, right: TrackVector3): TrackVector3 {
+  return [
+    left[1] * right[2] - left[2] * right[1],
+    left[2] * right[0] - left[0] * right[2],
+    left[0] * right[1] - left[1] * right[0],
+  ];
+}
+
+function dot(left: TrackVector3, right: TrackVector3): number {
+  return left[0] * right[0] + left[1] * right[1] + left[2] * right[2];
+}
+
+function pointNearTriangle(point: TrackVector3, triangle: TrackTriangle): boolean {
+  const edgeA = subtract(triangle[1], triangle[0]);
+  const edgeB = subtract(triangle[2], triangle[0]);
+  const normal = cross(edgeA, edgeB);
+  const normalLength = Math.sqrt(dot(normal, normal));
+  const epsilon = 1e-7;
+  if (normalLength < epsilon) {
+    return false;
+  }
+
+  const unitNormal: TrackVector3 = [
+    normal[0] / normalLength,
+    normal[1] / normalLength,
+    normal[2] / normalLength,
+  ];
+  const fromVertex = subtract(point, triangle[0]);
+  const planeDistance = dot(fromVertex, unitNormal);
+  if (Math.abs(planeDistance) > CHECKPOINT_PLANE_TOLERANCE_METERS) {
+    return false;
+  }
+
+  const projected: TrackVector3 = [
+    point[0] - unitNormal[0] * planeDistance,
+    point[1] - unitNormal[1] * planeDistance,
+    point[2] - unitNormal[2] * planeDistance,
+  ];
+  const projectedOffset = subtract(projected, triangle[0]);
+  const edgeADot = dot(edgeA, edgeA);
+  const edgeBDot = dot(edgeB, edgeB);
+  const edgeABDot = dot(edgeA, edgeB);
+  const offsetADot = dot(projectedOffset, edgeA);
+  const offsetBDot = dot(projectedOffset, edgeB);
+  const denominator = edgeADot * edgeBDot - edgeABDot * edgeABDot;
+  if (Math.abs(denominator) < epsilon) {
+    return false;
+  }
+
+  const u = (edgeBDot * offsetADot - edgeABDot * offsetBDot) / denominator;
+  const v = (edgeADot * offsetBDot - edgeABDot * offsetADot) / denominator;
+  return u >= -epsilon && v >= -epsilon && u + v <= 1 + epsilon;
 }
 
 function contains(checkpoint: LapCheckpoint, point: TrackVector3): boolean {
-  return checkpoint.triangles.some((triangle) => pointInTriangle(point, triangle));
+  return checkpoint.triangles.some((triangle) => pointNearTriangle(point, triangle));
+}
+
+function segmentIntersectsTriangle(
+  start: TrackVector3,
+  finish: TrackVector3,
+  triangle: TrackTriangle,
+): boolean {
+  const direction = subtract(finish, start);
+  const edgeA = subtract(triangle[1], triangle[0]);
+  const edgeB = subtract(triangle[2], triangle[0]);
+  const perpendicular = cross(direction, edgeB);
+  const determinant = dot(edgeA, perpendicular);
+  const epsilon = 1e-7;
+  if (Math.abs(determinant) < epsilon) {
+    return false;
+  }
+  const inverse = 1 / determinant;
+  const fromVertex = subtract(start, triangle[0]);
+  const u = inverse * dot(fromVertex, perpendicular);
+  if (u < -epsilon || u > 1 + epsilon) {
+    return false;
+  }
+  const side = cross(fromVertex, edgeA);
+  const v = inverse * dot(direction, side);
+  if (v < -epsilon || u + v > 1 + epsilon) {
+    return false;
+  }
+  const distanceAlongSegment = inverse * dot(edgeB, side);
+  return distanceAlongSegment >= -epsilon && distanceAlongSegment <= 1 + epsilon;
+}
+
+function crosses(
+  checkpoint: LapCheckpoint,
+  previous: TrackVector3,
+  current: TrackVector3,
+): boolean {
+  return checkpoint.triangles.some((triangle) => (
+    segmentIntersectsTriangle(previous, current, triangle)
+  ));
 }
 
 /** Ordered checkpoint tracker. A lap starts inside checkpoint 0 and completes on returning to it. */
@@ -100,9 +179,9 @@ export class LapSession {
     this.#sectorIndex = 0;
   }
 
-  update(position: TrackVector3): LapUpdate {
+  update(position: TrackVector3, previousPosition: TrackVector3 = position): LapUpdate {
     const checkpoint = this.#course.checkpoints[this.#expectedIndex]!;
-    if (!contains(checkpoint, position)) {
+    if (!contains(checkpoint, position) && !crosses(checkpoint, previousPosition, position)) {
       return { checkpointPassed: null, splitPassed: null, lapCompleted: false };
     }
 

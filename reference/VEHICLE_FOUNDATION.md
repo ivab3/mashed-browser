@@ -1,6 +1,6 @@
 # Stage 4 vehicle foundation
 
-Status: first playable slice implemented on 2026-08-24. Stage 4 and Gate C remain open.
+Status: playable single-vehicle lap implemented on 2026-08-24. Stage 4 and Gate C remain open.
 
 ## Implemented slice
 
@@ -24,12 +24,16 @@ The runtime now replaces the falling Stage 3 proxy with a fixed-step arcade vehi
   world-authored DFF clumps, ordered checkpoints, and the original track spawn;
 - runtime replacement of the debug car proxy by a matching `NAME0.DFF`–`NAME5.DFF` plus `NAME.TXD`
   pair, rendered at the confirmed DFF `×5` world scale.
+- route-aware collision layers that keep vertical scenery out of wheel raycasts, merge adjacent
+  sectors to suppress internal-edge artifacts, and provide a continuous support ribbon along the
+  AI checkpoint route;
+- a deterministic full-lap acceptance driver that uses ordinary `VehicleInputFrame` records and
+  completes all 136 Warzone checkpoints without recovery, reverse, or transform overrides.
 
 The four surfaces are exposed as adjacent strips in the test arena. This is deliberately a tuning
 lab rather than a race track. The collision binding is live: selecting a local
 `COLLIDE.BSP`/`COLLISIONS.BSP` in the runtime
-creates one static collider per non-empty sector. Track spawn/orientation and lap flow are connected;
-driving and validating a complete lap remains open.
+creates merged static drive/scenery colliders. Track spawn/orientation and lap flow are connected.
 
 ## Original vehicle rendering
 
@@ -92,8 +96,20 @@ It uses the real fixed-step Rapier vehicle without collision props and reports a
 braking, slalom, and handbrake-turn metrics. The current regression baseline is stored in
 [`reference/vehicle-tuning-baseline.json`](./vehicle-tuning-baseline.json); it describes the browser
 prototype and is not presented as a measurement of the original game. The corrected stability
-baseline reaches 50 km/h in 3.433 s and brakes from 44.879 km/h in 5.985 m. The handbrake scenario
-increases heading change from 1.575 to 1.88 radians over the same 90-frame turn.
+baseline reaches 50 km/h in 3.433 s and brakes from 44.879 km/h in 5.99 m. The handbrake scenario
+increases heading change from 1.572 to 1.879 radians over the same 90-frame turn.
+
+The full-lap acceptance scenario runs with user-owned Warzone assets:
+
+```bash
+pnpm lap:validate
+```
+
+It binds the original `AI1.BSP`, `COLLIDE.BSP`, and `LAPDATA.LUA`, drives through the same fixed-step
+input path as a player, and exits non-zero if the lap is incomplete or recovery was requested. The
+current deterministic result is 136/136 checkpoints in 60.8 s, 3,648 physics steps, 45.155 km/h peak,
+zero reverse frames, and zero recovery frames. The collision mesh contains 5,833 triangles after
+route filtering and application of the 272-triangle compatibility support ribbon.
 
 The collision suite verifies three force-threshold destruction events in a stable order, movement
 of the non-destructible dynamic block, and full restoration on reset. The BSP adapter rejects
@@ -104,7 +120,9 @@ A browser smoke with Warzone plus `CRUSADER0.DFF`/`CRUSADER.TXD` bound 13 intact
 vehicle triangles, retained the 23,077-triangle textured track and 5,661-triangle collision mesh,
 held 60 FPS, and reported no console errors. A later idle soak exposed an inverted upright-torque
 sign: infinitesimal pitch/roll errors were amplified until the chassis overturned. The restoring
-torque now follows `up × worldUp`; a 15-second neutral-input regression keeps all four wheels down,
+torque now follows `up × surfaceUp`; per-step custom forces/torques are cleared before fresh
+downforce, stability, and hill-start assistance are applied. A 15-second neutral-input regression
+keeps all four wheels down,
 the upright dot above `0.995`, and planar drift below one centimeter. Separate 16-second browser
 smokes with the debug proxy and Crusader DFF both held `4/4`, `0 km/h`, asphalt, 60 FPS, zero dropped
 time, and a clean console.
@@ -113,7 +131,6 @@ Still required before Gate C:
 
 - tune against repeatable acceleration, braking, slalom, drift, impact, and rollover scenarios in
   the reference game;
-- complete a full lap on the bound collision mesh;
 - add a second vehicle and vehicle/vehicle collision cases;
 - add the shared multiplayer camera after multiple active vehicles exist;
 - record a representative vehicle replay and verify it in every supported browser.

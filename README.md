@@ -86,3 +86,7 @@ bytes remain local and parsed typed arrays are transferred back without cloning.
 [`reference/RUNTIME_FOUNDATION.md`](./reference/RUNTIME_FOUNDATION.md) for runtime contracts and
 acceptance evidence. Loading a numbered vehicle DFF such as `CRUSADER0.DFF` together with its shared
 `CRUSADER.TXD` replaces the debug car proxy with the intact original model.
+
+With extracted Warzone assets in the standard ignored `game-data/` location, `pnpm lap:validate`
+runs the deterministic 136-checkpoint full-lap acceptance scenario. An alternative track directory
+can be passed after the command.

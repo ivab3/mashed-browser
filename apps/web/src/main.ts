@@ -21,7 +21,11 @@ import {
   type RuntimeState,
 } from "@mashed/core";
 import { BrowserVehicleInput } from "@mashed/input";
-import { createPhysicsRuntime, type PhysicsRuntime } from "@mashed/physics";
+import {
+  createPhysicsRuntime,
+  deriveRouteCollisionLayers,
+  type PhysicsRuntime,
+} from "@mashed/physics";
 import { RuntimeRenderer } from "@mashed/renderer";
 
 import { AssetLoadingClient } from "./asset-loader.js";
@@ -211,8 +215,18 @@ function bindVehicleModel(): string | undefined {
 
 function bindTrackParts(): string[] {
   const bound: string[] = [];
+  if (trackParts.ai && trackParts.lapData && physics) {
+    trackDefinition = deriveTrackDefinition(trackParts.ai, trackParts.lapData);
+    lapSession = new LapSession(trackDefinition);
+    physics.setRaceSpawn(trackDefinition.spawn);
+    renderer.setTrackRoute(trackDefinition.checkpoints);
+    bound.push(`${trackDefinition.checkpoints.length} ordered checkpoints`);
+    applyState(state.state);
+  }
   if (trackParts.collision && physics) {
-    const triangles = physics.setTrackCollision(trackParts.collision.worldSectors);
+    const triangles = physics.setTrackCollision(trackDefinition
+      ? deriveRouteCollisionLayers(trackDefinition, trackParts.collision.worldSectors)
+      : trackParts.collision.worldSectors);
     bound.push(`${triangles.toLocaleString()} collision triangles`);
   }
   if (trackParts.graphics) {
@@ -240,14 +254,6 @@ function bindTrackParts(): string[] {
         `${rendered.models}/${models.length} world-authored DFFs · ${rendered.atomics} atomics · ${rendered.triangles.toLocaleString()} triangles${rendered.skippedLocalTemplates > 0 ? ` · ${rendered.skippedLocalTemplates} local templates skipped` : ""}${rendered.missingTextureNames.length > 0 ? ` · ${rendered.missingTextureNames.length} missing DFF maps` : ""}`,
       );
     }
-  }
-  if (trackParts.ai && trackParts.lapData && physics) {
-    trackDefinition = deriveTrackDefinition(trackParts.ai, trackParts.lapData);
-    lapSession = new LapSession(trackDefinition);
-    physics.setRaceSpawn(trackDefinition.spawn);
-    renderer.setTrackRoute(trackDefinition.checkpoints);
-    bound.push(`${trackDefinition.checkpoints.length} ordered checkpoints`);
-    applyState(state.state);
   }
   const vehicle = bindVehicleModel();
   if (vehicle) {
@@ -356,7 +362,10 @@ function renderFrame(timestampMilliseconds: number): void {
     frame = clock.advance(timestampMilliseconds / 1000, (stepSeconds) => {
       const startedAt = performance.now();
       physics?.step(stepSeconds, vehicleInput.sample());
-      if (physics && lapSession?.update(physics.transformHistory.current.position).lapCompleted) {
+      if (physics && lapSession?.update(
+        physics.transformHistory.current.position,
+        physics.transformHistory.previous.position,
+      ).lapCompleted) {
         completedLapThisFrame = true;
       }
       physicsMilliseconds += performance.now() - startedAt;

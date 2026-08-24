@@ -11,6 +11,7 @@
     "assets:inspect": "node --import tsx tools/extractor/src/cli.ts inspect",
     "assets:probe": "node --import tsx packages/assets/src/probe.ts",
     "asset-viewer": "pnpm --filter @mashed/asset-viewer dev",
+    "lap:validate": "pnpm --filter @mashed/physics lap:validate",
     "web": "pnpm --filter @mashed/web dev",
     "vehicle:tune": "pnpm --filter @mashed/physics tune",
     "build": "pnpm -r --if-present build",

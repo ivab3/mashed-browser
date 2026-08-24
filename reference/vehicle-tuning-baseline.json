@@ -8,27 +8,27 @@
     "acceleration": {
       "targetSpeedKmh": 50,
       "targetTimeSeconds": 3.433,
-      "distanceMeters": 34.144,
+      "distanceMeters": 34.139,
       "finalSpeedKmh": 56.594,
       "peakSpeedKmh": 56.594
     },
     "braking": {
       "initialSpeedKmh": 44.879,
       "stoppingTimeSeconds": 1.033,
-      "stoppingDistanceMeters": 5.985,
-      "finalSpeedKmh": 0.934
+      "stoppingDistanceMeters": 5.99,
+      "finalSpeedKmh": 0.834
     },
     "slalom": {
-      "distanceMeters": 41.2,
-      "lateralOffsetMeters": 0.606,
-      "peakLateralSpeedMetersPerSecond": 5.157,
-      "peakSpeedKmh": 58.877
+      "distanceMeters": 41.207,
+      "lateralOffsetMeters": 0.792,
+      "peakLateralSpeedMetersPerSecond": 3.973,
+      "peakSpeedKmh": 58.279
     },
     "drift": {
-      "baselinePeakLateralSpeedMetersPerSecond": 0.857,
-      "handbrakePeakLateralSpeedMetersPerSecond": 0.682,
-      "baselineHeadingChangeRadians": 1.575,
-      "handbrakeHeadingChangeRadians": 1.88
+      "baselinePeakLateralSpeedMetersPerSecond": 0.868,
+      "handbrakePeakLateralSpeedMetersPerSecond": 0.684,
+      "baselineHeadingChangeRadians": 1.572,
+      "handbrakeHeadingChangeRadians": 1.879
     }
   }
 }

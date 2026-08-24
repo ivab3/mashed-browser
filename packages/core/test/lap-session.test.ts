@@ -15,6 +15,17 @@ function checkpoint(id: number, centerX: number): LapCheckpoint {
   };
 }
 
+function verticalGate(id: number, centerX: number): LapCheckpoint {
+  return {
+    id,
+    center: [centerX, 1, 0],
+    triangles: [
+      [[centerX, 0, -1], [centerX, 0, 1], [centerX, 2, -1]],
+      [[centerX, 2, -1], [centerX, 0, 1], [centerX, 2, 1]],
+    ],
+  };
+}
+
 describe("LapSession", () => {
   it("only accepts ordered checkpoints and completes on returning to the start", () => {
     const session = new LapSession({
@@ -47,5 +58,24 @@ describe("LapSession", () => {
     session.update([0, 0, 0]);
     session.reset();
     expect(session.progress).toMatchObject({ completedLaps: 0, passedCheckpoints: 0, nextCheckpointId: 20 });
+  });
+
+  it("detects swept crossings through zero-thickness vertical AI gates", () => {
+    const session = new LapSession({ checkpoints: [verticalGate(0, 0), verticalGate(1, 2)] });
+    expect(session.update([1.7, 1, 0], [1.5, 1, 0]).checkpointPassed).toBeNull();
+    expect(session.update([2.3, 1, 0], [1.7, 1, 0])).toMatchObject({
+      checkpointPassed: 1,
+      lapCompleted: false,
+    });
+    expect(session.update([-0.3, 1, 0], [0.3, 1, 0]).lapCompleted).toBe(true);
+  });
+
+  it("accepts near misses within the checkpoint tolerance without flattening vertical gates", () => {
+    const session = new LapSession({ checkpoints: [verticalGate(0, 0), verticalGate(1, 2)] });
+    expect(session.update([2.2, 1, 0])).toMatchObject({ checkpointPassed: 1 });
+    expect(session.update([0.2, 1, 0])).toMatchObject({ lapCompleted: true });
+
+    session.reset();
+    expect(session.update([2.2, 3, 0]).checkpointPassed).toBeNull();
   });
 });

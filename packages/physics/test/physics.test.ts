@@ -123,6 +123,99 @@ describe("PhysicsRuntime", () => {
     }
   });
 
+  it("disables test-arena collision while a real track mesh is bound", async () => {
+    const physics = await createPhysicsRuntime(
+      new RuntimeEventBus(),
+      1 / 60,
+      DEFAULT_VEHICLE_CONFIG,
+      { collisionObjects: false },
+    );
+    try {
+      physics.setTrackCollision([{
+        positions: new Float32Array([100, 0, 100, 104, 0, 100, 100, 0, 104]),
+        indices: new Uint32Array([0, 1, 2]),
+      }]);
+      for (let step = 0; step < 60; step += 1) {
+        physics.step(1 / 60);
+      }
+      expect(physics.transformHistory.current.position[1]).toBeLessThan(-2);
+
+      physics.clearTrackCollision();
+      physics.resetDemo();
+      for (let step = 0; step < 120; step += 1) {
+        physics.step(1 / 60);
+      }
+      expect(physics.telemetry.groundedWheels).toBe(4);
+    } finally {
+      physics.dispose();
+    }
+  });
+
+  it("combines adjacent track sectors into one collider", async () => {
+    const physics = await createPhysicsRuntime(new RuntimeEventBus());
+    try {
+      const collidersBefore = physics.metrics.colliders;
+      expect(physics.setTrackCollision([
+        {
+          positions: new Float32Array([-2, 0, -2, 0, 0, -2, -2, 0, 2]),
+          indices: new Uint32Array([0, 1, 2]),
+        },
+        {
+          positions: new Float32Array([0, 0, -2, 2, 0, -2, 2, 0, 2]),
+          indices: new Uint32Array([0, 1, 2]),
+        },
+      ])).toBe(2);
+      expect(physics.metrics.colliders).toBe(collidersBefore + 1);
+    } finally {
+      physics.dispose();
+    }
+  });
+
+  it("binds drive and scenery as separate collision layers", async () => {
+    const physics = await createPhysicsRuntime(new RuntimeEventBus());
+    try {
+      const collidersBefore = physics.metrics.colliders;
+      const sector = {
+        positions: new Float32Array([-2, 0, -2, 2, 0, -2, 0, 0, 2]),
+        indices: new Uint32Array([0, 1, 2]),
+      };
+      expect(physics.setTrackCollision({ drive: [sector], scenery: [sector] })).toBe(2);
+      expect(physics.metrics.colliders).toBe(collidersBefore + 2);
+    } finally {
+      physics.dispose();
+    }
+  });
+
+  it("climbs a steep road without accumulating helper forces across steps", async () => {
+    const physics = await createPhysicsRuntime(
+      new RuntimeEventBus(),
+      1 / 60,
+      DEFAULT_VEHICLE_CONFIG,
+      { collisionObjects: false },
+    );
+    try {
+      physics.setTrackCollision([{
+        positions: new Float32Array([
+          -5, 0, -5,
+          -5, 5, 20,
+          5, 0, -5,
+          5, 5, 20,
+        ]),
+        indices: new Uint32Array([0, 1, 2, 2, 1, 3]),
+      }]);
+      physics.setRaceSpawn({ position: [0, 1.45, -2], headingRadians: 0 });
+      for (let step = 0; step < 300; step += 1) {
+        physics.step(1 / 60, { drive: 1, steer: 0, brake: 0, handbrake: 0, recover: false });
+      }
+
+      expect(physics.transformHistory.current.position[2]).toBeGreaterThan(10);
+      expect(physics.transformHistory.current.position[1]).toBeGreaterThan(3);
+      expect(physics.telemetry.speedMetersPerSecond).toBeLessThan(10);
+    } finally {
+      physics.dispose();
+    }
+  });
+
   it("uses a track-provided race spawn for resets and recovery height", async () => {
     const physics = await createPhysicsRuntime(new RuntimeEventBus());
     try {
