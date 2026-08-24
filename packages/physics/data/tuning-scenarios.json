@@ -1,5 +1,5 @@
 {
-  "version": 1,
+  "version": 2,
   "stepSeconds": 0.016666666666666666,
   "settleSteps": 60,
   "acceleration": {
@@ -21,5 +21,14 @@
     "turnSteps": 90,
     "steering": 0.48,
     "handbrake": 0.82
+  },
+  "cornering": {
+    "accelerationSteps": 120,
+    "turnSteps": 180,
+    "steering": 0.82
+  },
+  "impact": {
+    "maximumSteps": 300,
+    "postImpactSteps": 30
   }
 }

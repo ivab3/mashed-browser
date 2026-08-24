@@ -210,7 +210,7 @@ function bindVehicleModel(): string | undefined {
     return undefined;
   }
   const rendered = renderer.setVehicleModel(model, textures);
-  return `${pair.vehicleName} skin ${pair.variant} · ${rendered.atomics} intact atomics · ${rendered.triangles.toLocaleString()} triangles · ${rendered.textures} textures${rendered.missingTextureNames.length > 0 ? ` · ${rendered.missingTextureNames.length} missing vehicle maps` : ""}`;
+  return `${pair.vehicleName} skin ${pair.variant} · ${rendered.atomics} intact atomics · ${rendered.triangles.toLocaleString()} triangles · ${rendered.lengthMeters.toFixed(2)} m long · ${rendered.textures} textures${rendered.missingTextureNames.length > 0 ? ` · ${rendered.missingTextureNames.length} missing vehicle maps` : ""}`;
 }
 
 function bindTrackParts(): string[] {

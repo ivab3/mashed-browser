@@ -1,9 +1,20 @@
 import { RuntimeEventBus, type RuntimeEvent } from "@mashed/core";
 import { describe, expect, it } from "vitest";
 
-import { createPhysicsRuntime, DEFAULT_VEHICLE_CONFIG } from "../src/index.js";
+import {
+  createPhysicsRuntime,
+  DEFAULT_VEHICLE_CONFIG,
+  driveForceBuildUpFactor,
+} from "../src/index.js";
 
 describe("PhysicsRuntime", () => {
+  it("reproduces the original six-second drive-force build-up curve", () => {
+    expect(driveForceBuildUpFactor(0, 0.5, 6)).toBe(0.5);
+    expect(driveForceBuildUpFactor(3, 0.5, 6)).toBe(0.75);
+    expect(driveForceBuildUpFactor(6, 0.5, 6)).toBe(1);
+    expect(driveForceBuildUpFactor(12, 0.5, 6)).toBe(1);
+  });
+
   it("keeps a neutral vehicle upright and stationary during an idle soak", async () => {
     const physics = await createPhysicsRuntime(
       new RuntimeEventBus(),
@@ -66,6 +77,35 @@ describe("PhysicsRuntime", () => {
     } finally {
       first.dispose();
       second.dispose();
+    }
+  });
+
+  it("maps positive player steering to Rapier's mirrored wheel-steering direction", async () => {
+    const physics = await createPhysicsRuntime(
+      new RuntimeEventBus(),
+      1 / 60,
+      DEFAULT_VEHICLE_CONFIG,
+      { collisionObjects: false },
+    );
+    try {
+      for (let step = 0; step < 60; step += 1) {
+        physics.step(1 / 60);
+      }
+      const startX = physics.transformHistory.current.position[0];
+      for (let step = 0; step < 180; step += 1) {
+        physics.step(1 / 60, {
+          drive: 1,
+          steer: 0.6,
+          brake: 0,
+          handbrake: 0,
+          recover: false,
+        });
+      }
+      expect(physics.telemetry.steeringRadians).toBeGreaterThan(0);
+      expect(physics.telemetry.headingRadians).toBeLessThan(0);
+      expect(physics.transformHistory.current.position[0]).toBeLessThan(startX - 5);
+    } finally {
+      physics.dispose();
     }
   });
 

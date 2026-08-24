@@ -59,6 +59,14 @@ export interface RenderWareModelBuildOptions {
   atomicIndices?: ReadonlySet<number>;
 }
 
+export interface VehicleModelFit {
+  scale: number;
+  size: readonly [number, number, number];
+}
+
+export const DEFAULT_VEHICLE_MODEL_LENGTH_METERS = 3.02;
+export const DEFAULT_VEHICLE_MODEL_GROUND_Y = -0.82;
+
 function frameMatrix(frame: RenderWareModelFrame): THREE.Matrix4 {
   return new THREE.Matrix4().set(
     frame.right[0], frame.up[0], frame.at[0], frame.position[0],
@@ -225,5 +233,46 @@ export function buildRenderWareModel(
     triangles,
     missingTextureNames: [...textureNames].filter((name) => !textures.has(name)),
     placement: hasWorldPlacement(model, matrices) ? "world-authored" : "local-template",
+  };
+}
+
+/**
+ * Vehicle DFFs contain real-car-sized geometry when the generic DFF x5 convention is
+ * applied. The current physics profile uses a compact arcade footprint, so the visible
+ * model keeps its authored +Z orientation and is uniformly fitted by length.
+ */
+export function fitVehicleModelRoot(
+  root: THREE.Group,
+  targetLengthMeters = DEFAULT_VEHICLE_MODEL_LENGTH_METERS,
+  groundY = DEFAULT_VEHICLE_MODEL_GROUND_Y,
+): VehicleModelFit {
+  if (!Number.isFinite(targetLengthMeters) || targetLengthMeters <= 0) {
+    throw new Error(`Vehicle model target length must be positive, got ${targetLengthMeters}`);
+  }
+  if (!Number.isFinite(groundY)) {
+    throw new Error(`Vehicle model ground offset must be finite, got ${groundY}`);
+  }
+  root.position.set(0, 0, 0);
+  root.rotation.set(0, 0, 0);
+  root.scale.setScalar(1);
+  root.updateMatrixWorld(true);
+  const sourceBounds = new THREE.Box3().setFromObject(root);
+  const sourceSize = sourceBounds.getSize(new THREE.Vector3());
+  if (sourceBounds.isEmpty() || sourceSize.z <= 1e-6) {
+    throw new Error("Vehicle model has no measurable longitudinal extent");
+  }
+  const scale = targetLengthMeters / sourceSize.z;
+  root.scale.setScalar(scale);
+  root.updateMatrixWorld(true);
+  const fittedBounds = new THREE.Box3().setFromObject(root);
+  const center = fittedBounds.getCenter(new THREE.Vector3());
+  root.position.x -= center.x;
+  root.position.y += groundY - fittedBounds.min.y;
+  root.position.z -= center.z;
+  root.updateMatrixWorld(true);
+  const size = new THREE.Box3().setFromObject(root).getSize(new THREE.Vector3());
+  return {
+    scale,
+    size: [size.x, size.y, size.z],
   };
 }

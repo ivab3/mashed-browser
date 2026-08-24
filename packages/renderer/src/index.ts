@@ -15,6 +15,7 @@ import {
 } from "./renderware-track.js";
 import {
   buildRenderWareModel,
+  fitVehicleModelRoot,
   selectIntactVehicleAtomicIndices,
   type RenderWareModel,
 } from "./renderware-model.js";
@@ -87,6 +88,8 @@ export interface VehicleRenderStats {
   atomics: number;
   triangles: number;
   textures: number;
+  lengthMeters: number;
+  modelScale: number;
   missingTextureNames: readonly string[];
 }
 
@@ -349,12 +352,12 @@ export class RuntimeRenderer {
   setVehicleModel(
     model: RenderWareModel,
     dictionary?: RenderWareTrackTextureDictionary,
-    scale = 5,
   ): VehicleRenderStats {
     this.clearVehicleModel();
     const textureSet = buildRenderWareTextures(dictionary);
     const atomicIndices = selectIntactVehicleAtomicIndices(model);
-    const built = buildRenderWareModel(model, textureSet.byName, { scale, atomicIndices });
+    const built = buildRenderWareModel(model, textureSet.byName, { atomicIndices });
+    const fit = fitVehicleModelRoot(built.root);
     built.root.name = "loaded-vehicle-model";
     this.#vehicleModelRoot = built.root;
     this.#vehicleTextures = textureSet.owned;
@@ -364,6 +367,8 @@ export class RuntimeRenderer {
       atomics: built.atomics,
       triangles: built.triangles,
       textures: textureSet.owned.length,
+      lengthMeters: fit.size[2],
+      modelScale: fit.scale,
       missingTextureNames: built.missingTextureNames,
     };
   }
@@ -459,9 +464,12 @@ export class RuntimeRenderer {
       } else {
         forward.normalize();
       }
-      const desired = vehiclePosition.clone().addScaledVector(forward, -7.5);
-      desired.y += 4.5;
-      const desiredTarget = vehiclePosition.clone().addScaledVector(forward, 2.8);
+      // Leave enough track context for the eventual 2x2 four-player grid. The original
+      // Warzone AI corridor is 5 m wide, so multiplayer framing belongs to the camera
+      // rather than to a visual-only vehicle shrink that would diverge from collision.
+      const desired = vehiclePosition.clone().addScaledVector(forward, -10);
+      desired.y += 7.2;
+      const desiredTarget = vehiclePosition.clone().addScaledVector(forward, 3);
       desiredTarget.y += 0.45;
       const followAlpha = 1 - Math.exp(-5.2 * Math.min(frame.frameDeltaSeconds, 0.1));
       if (this.#camera.position.distanceToSquared(desired) > 400) {

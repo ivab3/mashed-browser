@@ -2,33 +2,54 @@
   "kind": "browser-prototype-baseline",
   "note": "Regression baseline for the current browser tune; not a measured original-game target.",
   "report": {
-    "version": 1,
+    "version": 2,
     "configId": "arcade-default",
     "stepSeconds": 0.016666666666666666,
     "acceleration": {
       "targetSpeedKmh": 50,
-      "targetTimeSeconds": 3.433,
-      "distanceMeters": 34.139,
-      "finalSpeedKmh": 56.594,
-      "peakSpeedKmh": 56.594
+      "targetTimeSeconds": 3.267,
+      "distanceMeters": 33.989,
+      "finalSpeedKmh": 62.224,
+      "peakSpeedKmh": 62.224
     },
     "braking": {
-      "initialSpeedKmh": 44.879,
-      "stoppingTimeSeconds": 1.033,
-      "stoppingDistanceMeters": 5.99,
-      "finalSpeedKmh": 0.834
+      "initialSpeedKmh": 45.903,
+      "stoppingTimeSeconds": 1,
+      "stoppingDistanceMeters": 5.977,
+      "finalSpeedKmh": 0.927
     },
     "slalom": {
-      "distanceMeters": 41.207,
-      "lateralOffsetMeters": 0.792,
-      "peakLateralSpeedMetersPerSecond": 3.973,
-      "peakSpeedKmh": 58.279
+      "distanceMeters": 42.415,
+      "lateralOffsetMeters": 7.885,
+      "peakLateralSpeedMetersPerSecond": 6.837,
+      "peakSpeedKmh": 66.41
     },
     "drift": {
-      "baselinePeakLateralSpeedMetersPerSecond": 0.868,
-      "handbrakePeakLateralSpeedMetersPerSecond": 0.684,
-      "baselineHeadingChangeRadians": 1.572,
-      "handbrakeHeadingChangeRadians": 1.879
+      "baselinePeakLateralSpeedMetersPerSecond": 0.873,
+      "handbrakePeakLateralSpeedMetersPerSecond": 0.669,
+      "baselinePeakSlipAngleDegrees": 4.973,
+      "handbrakePeakSlipAngleDegrees": 4.511,
+      "baselineHeadingChangeRadians": 1.576,
+      "handbrakeHeadingChangeRadians": 1.892,
+      "baselineExitSpeedKmh": 49.422,
+      "handbrakeExitSpeedKmh": 47.307
+    },
+    "cornering": {
+      "headingChangeRadians": 5.504,
+      "peakLateralSpeedMetersPerSecond": 1.616,
+      "peakSlipAngleDegrees": 8.681,
+      "maximumBodyTiltDegrees": 1.168,
+      "minimumGroundedWheels": 4,
+      "wheelLiftTimeSeconds": 0,
+      "exitSpeedKmh": 55.998
+    },
+    "impact": {
+      "objectId": "crate-a",
+      "impactTimeSeconds": 2.5,
+      "impactSpeedKmh": 37.651,
+      "impactForceNewtons": 30556.277,
+      "postImpactSpeedKmh": 32.176,
+      "speedRetentionRatio": 0.855
     }
   }
 }

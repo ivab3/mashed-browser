@@ -23,12 +23,15 @@ The runtime now replaces the falling Stage 3 proxy with a fixed-step arcade vehi
 - a playable track session assembled from graphical/collision/AI BSP, TXD, COURSE/LAPDATA metadata,
   world-authored DFF clumps, ordered checkpoints, and the original track spawn;
 - runtime replacement of the debug car proxy by a matching `NAME0.DFF`–`NAME5.DFF` plus `NAME.TXD`
-  pair, rendered at the confirmed DFF `×5` world scale.
+  pair, fitted to the compact 3.02 m physics footprint and kept in its authored physics `+Z`
+  orientation;
 - route-aware collision layers that keep vertical scenery out of wheel raycasts, merge adjacent
   sectors to suppress internal-edge artifacts, and provide a continuous support ribbon along the
   AI checkpoint route;
 - a deterministic full-lap acceptance driver that uses ordinary `VehicleInputFrame` records and
-  completes all 136 Warzone checkpoints without recovery, reverse, or transform overrides.
+  completes all 136 Warzone checkpoints without recovery, reverse, or transform overrides;
+- a versioned vehicle-feel comparison suite that measures acceleration, braking, slalom, drift,
+  hard-corner stability, and impact response for the committed or an alternative JSON profile.
 
 The four surfaces are exposed as adjacent strips in the test arena. This is deliberately a tuning
 lab rather than a race track. The collision binding is live: selecting a local
@@ -46,6 +49,20 @@ same selector produced the expected atomic indices on both Crusader and Wildfire
 The runtime matches numbered vehicle DFF names to their shared TXD case-insensitively, preferring
 skin zero when several variants are loaded. Vehicle textures are owned separately from the track
 dictionary, so loading `CRUSADER.TXD` no longer replaces `WARZONE.TXD`.
+
+The generic standalone-DFF convention remains `×5` for world-authored course models. Original
+vehicle DFFs are handled separately: their visible high-detail bounds are uniformly fitted to the
+current 3.02 m physics length, centered over the chassis, grounded at the suspension footprint, and
+kept in its authored `+Z` orientation. Rapier's wheel-steering sign is inverted at the physics
+adapter so keyboard/gamepad `left` and `right` match the input contract and the visible car.
+
+The scale audit against original files found a `2.295 × 1.743 × 5.299` world-unit intact Crusader
+and an independently authored `2.263 × 1.653 × 5.298` collision envelope in parts `59`–`62` after
+the confirmed DFF `×5` conversion. Warzone's first AI corridor is `5.837` m wide and settles to
+exactly `5.0` m at the following checkpoints, which is consistent with a two-by-two starting grid,
+not four cars abreast. The fitted browser Crusader is already about `1.31` m wide. Its single-car
+camera therefore carries extra height and trailing distance as headroom for the later shared-camera
+fit instead of shrinking the visible model below its physics footprint.
 
 ## Data contract
 
@@ -70,6 +87,11 @@ The browser adapter converts keyboard/gamepad state to this record, clamps inval
 applies a rescaled analog deadzone. `PhysicsRuntime.step` receives the record alongside the fixed
 timestep, keeping DOM and Gamepad APIs out of physics and preserving deterministic input tapes.
 
+The default drive profile also reproduces the normalized throttle envelope found in `MFL.exe`:
+each forward/reverse press starts at 50% force and builds linearly to 100% over six seconds. The
+browser's absolute Rapier force remains a browser-side tune because the original executable's raw
+drivetrain fields use a different physics path and do not retain their source names.
+
 ## Controls
 
 - `W/S` or up/down: accelerate and brake-to-reverse;
@@ -79,6 +101,12 @@ timestep, keeping DOM and Gamepad APIs out of physics and preserving determinist
 - `R`: recover upright at the current horizontal position;
 - gamepad: left stick, triggers, A for brake, B for handbrake, Y for recovery;
 - `C`: toggle collider debug lines; the panel can enable the orbit camera.
+
+These are prototype controls, not a reconstruction of the original keyboard map. The original
+files expose `Accelerate`, `Brake/Reverse`, `Fire`, and `Powerup Toggle`; they do not expose a
+separate `Handbrake` action. Consequently, `Shift` service brake and `Space` handbrake were added
+for the browser handling lab rather than recovered from the game files. The original S/X/arrow/A/D
+layout is intentionally not mirrored here.
 
 ## Current verification
 
@@ -92,12 +120,25 @@ The reproducible measurement harness runs with:
 pnpm vehicle:tune
 ```
 
-It uses the real fixed-step Rapier vehicle without collision props and reports acceleration,
-braking, slalom, and handbrake-turn metrics. The current regression baseline is stored in
+It uses the real fixed-step Rapier vehicle and reports acceleration, braking, slalom,
+handbrake-turn, hard-corner stability, and light-prop impact metrics. The current regression baseline is stored in
 [`reference/vehicle-tuning-baseline.json`](./vehicle-tuning-baseline.json); it describes the browser
-prototype and is not presented as a measurement of the original game. The corrected stability
-baseline reaches 50 km/h in 3.433 s and brakes from 44.879 km/h in 5.99 m. The handbrake scenario
-increases heading change from 1.572 to 1.879 radians over the same 90-frame turn.
+prototype and is not presented as a measurement of the original game. The accepted source-mass
+baseline reaches 50 km/h in 3.267 s and brakes from 45.903 km/h in 5.977 m. The handbrake scenario
+increases heading change from 1.576 to 1.892 radians over the same 90-frame turn. The hard-corner
+tape keeps all four wheels down with 1.168 degrees of peak body tilt. The impact tape hits the first
+crate at 37.651 km/h and retains 85.5% of that speed after 0.5 seconds of neutral input.
+
+An alternative data-driven profile can be compared without editing the committed tune:
+
+```bash
+pnpm vehicle:tune -- \
+  --config reference/captures/crusader-candidate.json \
+  --compare reference/vehicle-tuning-baseline.json
+```
+
+The human A/B procedure and reference capture contract are documented in
+[`reference/VEHICLE_TUNING.md`](./VEHICLE_TUNING.md).
 
 The full-lap acceptance scenario runs with user-owned Warzone assets:
 
@@ -107,7 +148,7 @@ pnpm lap:validate
 
 It binds the original `AI1.BSP`, `COLLIDE.BSP`, and `LAPDATA.LUA`, drives through the same fixed-step
 input path as a player, and exits non-zero if the lap is incomplete or recovery was requested. The
-current deterministic result is 136/136 checkpoints in 60.8 s, 3,648 physics steps, 45.155 km/h peak,
+current deterministic result is 136/136 checkpoints in 60.983 s, 3,659 physics steps, 44.378 km/h peak,
 zero reverse frames, and zero recovery frames. The collision mesh contains 5,833 triangles after
 route filtering and application of the 272-triangle compatibility support ribbon.
 
@@ -129,8 +170,8 @@ time, and a clean console.
 
 Still required before Gate C:
 
-- tune against repeatable acceleration, braking, slalom, drift, impact, and rollover scenarios in
-  the reference game;
+- run the six-scenario A/B session in the reference game, record directional differences, and tune
+  the browser profile against those observations;
 - add a second vehicle and vehicle/vehicle collision cases;
 - add the shared multiplayer camera after multiple active vehicles exist;
 - record a representative vehicle replay and verify it in every supported browser.

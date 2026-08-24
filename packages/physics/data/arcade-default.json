@@ -3,7 +3,7 @@
   "displayName": "Stage 4 arcade prototype",
   "spawn": { "position": [-4, 1.05, -8], "headingRadians": 0 },
   "chassis": {
-    "mass": 1050,
+    "mass": 1000,
     "halfExtents": [0.86, 0.25, 1.34],
     "noseHalfExtents": [0.72, 0.17, 0.42],
     "noseOffset": [0, -0.03, 1.25],
@@ -22,8 +22,10 @@
     "maxSuspensionForce": 35000
   },
   "drive": {
-    "engineForce": 5200,
-    "reverseForce": 3300,
+    "engineForce": 8000,
+    "reverseForce": 6600,
+    "initialThrottleFactor": 0.5,
+    "throttleRampSeconds": 6,
     "serviceBrakeForce": 52,
     "handbrakeForce": 82,
     "reverseEngageSpeed": 1.4,

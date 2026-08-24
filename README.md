@@ -46,7 +46,8 @@ Project direction, gates, and scope live in [`ROADMAP.md`](./ROADMAP.md). Refere
 metadata and acceptance scenarios live in [`REFERENCE.md`](./REFERENCE.md).
 
 Vehicle implementation notes and remaining Gate C work live in
-[`reference/VEHICLE_FOUNDATION.md`](./reference/VEHICLE_FOUNDATION.md).
+[`reference/VEHICLE_FOUNDATION.md`](./reference/VEHICLE_FOUNDATION.md). The repeatable A/B workflow
+for vehicle feel lives in [`reference/VEHICLE_TUNING.md`](./reference/VEHICLE_TUNING.md).
 
 ## Inspect Stage 2 fixtures
 
@@ -90,3 +91,7 @@ acceptance evidence. Loading a numbered vehicle DFF such as `CRUSADER0.DFF` toge
 With extracted Warzone assets in the standard ignored `game-data/` location, `pnpm lap:validate`
 runs the deterministic 136-checkpoint full-lap acceptance scenario. An alternative track directory
 can be passed after the command.
+
+`pnpm vehicle:tune -- --compare reference/vehicle-tuning-baseline.json` runs the six-scenario
+vehicle-feel suite and reports non-zero metric deltas. Pass `--config` with an alternative
+`VehicleConfig` JSON file to measure a candidate without changing the committed profile.

@@ -36,6 +36,8 @@ export interface VehicleConfig {
   drive: {
     engineForce: number;
     reverseForce: number;
+    initialThrottleFactor: number;
+    throttleRampSeconds: number;
     serviceBrakeForce: number;
     handbrakeForce: number;
     reverseEngageSpeed: number;

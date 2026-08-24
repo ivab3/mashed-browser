@@ -155,7 +155,7 @@ export function createRouteInput(state: RouteDriverState): VehicleInputFrame {
 
   return {
     drive: brake > 0 ? 0 : state.speedMetersPerSecond < targetSpeed ? 1 : 0.2,
-    steer: clamp(headingError * 1.55, -1, 1),
+    steer: clamp(-headingError * 1.55, -1, 1),
     brake,
     handbrake: Math.abs(headingError) > 0.85 && state.speedMetersPerSecond > 6 ? 0.25 : 0,
     recover: false,

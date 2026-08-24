@@ -3,6 +3,9 @@ import { describe, expect, it } from "vitest";
 
 import {
   buildRenderWareModel,
+  DEFAULT_VEHICLE_MODEL_GROUND_Y,
+  DEFAULT_VEHICLE_MODEL_LENGTH_METERS,
+  fitVehicleModelRoot,
   renderWareFrameMatrices,
   selectIntactVehicleAtomicIndices,
   type RenderWareModel,
@@ -83,5 +86,24 @@ describe("RenderWare DFF model builder", () => {
       atomics: 2,
       triangles: 2,
     });
+  });
+
+  it("keeps local vehicle DFFs facing physics +Z and fits the arcade footprint", () => {
+    const vehicle = model(0);
+    const built = buildRenderWareModel(vehicle, new Map());
+    const fit = fitVehicleModelRoot(built.root);
+    const bounds = new THREE.Box3().setFromObject(built.root);
+    const forward = new THREE.Vector3(0, 0, 1).applyQuaternion(built.root.quaternion);
+
+    expect(fit.size[2]).toBeCloseTo(DEFAULT_VEHICLE_MODEL_LENGTH_METERS);
+    expect(bounds.min.y).toBeCloseTo(DEFAULT_VEHICLE_MODEL_GROUND_Y);
+    expect(forward.z).toBeCloseTo(1);
+    expect(bounds.getCenter(new THREE.Vector3()).x).toBeCloseTo(0);
+    expect(bounds.getCenter(new THREE.Vector3()).z).toBeCloseTo(0);
+  });
+
+  it("rejects an invalid vehicle footprint", () => {
+    expect(() => fitVehicleModelRoot(new THREE.Group(), 0)).toThrow(/target length/);
+    expect(() => fitVehicleModelRoot(new THREE.Group())).toThrow(/longitudinal extent/);
   });
 });

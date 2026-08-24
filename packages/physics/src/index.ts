@@ -177,6 +177,20 @@ function approach(current: number, target: number, maximumDelta: number): number
   return Math.max(target, current - maximumDelta);
 }
 
+/** Normalized drive-force envelope; the default 0.5/6 curve is sourced from MFL.exe. */
+export function driveForceBuildUpFactor(
+  heldSeconds: number,
+  initialFactor: number,
+  rampSeconds: number,
+): number {
+  const start = Math.min(1, Math.max(0, initialFactor));
+  if (rampSeconds <= 0) {
+    return 1;
+  }
+  const progress = Math.min(1, Math.max(0, heldSeconds) / rampSeconds);
+  return start + (1 - start) * progress;
+}
+
 function rotateVector(vector: RapierVector, rotation: RapierRotation): RapierVector {
   const temporaryX = 2 * (rotation.y * vector.z - rotation.z * vector.y);
   const temporaryY = 2 * (rotation.z * vector.x - rotation.x * vector.z);
@@ -238,6 +252,8 @@ export class PhysicsRuntime {
   #activeSpawn: VehicleSpawn;
   #history: PhysicsTransformHistory;
   #steeringRadians = 0;
+  #forwardDriveSeconds = 0;
+  #reverseDriveSeconds = 0;
   #upsideDownSeconds = 0;
   #recoveryWasPressed = false;
   #telemetry: VehicleTelemetry = {
@@ -636,6 +652,24 @@ export class PhysicsRuntime {
   }
 
   #applyVehicleControls(input: VehicleInputFrame, stepSeconds: number): void {
+    if (input.drive > 0) {
+      this.#forwardDriveSeconds += stepSeconds;
+      this.#reverseDriveSeconds = 0;
+    } else if (input.drive < 0) {
+      this.#reverseDriveSeconds += stepSeconds;
+      this.#forwardDriveSeconds = 0;
+    } else {
+      this.#forwardDriveSeconds = 0;
+      this.#reverseDriveSeconds = 0;
+    }
+    const driveHeldSeconds = input.drive > 0
+      ? this.#forwardDriveSeconds
+      : this.#reverseDriveSeconds;
+    const driveForceFactor = driveForceBuildUpFactor(
+      driveHeldSeconds,
+      this.#config.drive.initialThrottleFactor,
+      this.#config.drive.throttleRampSeconds,
+    );
     const velocity = this.#body.linvel();
     const forward = rotateVector({ x: 0, y: 0, z: 1 }, this.#body.rotation());
     const forwardSpeed = velocity.x * forward.x + velocity.y * forward.y + velocity.z * forward.z;
@@ -664,9 +698,9 @@ export class PhysicsRuntime {
       && up.y > 0.8;
     if (counteringBackwardRoll) {
       this.#body.addForce({
-        x: forward.x * this.#config.drive.engineForce * 2,
-        y: forward.y * this.#config.drive.engineForce * 2,
-        z: forward.z * this.#config.drive.engineForce * 2,
+        x: forward.x * this.#config.drive.engineForce * driveForceFactor * 2,
+        y: forward.y * this.#config.drive.engineForce * driveForceFactor * 2,
+        z: forward.z * this.#config.drive.engineForce * driveForceFactor * 2,
       }, true);
     }
     if (!counteringBackwardRoll
@@ -694,7 +728,8 @@ export class PhysicsRuntime {
       ? 1
       : engineSurfaceMultiplier / groundedDrivenWheels;
     const engineForce = drive >= 0 ? this.#config.drive.engineForce : this.#config.drive.reverseForce;
-    const forcePerWheel = drive * engineForce * surfaceEngine / this.#config.drive.drivenWheels.length;
+    const forcePerWheel = drive * driveForceFactor * engineForce * surfaceEngine
+      / this.#config.drive.drivenWheels.length;
 
     for (let wheel = 0; wheel < this.#vehicle.numWheels(); wheel += 1) {
       const surface = this.#surfaceAtWheel(wheel) ?? "asphalt";
@@ -710,7 +745,9 @@ export class PhysicsRuntime {
         wheel,
         this.#config.handling.baseSideFriction * handling.sideFriction * rearGrip,
       );
-      this.#vehicle.setWheelSteering(wheel, FRONT_WHEELS.has(wheel) ? this.#steeringRadians : 0);
+      // Rapier's +steering direction is mirrored relative to the input contract:
+      // positive input means player-right, while the controller expects the opposite sign.
+      this.#vehicle.setWheelSteering(wheel, FRONT_WHEELS.has(wheel) ? -this.#steeringRadians : 0);
       this.#vehicle.setWheelEngineForce(
         wheel,
         this.#config.drive.drivenWheels.includes(wheel) ? forcePerWheel : 0,
@@ -882,6 +919,8 @@ export class PhysicsRuntime {
     this.#contacts.clear();
     this.#eventQueue.clear();
     this.#steeringRadians = 0;
+    this.#forwardDriveSeconds = 0;
+    this.#reverseDriveSeconds = 0;
     this.#upsideDownSeconds = 0;
     const initial = transformOf(this.#body);
     this.#history = { previous: cloneTransform(initial), current: initial };

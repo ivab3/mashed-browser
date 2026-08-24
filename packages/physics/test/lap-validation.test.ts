@@ -23,7 +23,7 @@ describe("lap route driver", () => {
     });
 
     expect(input.drive).toBe(1);
-    expect(input.steer).toBe(1);
+    expect(input.steer).toBe(-1);
     expect(input.recover).toBe(false);
   });
 
