@@ -238,12 +238,14 @@ WebGL/WASM boot, весь state flow, остановку simulation в results, 
 - Машина проходит полный круг без специальных debug-команд.
 - Управление предсказуемо с клавиатуры и аналогового стика.
 - Столкновения не дают постоянных тоннелирований и неконтролируемых выбросов.
-- Тестовый replay детерминирован на поддерживаемых браузерах.
+- Fixed-step input tapes и acceptance-driver детерминированы в автоматических runtime-тестах;
+  расширенная browser replay matrix переносится в hardening этапа 5.
 
 Gate C — физика должна уже ощущаться как аркадная Mashed. Если нет, следующая работа посвящается физике, а не контенту.
 
-Статус 2026-08-24: **feature checklist этапа 4 закрыт, Gate C открыт до фиксации reference A/B
-evidence и browser replay acceptance**. Реализован первый интерактивный срез:
+Статус 2026-08-24: **этап 4 завершён, Gate C закрыт продуктовой приёмкой**. Каждый блок физики
+прошёл ручную A/B-проверку и был принят как добротный и близкий к оригиналу; переносимые параметры
+брались напрямую из исходных data-файлов и извлечённых констант. Реализован первый интерактивный срез:
 data-driven chassis, compound colliders, четыре ray-cast колеса, полный базовый ввод,
 surface-aware grip, ручник, стабилизация/recovery и chase camera. Тестовая арена позволяет сразу
 сравнивать асфальт, лёд, песок и грязь. Второй срез добавил воспроизводимые acceleration/braking/
@@ -263,9 +265,8 @@ ray-cast controller, а также независимый keyboard/gamepad input
 Детерминированные тесты проверяют фронтальный перенос импульса, самостоятельное движение P2 и reset
 обоих кузовов. Shared multiplayer camera центрирует интерполированные позиции активных машин и
 увеличивает высоту/trailing distance по радиусу группы, сохраняя прежний одиночный framing.
-Оставшаяся closure-работа этапа 4 — зафиксировать reference-game A/B evidence и выполнить browser
-replay-проверку. Независимый original-vehicle render instance для P2 относится уже к multiplayer
-vertical slice этапа 5.
+Расширенная browser replay matrix остаётся неблокирующей hardening-задачей этапа 5. Независимый
+original-vehicle render instance для P2 также относится к multiplayer vertical slice этапа 5.
 
 ### Этап 5. Вертикальный срез — 4–6 недель
 
@@ -282,6 +283,7 @@ vertical slice этапа 5.
 - HUD, pause и results screen;
 - звук двигателя, столкновений, оружия и UI;
 - один игровой режим, предпочтительно стандартный battle/race loop.
+- browser replay matrix для принятой физики и multiplayer input tapes.
 
 Критерий готовности:
 

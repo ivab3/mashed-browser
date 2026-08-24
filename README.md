@@ -8,10 +8,10 @@ Milestone **M0: Asset feasibility** and the Stage 3 runtime foundation are compl
 provides a reproducible local extraction pipeline; Stage 2 provides RenderWare DFF/TXD readers, full
 graphical/collision BSP sector parsing, and a Three.js asset viewer. Stage 3 adds a deterministic
 fixed-step core, replay checks, Rapier/Three.js/Web Audio adapters, debug tooling, and the browser
-runtime shell. Stage 4 is underway with a playable data-driven ray-cast vehicle, keyboard/gamepad
-controls, four grip surfaces, recovery, a shared multiplayer camera, collision BSP binding, dynamic/destructible
-props, a reproducible tuning harness, playable original track sessions, and runtime-bound original
-vehicle DFF/TXD models.
+runtime shell. Stage 4 and Gate C are complete with a playable data-driven ray-cast vehicle,
+keyboard/gamepad controls, four grip surfaces, recovery, a shared multiplayer camera, collision BSP
+binding, dynamic/destructible props, a reproducible tuning harness, playable original track sessions,
+and runtime-bound original vehicle DFF/TXD models.
 [ADR-0001](./reference/ADR-0001-runtime-asset-loading.md) selects direct runtime
 parsing in a loading Worker instead of mandatory pre-conversion.
 
@@ -45,7 +45,7 @@ pnpm vehicle:tune
 Project direction, gates, and scope live in [`ROADMAP.md`](./ROADMAP.md). Reference-build
 metadata and acceptance scenarios live in [`REFERENCE.md`](./REFERENCE.md).
 
-Vehicle implementation notes and remaining Gate C work live in
+Vehicle implementation notes and Gate C acceptance evidence live in
 [`reference/VEHICLE_FOUNDATION.md`](./reference/VEHICLE_FOUNDATION.md). The repeatable A/B workflow
 for vehicle feel lives in [`reference/VEHICLE_TUNING.md`](./reference/VEHICLE_TUNING.md).
 

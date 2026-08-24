@@ -1,6 +1,6 @@
 # Stage 4 vehicle foundation
 
-Status: playable single-vehicle lap implemented on 2026-08-24. Stage 4 and Gate C remain open.
+Status: Stage 4 complete and Gate C accepted on 2026-08-24.
 
 ## Implemented slice
 
@@ -208,12 +208,16 @@ the upright dot above `0.995`, and planar drift below one centimeter. Separate 1
 smokes with the debug proxy and Crusader DFF both held `4/4`, `0 km/h`, asphalt, 60 FPS, zero dropped
 time, and a clean console.
 
-Still required before Gate C:
+## Gate C acceptance
 
-- run the seven-scenario A/B session in the reference game, record directional differences, and tune
-  the browser profile against those observations;
-- record a representative vehicle replay and verify it in every supported browser.
+The product owner accepted each tuning block after hands-on A/B testing: mass, acceleration,
+braking/reverse, source-derived steering, compliant suspension/body response, wall/prop impacts,
+equal-mass vehicle collisions, independent P2 control, and shared-camera behavior. The resulting
+vehicle was judged robust and close to the original. Source data and executable-derived constants
+were used where their units and behavior transferred cleanly; browser-specific Rapier coefficients
+remain explicitly documented tunes. This closes Gate C.
 
-Deferred to the Stage 5 multiplayer vertical slice:
+Deferred as non-blocking Stage 5 multiplayer/hardening work:
 
-- replace the second player's debug proxy with an independently skinned original vehicle instance.
+- replace the second player's debug proxy with an independently skinned original vehicle instance;
+- run a representative multiplayer replay across the supported browser matrix.
