@@ -105,6 +105,73 @@ describe("PhysicsRuntime", () => {
     }
   });
 
+  it("resolves a deterministic collision between equal compound vehicles", async () => {
+    const options = {
+      collisionObjects: false,
+      collisionVehicle: {
+        id: "vehicle-two",
+        spawn: { position: [-4, 1.05, 10] as const, headingRadians: Math.PI },
+      },
+    };
+    const first = await createPhysicsRuntime(
+      new RuntimeEventBus(),
+      1 / 60,
+      DEFAULT_VEHICLE_CONFIG,
+      options,
+    );
+    const second = await createPhysicsRuntime(
+      new RuntimeEventBus(),
+      1 / 60,
+      DEFAULT_VEHICLE_CONFIG,
+      options,
+    );
+    const control = await createPhysicsRuntime(
+      new RuntimeEventBus(),
+      1 / 60,
+      DEFAULT_VEHICLE_CONFIG,
+      { collisionObjects: false },
+    );
+    try {
+      for (let step = 0; step < 60; step += 1) {
+        first.step(1 / 60);
+        second.step(1 / 60);
+        control.step(1 / 60);
+      }
+      const targetStart = first.sceneObjects.find((object) => object.id === "vehicle-two")!;
+      expect(targetStart.kind).toBe("vehicle");
+      expect(first.telemetry.groundedWheels).toBe(4);
+
+      const input = { drive: 1, steer: 0, brake: 0, handbrake: 0, recover: false };
+      for (let step = 0; step < 240; step += 1) {
+        first.step(1 / 60, input);
+        second.step(1 / 60, input);
+        control.step(1 / 60, input);
+      }
+
+      const firstTarget = first.sceneObjects.find((object) => object.id === "vehicle-two")!;
+      const secondTarget = second.sceneObjects.find((object) => object.id === "vehicle-two")!;
+      expect(first.transformHistory.current).toEqual(second.transformHistory.current);
+      expect(firstTarget.history.current).toEqual(secondTarget.history.current);
+      expect(firstTarget.history.current.position[2]).toBeGreaterThan(
+        targetStart.history.current.position[2] + 5,
+      );
+      expect(first.transformHistory.current.position[2]).toBeLessThan(
+        control.transformHistory.current.position[2] - 5,
+      );
+
+      first.resetDemo();
+      const resetPosition = first.sceneObjects
+        .find((object) => object.id === "vehicle-two")!.history.current.position;
+      resetPosition.forEach((component, index) => {
+        expect(component).toBeCloseTo(options.collisionVehicle.spawn.position[index]!);
+      });
+    } finally {
+      first.dispose();
+      second.dispose();
+      control.dispose();
+    }
+  });
+
   it("maps positive player steering to Rapier's mirrored wheel-steering direction", async () => {
     const physics = await createPhysicsRuntime(
       new RuntimeEventBus(),

@@ -68,7 +68,7 @@ export interface VehicleTelemetry {
   surface: SurfaceType | "airborne";
 }
 
-export type PhysicsSceneObjectKind = "crate" | "barrel" | "block";
+export type PhysicsSceneObjectKind = "crate" | "barrel" | "block" | "vehicle";
 
 export interface PhysicsSceneObject {
   id: string;
@@ -90,6 +90,10 @@ export interface VehicleSpawn {
 
 export interface PhysicsRuntimeOptions {
   collisionObjects?: boolean;
+  collisionVehicle?: {
+    id: string;
+    spawn: VehicleSpawn;
+  };
 }
 
 interface SurfaceBodyData {
@@ -106,6 +110,7 @@ interface ArenaObject {
   colliderHandle: number;
   body: RapierRigidBody;
   initialPosition: readonly [number, number, number];
+  initialRotation: readonly [number, number, number, number];
   history: PhysicsTransformHistory;
 }
 
@@ -283,6 +288,10 @@ export class PhysicsRuntime {
   readonly #contacts = new Set<string>();
   readonly #arenaBodies: RapierRigidBody[] = [];
   readonly #arenaObjects: ArenaObject[] = [];
+  readonly #collisionVehicles: Array<{
+    body: RapierRigidBody;
+    controller: RapierVehicleController;
+  }> = [];
   readonly #objectByCollider = new Map<number, ArenaObject>();
   readonly #trackBodies: RapierRigidBody[] = [];
   #trackTriangles = 0;
@@ -323,12 +332,60 @@ export class PhysicsRuntime {
     this.#eventQueue = new RAPIER.EventQueue(true);
     this.#createArena(RAPIER);
 
-    const { chassis, spawn } = this.#config;
+    const { spawn } = this.#config;
+    this.#body = this.#createChassisBody(spawn).body;
+
+    this.#vehicle = this.#createVehicleController(this.#body);
+    if (options.collisionObjects !== false) {
+      this.#createCollisionObjects();
+    }
+    if (options.collisionVehicle) {
+      this.#createCollisionVehicle(options.collisionVehicle.id, options.collisionVehicle.spawn);
+    }
+    const initial = transformOf(this.#body);
+    this.#history = { previous: cloneTransform(initial), current: initial };
+  }
+
+  #createVehicleController(body: RapierRigidBody): RapierVehicleController {
+    const vehicle = this.#world.createVehicleController(body);
+    vehicle.indexUpAxis = 1;
+    vehicle.setIndexForwardAxis = 2;
+    for (const connection of this.#config.wheels.connectionPoints) {
+      vehicle.addWheel(
+        { x: connection[0], y: connection[1], z: connection[2] },
+        { x: 0, y: -1, z: 0 },
+        { x: -1, y: 0, z: 0 },
+        this.#config.wheels.suspensionRestLength,
+        this.#config.wheels.radius,
+      );
+    }
+    for (let wheel = 0; wheel < vehicle.numWheels(); wheel += 1) {
+      vehicle.setWheelMaxSuspensionTravel(wheel, this.#config.wheels.maxSuspensionTravel);
+      vehicle.setWheelSuspensionStiffness(wheel, this.#config.wheels.suspensionStiffness);
+      vehicle.setWheelSuspensionCompression(wheel, this.#config.wheels.suspensionCompression);
+      vehicle.setWheelSuspensionRelaxation(wheel, this.#config.wheels.suspensionRelaxation);
+      vehicle.setWheelMaxSuspensionForce(wheel, this.#config.wheels.maxSuspensionForce);
+      vehicle.setWheelFrictionSlip(
+        wheel,
+        this.#config.handling.baseFrictionSlip * this.#sourceHandling.grip,
+      );
+      vehicle.setWheelSideFrictionStiffness(
+        wheel,
+        this.#config.handling.baseSideFriction * this.#sourceHandling.handling,
+      );
+    }
+    return vehicle;
+  }
+
+  #createChassisBody(spawn: VehicleSpawn): { body: RapierRigidBody; colliderHandle: number } {
+    const RAPIER = this.#RAPIER;
+    const chassis = this.#config.chassis;
     const rotation = yawRotation(spawn.headingRadians);
-    this.#body = this.#world.createRigidBody(
+    const body = this.#world.createRigidBody(
       RAPIER.RigidBodyDesc.dynamic()
         .setTranslation(...spawn.position)
         .setRotation(rotation)
+        .setUserData({ wheelSurface: false })
         .setLinearDamping(chassis.linearDamping)
         .setAngularDamping(chassis.angularDamping)
         .setAdditionalMassProperties(
@@ -341,14 +398,14 @@ export class PhysicsRuntime {
         .setCanSleep(true),
     );
     const collisionEvents = RAPIER.ActiveEvents.COLLISION_EVENTS;
-    this.#world.createCollider(
+    const collider = this.#world.createCollider(
       RAPIER.ColliderDesc.cuboid(...chassis.halfExtents)
         .setMass(0)
         .setFriction(0)
         .setFrictionCombineRule(RAPIER.CoefficientCombineRule.Min)
         .setRestitution(this.#config.collisionResponse.chassisRestitution)
         .setActiveEvents(collisionEvents),
-      this.#body,
+      body,
     );
     this.#world.createCollider(
       RAPIER.ColliderDesc.cuboid(...chassis.noseHalfExtents)
@@ -358,41 +415,9 @@ export class PhysicsRuntime {
         .setFrictionCombineRule(RAPIER.CoefficientCombineRule.Min)
         .setRestitution(this.#config.collisionResponse.noseRestitution)
         .setActiveEvents(collisionEvents),
-      this.#body,
+      body,
     );
-
-    this.#vehicle = this.#world.createVehicleController(this.#body);
-    this.#vehicle.indexUpAxis = 1;
-    this.#vehicle.setIndexForwardAxis = 2;
-    for (const connection of this.#config.wheels.connectionPoints) {
-      this.#vehicle.addWheel(
-        { x: connection[0], y: connection[1], z: connection[2] },
-        { x: 0, y: -1, z: 0 },
-        { x: -1, y: 0, z: 0 },
-        this.#config.wheels.suspensionRestLength,
-        this.#config.wheels.radius,
-      );
-    }
-    for (let wheel = 0; wheel < this.#vehicle.numWheels(); wheel += 1) {
-      this.#vehicle.setWheelMaxSuspensionTravel(wheel, this.#config.wheels.maxSuspensionTravel);
-      this.#vehicle.setWheelSuspensionStiffness(wheel, this.#config.wheels.suspensionStiffness);
-      this.#vehicle.setWheelSuspensionCompression(wheel, this.#config.wheels.suspensionCompression);
-      this.#vehicle.setWheelSuspensionRelaxation(wheel, this.#config.wheels.suspensionRelaxation);
-      this.#vehicle.setWheelMaxSuspensionForce(wheel, this.#config.wheels.maxSuspensionForce);
-      this.#vehicle.setWheelFrictionSlip(
-        wheel,
-        this.#config.handling.baseFrictionSlip * this.#sourceHandling.grip,
-      );
-      this.#vehicle.setWheelSideFrictionStiffness(
-        wheel,
-        this.#config.handling.baseSideFriction * this.#sourceHandling.handling,
-      );
-    }
-    if (options.collisionObjects !== false) {
-      this.#createCollisionObjects();
-    }
-    const initial = transformOf(this.#body);
-    this.#history = { previous: cloneTransform(initial), current: initial };
+    return { body, colliderHandle: collider.handle };
   }
 
   get transformHistory(): PhysicsTransformHistory {
@@ -549,6 +574,15 @@ export class PhysicsRuntime {
       && (collider.parent()?.userData as SurfaceBodyData | undefined)?.wheelSurface !== false
     ));
     this.#applyStability();
+    for (const collisionVehicle of this.#collisionVehicles) {
+      collisionVehicle.body.resetForces(true);
+      collisionVehicle.body.resetTorques(true);
+      collisionVehicle.controller.updateVehicle(stepSeconds, undefined, undefined, (collider) => (
+        collider.parent()?.handle !== collisionVehicle.body.handle
+        && (collider.parent()?.userData as SurfaceBodyData | undefined)?.wheelSurface !== false
+      ));
+      this.#applyStability(collisionVehicle.body, collisionVehicle.controller);
+    }
     this.#world.step(this.#eventQueue);
     this.#drainEvents();
     this.#history = {
@@ -587,6 +621,9 @@ export class PhysicsRuntime {
 
   dispose(): void {
     this.#world.removeVehicleController(this.#vehicle);
+    for (const collisionVehicle of this.#collisionVehicles) {
+      this.#world.removeVehicleController(collisionVehicle.controller);
+    }
     this.#eventQueue.free();
     this.#world.free();
   }
@@ -672,11 +709,31 @@ export class PhysicsRuntime {
         colliderHandle: collider.handle,
         body,
         initialPosition: spec.position,
+        initialRotation: [0, 0, 0, 1],
         history: { previous: cloneTransform(initial), current: initial },
       };
       this.#arenaObjects.push(object);
       this.#objectByCollider.set(collider.handle, object);
     }
+  }
+
+  #createCollisionVehicle(id: string, spawn: VehicleSpawn): void {
+    const created = this.#createChassisBody(spawn);
+    const controller = this.#createVehicleController(created.body);
+    this.#collisionVehicles.push({ body: created.body, controller });
+    const initial = transformOf(created.body);
+    this.#arenaObjects.push({
+      id,
+      kind: "vehicle",
+      destructible: false,
+      active: true,
+      breakForce: Number.POSITIVE_INFINITY,
+      colliderHandle: created.colliderHandle,
+      body: created.body,
+      initialPosition: spawn.position,
+      initialRotation: [initial.rotation[0], initial.rotation[1], initial.rotation[2], initial.rotation[3]],
+      history: { previous: cloneTransform(initial), current: initial },
+    });
   }
 
   #resetCollisionObjects(): void {
@@ -687,7 +744,12 @@ export class PhysicsRuntime {
         y: object.initialPosition[1],
         z: object.initialPosition[2],
       }, true);
-      object.body.setRotation({ x: 0, y: 0, z: 0, w: 1 }, true);
+      object.body.setRotation({
+        x: object.initialRotation[0],
+        y: object.initialRotation[1],
+        z: object.initialRotation[2],
+        w: object.initialRotation[3],
+      }, true);
       object.body.setLinvel({ x: 0, y: 0, z: 0 }, true);
       object.body.setAngvel({ x: 0, y: 0, z: 0 }, true);
       object.active = true;
@@ -815,18 +877,21 @@ export class PhysicsRuntime {
     }
   }
 
-  #applyStability(): void {
-    const rotation = this.#body.rotation();
-    const velocity = this.#body.linvel();
-    const angularVelocity = this.#body.angvel();
+  #applyStability(
+    body: RapierRigidBody = this.#body,
+    vehicle: RapierVehicleController = this.#vehicle,
+  ): void {
+    const rotation = body.rotation();
+    const velocity = body.linvel();
+    const angularVelocity = body.angvel();
     const up = rotateVector({ x: 0, y: 1, z: 0 }, rotation);
     const targetUp = { x: 0, y: 0, z: 0 };
     let groundedWheels = 0;
-    for (let wheel = 0; wheel < this.#vehicle.numWheels(); wheel += 1) {
-      if (!this.#vehicle.wheelIsInContact(wheel)) {
+    for (let wheel = 0; wheel < vehicle.numWheels(); wheel += 1) {
+      if (!vehicle.wheelIsInContact(wheel)) {
         continue;
       }
-      const normal = this.#vehicle.wheelContactNormal(wheel);
+      const normal = vehicle.wheelContactNormal(wheel);
       if (!normal) {
         continue;
       }
@@ -848,9 +913,9 @@ export class PhysicsRuntime {
       }
     }
     const speedSquared = velocity.x * velocity.x + velocity.z * velocity.z;
-    this.#body.addForce({ x: 0, y: -speedSquared * this.#config.handling.downforce, z: 0 }, true);
+    body.addForce({ x: 0, y: -speedSquared * this.#config.handling.downforce, z: 0 }, true);
     // up × surfaceUp points along the shortest restoring pitch/roll axis.
-    this.#body.addTorque({
+    body.addTorque({
       x: (up.y * targetUp.z - up.z * targetUp.y) * this.#config.handling.uprightStrength
         - angularVelocity.x * this.#config.handling.uprightDamping,
       y: 0,

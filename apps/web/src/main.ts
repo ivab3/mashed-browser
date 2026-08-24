@@ -25,6 +25,7 @@ import {
   createPhysicsRuntime,
   deriveRouteCollisionLayers,
   type PhysicsRuntime,
+  type PhysicsRuntimeOptions,
 } from "@mashed/physics";
 import { RuntimeRenderer } from "@mashed/renderer";
 
@@ -59,6 +60,20 @@ function assetSummary(asset: LoadedAsset): string {
 }
 
 const STEP_SECONDS = 1 / 60;
+
+function selectedPhysicsOptions(): PhysicsRuntimeOptions {
+  const lab = new URLSearchParams(window.location.search).get("collisionLab");
+  return lab === "vehicle-pair"
+    ? {
+        collisionObjects: false,
+        collisionVehicle: {
+          id: "vehicle-two",
+          spawn: { position: [-4, 1.05, 10], headingRadians: Math.PI },
+        },
+      }
+    : {};
+}
+
 const viewport = element<HTMLElement>("viewport");
 const stateBadge = element<HTMLElement>("state-badge");
 const runtimeStatus = element<HTMLElement>("runtime-status");
@@ -421,7 +436,7 @@ function renderFrame(timestampMilliseconds: number): void {
 async function boot(): Promise<void> {
   state.transition("loading", "Loading Rapier WebAssembly…");
   try {
-    physics = await createPhysicsRuntime(events, STEP_SECONDS);
+    physics = await createPhysicsRuntime(events, STEP_SECONDS, undefined, selectedPhysicsOptions());
     state.transition("menu", "Runtime ready");
     clock.reset(performance.now() / 1000);
     animationFrame = requestAnimationFrame(renderFrame);

@@ -33,11 +33,19 @@ The runtime now replaces the falling Stage 3 proxy with a fixed-step arcade vehi
 - a versioned vehicle-feel comparison suite that measures acceleration, braking, slalom, drift,
   hard-corner stability, prop impact, and wall impact for the committed or an alternative JSON
   profile.
+- an opt-in vehicle-pair collision lab whose neutral second vehicle reuses the accepted chassis
+  mass/inertia, compound colliders, ray-cast suspension, and upright stabilization.
 
 The four surfaces are exposed as adjacent strips in the test arena. This is deliberately a tuning
 lab rather than a race track. The collision binding is live: selecting a local
 `COLLIDE.BSP`/`COLLISIONS.BSP` in the runtime
 creates merged static drive/scenery colliders. Track spawn/orientation and lap flow are connected.
+
+The browser URL `?collisionLab=vehicle-pair` replaces the prop line with a blue neutral vehicle on
+the asphalt lane. Driving straight produces a repeatable equal-mass frontal impact; reset restores
+both chassis. This is the collision foundation, not yet a second player: the target has a full
+passive vehicle controller but no independent input stream, telemetry, original DFF instance, or
+camera participation.
 
 ## Original vehicle rendering
 
@@ -186,6 +194,6 @@ Still required before Gate C:
 
 - run the seven-scenario A/B session in the reference game, record directional differences, and tune
   the browser profile against those observations;
-- add a second vehicle and vehicle/vehicle collision cases;
+- promote the passive collision vehicle to a second input/telemetry/render-model stream;
 - add the shared multiplayer camera after multiple active vehicles exist;
 - record a representative vehicle replay and verify it in every supported browser.

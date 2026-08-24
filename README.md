@@ -87,11 +87,13 @@ bytes remain local and parsed typed arrays are transferred back without cloning.
 [`reference/RUNTIME_FOUNDATION.md`](./reference/RUNTIME_FOUNDATION.md) for runtime contracts and
 acceptance evidence. Loading a numbered vehicle DFF such as `CRUSADER0.DFF` together with its shared
 `CRUSADER.TXD` replaces the debug car proxy with the intact original model.
+Open `/buildings?collisionLab=vehicle-pair` to replace the arena props with the passive second-car
+collision target.
 
 With extracted Warzone assets in the standard ignored `game-data/` location, `pnpm lap:validate`
 runs the deterministic 136-checkpoint full-lap acceptance scenario. An alternative track directory
 can be passed after the command.
 
-`pnpm vehicle:tune -- --compare reference/vehicle-tuning-baseline.json` runs the six-scenario
+`pnpm vehicle:tune -- --compare reference/vehicle-tuning-baseline.json` runs the seven-scenario
 vehicle-feel suite and reports non-zero metric deltas. Pass `--config` with an alternative
 `VehicleConfig` JSON file to measure a candidate without changing the committed profile.

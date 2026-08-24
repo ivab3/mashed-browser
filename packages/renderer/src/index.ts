@@ -539,14 +539,20 @@ export class RuntimeRenderer {
   #createSceneObject(object: PhysicsSceneObject): THREE.Mesh {
     const geometry = object.kind === "barrel"
       ? new THREE.CylinderGeometry(0.42, 0.42, 1.1, 18)
+      : object.kind === "vehicle"
+        ? new THREE.BoxGeometry(1.72, 0.5, 3.02)
       : object.kind === "block"
         ? new THREE.BoxGeometry(1.6, 1.5, 1.6)
         : new THREE.BoxGeometry(1.1, 1.1, 1.1);
-    const color = object.kind === "barrel" ? 0xd94b3d : object.kind === "block" ? 0x718087 : 0xe0a43b;
+    const color = object.kind === "barrel"
+      ? 0xd94b3d
+      : object.kind === "vehicle"
+        ? 0x3994d8
+        : object.kind === "block" ? 0x718087 : 0xe0a43b;
     const material = new THREE.MeshStandardMaterial({
       color,
       roughness: object.destructible ? 0.68 : 0.9,
-      metalness: object.kind === "barrel" ? 0.28 : 0.05,
+      metalness: object.kind === "barrel" || object.kind === "vehicle" ? 0.28 : 0.05,
     });
     const mesh = new THREE.Mesh(geometry, material);
     mesh.name = object.id;
