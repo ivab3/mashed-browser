@@ -9,7 +9,7 @@ provides a reproducible local extraction pipeline; Stage 2 provides RenderWare D
 graphical/collision BSP sector parsing, and a Three.js asset viewer. Stage 3 adds a deterministic
 fixed-step core, replay checks, Rapier/Three.js/Web Audio adapters, debug tooling, and the browser
 runtime shell. Stage 4 is underway with a playable data-driven ray-cast vehicle, keyboard/gamepad
-controls, four grip surfaces, recovery, a chase camera, collision BSP binding, dynamic/destructible
+controls, four grip surfaces, recovery, a shared multiplayer camera, collision BSP binding, dynamic/destructible
 props, a reproducible tuning harness, playable original track sessions, and runtime-bound original
 vehicle DFF/TXD models.
 [ADR-0001](./reference/ADR-0001-runtime-asset-loading.md) selects direct runtime
@@ -89,7 +89,8 @@ acceptance evidence. Loading a numbered vehicle DFF such as `CRUSADER0.DFF` toge
 `CRUSADER.TXD` replaces the debug car proxy with the intact original model.
 Open `/buildings?collisionLab=vehicle-pair` for the two-player collision lab. P1 uses WASD and
 gamepad 1; P2 uses the arrow keys and gamepad 2. The cars start side by side, facing the same way,
-and both expose independent live telemetry.
+and both expose independent live telemetry. The camera centers the active group and pulls back as
+the cars separate.
 
 With extracted Warzone assets in the standard ignored `game-data/` location, `pnpm lap:validate`
 runs the deterministic 136-checkpoint full-lap acceptance scenario. An alternative track directory

@@ -160,5 +160,14 @@ footer span:first-child { color: #a7b8bb; }
 @media (max-width: 820px) {
   body { overflow: auto; }
   main { grid-template-columns: 1fr; grid-template-rows: minmax(520px, 68vh) auto; height: auto; min-height: 100%; }
+  .telemetry {
+    top: 88px;
+    left: 20px;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    width: calc(100% - 40px);
+  }
+  .telemetry div { padding: 7px 8px; border-right: 1px solid rgb(255 255 255 / 7%); }
+  .telemetry div:nth-child(4n) { border-right: 0; }
+  .telemetry .wide { grid-column: span 2; }
   .control-panel { min-height: 540px; border-top: 1px solid #26343b; border-left: 0; }
 }

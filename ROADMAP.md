@@ -223,7 +223,7 @@ WebGL/WASM boot, весь state flow, остановку simulation в results, 
 - [ ] Столкновения машина–машина.
 - [x] Reset/recovery при перевороте или застревании.
 - [x] Chase camera.
-- [ ] Общая multiplayer camera.
+- [x] Общая multiplayer camera.
 - [x] Параметры машины в data-файлах, а не в коде.
 
 Метод настройки:
@@ -260,7 +260,9 @@ wall impact. Принятый impact-профиль использует изв�
 Vehicle-pair collision slice теперь даёт второй машине те же mass/inertia, compound colliders и
 ray-cast controller, а также независимый keyboard/gamepad input, recovery и telemetry stream.
 Детерминированные тесты проверяют фронтальный перенос импульса, самостоятельное движение P2 и reset
-обоих кузовов. Следующий слой — shared multiplayer camera, затем browser replay-проверка.
+обоих кузовов. Shared multiplayer camera центрирует интерполированные позиции активных машин и
+увеличивает высоту/trailing distance по радиусу группы, сохраняя прежний одиночный framing.
+Следующий слой — browser replay-проверка и независимый original-vehicle render instance для P2.
 
 ### Этап 5. Вертикальный срез — 4–6 недель
 

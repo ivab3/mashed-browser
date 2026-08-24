@@ -16,7 +16,8 @@ The runtime now replaces the falling Stage 3 proxy with a fixed-step arcade vehi
   speed;
 - keyboard and standard-gamepad input sampled once per simulation step;
 - asphalt, ice, sand, and mud handling profiles selected from the collider under each wheel;
-- a damped chase camera with the Stage 3 orbit/debug camera still available;
+- a damped chase camera that fits all active vehicles, with the Stage 3 orbit/debug camera still
+  available;
 - dynamic crates, a barrel, and a heavy block; force-threshold props emit deterministic destruction
   events and are restored with the race reset;
 - a validated plain-data boundary that turns parsed collision BSP world sectors into Rapier trimeshes;
@@ -45,8 +46,15 @@ The browser URL `?collisionLab=vehicle-pair` replaces the prop line with a blue 
 beside P1 on the asphalt lane. Both cars start with the same heading, so P2's arrow-key axes match
 P1's screen-relative direction instead of appearing inverted. Each chassis consumes its own
 replay-safe input record and publishes its own telemetry; steering the parallel cars into each other
-exposes equal-mass side impacts, and reset restores the shared starting row. The second player still
-uses a debug render proxy and does not yet participate in a shared multiplayer camera.
+exposes equal-mass side impacts, and reset restores the shared starting row. Both interpolated
+vehicle positions participate in the shared camera; P2 still uses a debug render proxy.
+
+The pure camera-fit contract averages active vehicle positions and measures the maximum 3D radius
+around that center. The accepted single-car `10 m` trail and `7.2 m` height remain unchanged; both
+values grow smoothly with group separation while extreme zoom growth is capped. The primary
+vehicle's heading still defines view direction, avoiding a feel change in the accepted chase camera.
+At viewport widths up to `820 px`, the telemetry overlay switches to four compact columns so it does
+not hide the multiplayer framing.
 
 ## Original vehicle rendering
 
@@ -70,9 +78,9 @@ The scale audit against original files found a `2.295 × 1.743 × 5.299` world-u
 and an independently authored `2.263 × 1.653 × 5.298` collision envelope in parts `59`–`62` after
 the confirmed DFF `×5` conversion. Warzone's first AI corridor is `5.837` m wide and settles to
 exactly `5.0` m at the following checkpoints, which is consistent with a two-by-two starting grid,
-not four cars abreast. The fitted browser Crusader is already about `1.31` m wide. Its single-car
-camera therefore carries extra height and trailing distance as headroom for the later shared-camera
-fit instead of shrinking the visible model below its physics footprint.
+not four cars abreast. The fitted browser Crusader is already about `1.31` m wide. The shared camera
+therefore expands around the physical group instead of shrinking visible models below their physics
+footprints.
 
 ## Data contract
 
@@ -204,6 +212,5 @@ Still required before Gate C:
 
 - run the seven-scenario A/B session in the reference game, record directional differences, and tune
   the browser profile against those observations;
-- add the shared multiplayer camera after multiple active vehicles exist;
 - replace the second player's debug proxy with an independently skinned original vehicle instance;
 - record a representative vehicle replay and verify it in every supported browser.
