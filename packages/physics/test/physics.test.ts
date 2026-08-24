@@ -5,6 +5,7 @@ import {
   createPhysicsRuntime,
   DEFAULT_VEHICLE_CONFIG,
   driveForceBuildUpFactor,
+  sourceHandlingScales,
   steeringSpeedScale,
 } from "../src/index.js";
 
@@ -22,6 +23,21 @@ describe("PhysicsRuntime", () => {
     expect(steeringSpeedScale(30, 30, "linear", 0.64)).toBeCloseTo(0.36);
     expect(steeringSpeedScale(15, 30, "reciprocal", 1.5)).toBeCloseTo(1 / 1.75);
     expect(steeringSpeedScale(30, 30, "reciprocal", 1.5)).toBeCloseTo(0.4);
+  });
+
+  it("anchors source Grip and Handling to Crusader without changing its accepted tune", () => {
+    expect(sourceHandlingScales({ grip: 35_000, handling: 0.9 })).toEqual({
+      grip: 1,
+      handling: 1,
+    });
+    expect(sourceHandlingScales({ grip: 45_000, handling: 1.2 })).toEqual({
+      grip: 45_000 / 35_000,
+      handling: 0.75,
+    });
+    expect(sourceHandlingScales({ grip: 0, handling: Number.NaN })).toEqual({
+      grip: 1,
+      handling: 1,
+    });
   });
 
   it("keeps a neutral vehicle upright and stationary during an idle soak", async () => {

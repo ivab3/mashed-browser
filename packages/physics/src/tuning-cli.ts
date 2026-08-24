@@ -30,7 +30,17 @@ async function loadJson(path: string): Promise<unknown> {
 
 function parseConfig(value: unknown, path: string): VehicleConfig {
   const object = requireObject(value, path);
-  for (const key of ["id", "spawn", "chassis", "wheels", "drive", "handling", "recovery", "surfaces"]) {
+  for (const key of [
+    "id",
+    "sourceStats",
+    "spawn",
+    "chassis",
+    "wheels",
+    "drive",
+    "handling",
+    "recovery",
+    "surfaces",
+  ]) {
     if (!(key in object)) {
       throw new Error(`${path} is missing VehicleConfig.${key}`);
     }

@@ -1,7 +1,9 @@
 # Stage 4 vehicle feel tuning
 
 Status: the source-derived throttle build-up curve, `1000` chassis mass, and reciprocal steering
-curve are accepted. The next comparison isolates the Crusader `Grip / Handling` relationship.
+curve are accepted. The original `Grip / Handling` values now feed a Crusader-anchored relative
+adapter without changing the accepted Crusader tune. The next human comparison isolates braking
+and brake-to-reverse behavior.
 
 ## Purpose
 
@@ -91,8 +93,24 @@ state flags, so neither is treated as the normal acceleration profile.
 The executable also contains a 15-entry per-vehicle tuning table. Its vehicle-selection UI confirms
 the field order as `Power / Grip / Handling / Drag`. Crusader (internal id `48`) has the raw row
 `85, 35000, 900, 1600`; the latter two values become `0.9` and `1.6` in physics state. Those units do
-not map directly to Rapier wheel force, so the next candidate translates the original speed-sensitive
-steering relationship instead of copying the raw numbers into unrelated Rapier coefficients.
+not map directly to Rapier wheel force. The constructor copies `Grip = 35000` into the vehicle's
+contact state and `Handling = 0.9` into all four wheel records. The update path uses Handling as a
+divisor. An adjacent compiled threshold is independently initialized to `4000`; it is not another
+reading of the Grip field.
+
+The browser therefore keeps its accepted absolute Rapier coefficients and applies only relative
+source-stat scales, anchored to Crusader:
+
+```text
+frictionSlipScale = sourceGrip / 35000
+sideFrictionScale = 0.9 / sourceHandling
+```
+
+For Crusader both scales are exactly `1`, so all 33 deterministic metrics remain byte-for-byte at
+the accepted baseline. Mapping the first scale to Rapier friction slip and the inverse Handling
+scale to side-friction stiffness is a cross-engine adapter, not a claim that the raw original units
+are Rapier units. It becomes testable when a second source vehicle is added. `Power = 85` and
+`Drag = 1.6` are retained in the typed source record but are not yet mapped into browser forces.
 
 The vehicle constructor independently hardcodes chassis mass `1000` and inverse mass `0.001`. A
 single-variable browser candidate using that mass won the human A/B drive on Crusader/Warzone and is

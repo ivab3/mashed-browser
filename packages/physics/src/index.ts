@@ -11,6 +11,7 @@ import {
 
 export {
   DEFAULT_VEHICLE_CONFIG,
+  type SourceVehicleStats,
   type SteeringSpeedCurve,
   type SurfaceHandlingConfig,
   type SurfaceType,
@@ -24,6 +25,7 @@ export {
 import type { RouteCollisionLayers } from "./route-collision.js";
 import {
   DEFAULT_VEHICLE_CONFIG,
+  type SourceVehicleStats,
   type SteeringSpeedCurve,
   type SurfaceType,
   type VehicleConfig,
@@ -209,6 +211,22 @@ export function steeringSpeedScale(
     : Math.max(0, 1 - strength * speedRatio);
 }
 
+const CRUSADER_SOURCE_GRIP = 35_000;
+const CRUSADER_SOURCE_HANDLING = 0.9;
+
+/** Relative source-stat adapter anchored to the accepted Crusader tune. */
+export function sourceHandlingScales(
+  stats: Pick<SourceVehicleStats, "grip" | "handling">,
+): { grip: number; handling: number } {
+  const grip = Number.isFinite(stats.grip) && stats.grip > 0
+    ? stats.grip / CRUSADER_SOURCE_GRIP
+    : 1;
+  const handling = Number.isFinite(stats.handling) && stats.handling > 0
+    ? CRUSADER_SOURCE_HANDLING / stats.handling
+    : 1;
+  return { grip, handling };
+}
+
 function rotateVector(vector: RapierVector, rotation: RapierRotation): RapierVector {
   const temporaryX = 2 * (rotation.y * vector.z - rotation.z * vector.y);
   const temporaryY = 2 * (rotation.z * vector.x - rotation.x * vector.z);
@@ -261,6 +279,7 @@ export class PhysicsRuntime {
   readonly #body: RapierRigidBody;
   readonly #vehicle: RapierVehicleController;
   readonly #config: VehicleConfig;
+  readonly #sourceHandling: { grip: number; handling: number };
   readonly #contacts = new Set<string>();
   readonly #arenaBodies: RapierRigidBody[] = [];
   readonly #arenaObjects: ArenaObject[] = [];
@@ -294,6 +313,7 @@ export class PhysicsRuntime {
     this.#RAPIER = RAPIER;
     this.#events = events;
     this.#config = structuredClone(config);
+    this.#sourceHandling = sourceHandlingScales(this.#config.sourceStats);
     this.#activeSpawn = {
       position: [...this.#config.spawn.position],
       headingRadians: this.#config.spawn.headingRadians,
@@ -359,8 +379,14 @@ export class PhysicsRuntime {
       this.#vehicle.setWheelSuspensionCompression(wheel, this.#config.wheels.suspensionCompression);
       this.#vehicle.setWheelSuspensionRelaxation(wheel, this.#config.wheels.suspensionRelaxation);
       this.#vehicle.setWheelMaxSuspensionForce(wheel, this.#config.wheels.maxSuspensionForce);
-      this.#vehicle.setWheelFrictionSlip(wheel, this.#config.handling.baseFrictionSlip);
-      this.#vehicle.setWheelSideFrictionStiffness(wheel, this.#config.handling.baseSideFriction);
+      this.#vehicle.setWheelFrictionSlip(
+        wheel,
+        this.#config.handling.baseFrictionSlip * this.#sourceHandling.grip,
+      );
+      this.#vehicle.setWheelSideFrictionStiffness(
+        wheel,
+        this.#config.handling.baseSideFriction * this.#sourceHandling.handling,
+      );
     }
     if (options.collisionObjects !== false) {
       this.#createCollisionObjects();
@@ -761,11 +787,14 @@ export class PhysicsRuntime {
         : 1;
       this.#vehicle.setWheelFrictionSlip(
         wheel,
-        this.#config.handling.baseFrictionSlip * handling.frictionSlip,
+        this.#config.handling.baseFrictionSlip * this.#sourceHandling.grip * handling.frictionSlip,
       );
       this.#vehicle.setWheelSideFrictionStiffness(
         wheel,
-        this.#config.handling.baseSideFriction * handling.sideFriction * rearGrip,
+        this.#config.handling.baseSideFriction
+          * this.#sourceHandling.handling
+          * handling.sideFriction
+          * rearGrip,
       );
       // Rapier's +steering direction is mirrored relative to the input contract:
       // positive input means player-right, while the controller expects the opposite sign.

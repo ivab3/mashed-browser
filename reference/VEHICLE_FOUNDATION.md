@@ -67,9 +67,11 @@ fit instead of shrinking the visible model below its physics footprint.
 ## Data contract
 
 The initial tune lives in [`packages/physics/data/arcade-default.json`](../packages/physics/data/arcade-default.json).
-It owns chassis dimensions/mass, suspension, drive, grip, stabilization, recovery, and per-surface
-multipliers. Physics code consumes the typed `VehicleConfig` contract and accepts an alternative
-profile at runtime; vehicle constants do not need code changes.
+It owns the original vehicle's `Power / Grip / Handling / Drag` source record alongside chassis
+dimensions/mass, suspension, drive, grip, stabilization, recovery, and per-surface multipliers.
+Physics code consumes the typed `VehicleConfig` contract and accepts an alternative profile at
+runtime; vehicle constants do not need code changes. Source Grip and Handling are translated as
+relative coefficients anchored to Crusader rather than copied into unrelated Rapier units.
 
 `VehicleInputFrame` is plain replay-safe data:
 
@@ -91,6 +93,10 @@ The default drive profile also reproduces the normalized throttle envelope found
 each forward/reverse press starts at 50% force and builds linearly to 100% over six seconds. The
 browser's absolute Rapier force remains a browser-side tune because the original executable's raw
 drivetrain fields use a different physics path and do not retain their source names.
+
+Crusader's source `Grip = 35000` and `Handling = 0.9` are the neutral `1 / 1` anchor for the
+relative handling adapter. Consequently, integrating them changes none of the accepted Crusader
+regression metrics; the ratios only affect future vehicle profiles with different source rows.
 
 ## Controls
 
@@ -148,7 +154,7 @@ pnpm lap:validate
 
 It binds the original `AI1.BSP`, `COLLIDE.BSP`, and `LAPDATA.LUA`, drives through the same fixed-step
 input path as a player, and exits non-zero if the lap is incomplete or recovery was requested. The
-current deterministic result is 136/136 checkpoints in 60.983 s, 3,659 physics steps, 44.378 km/h peak,
+current deterministic result is 136/136 checkpoints in 61.867 s, 3,712 physics steps, 44.559 km/h peak,
 zero reverse frames, and zero recovery frames. The collision mesh contains 5,833 triangles after
 route filtering and application of the 272-triangle compatibility support ribbon.
 

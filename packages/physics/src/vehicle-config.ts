@@ -4,6 +4,13 @@ export type Vector3Config = readonly [number, number, number];
 export type SurfaceType = "asphalt" | "ice" | "sand" | "mud";
 export type SteeringSpeedCurve = "linear" | "reciprocal";
 
+export interface SourceVehicleStats {
+  power: number;
+  grip: number;
+  handling: number;
+  drag: number;
+}
+
 export interface SurfaceHandlingConfig {
   frictionSlip: number;
   sideFriction: number;
@@ -14,6 +21,7 @@ export interface SurfaceHandlingConfig {
 export interface VehicleConfig {
   id: string;
   displayName: string;
+  sourceStats: SourceVehicleStats;
   spawn: { position: Vector3Config; headingRadians: number };
   chassis: {
     mass: number;

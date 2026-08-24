@@ -1,6 +1,7 @@
 {
   "id": "arcade-default",
   "displayName": "Stage 4 arcade prototype",
+  "sourceStats": { "power": 85, "grip": 35000, "handling": 0.9, "drag": 1.6 },
   "spawn": { "position": [-4, 1.05, -8], "headingRadians": 0 },
   "chassis": {
     "mass": 1000,
