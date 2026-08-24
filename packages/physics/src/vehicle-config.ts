@@ -66,6 +66,15 @@ export interface VehicleConfig {
     uprightStrength: number;
     uprightDamping: number;
   };
+  collisionResponse: {
+    chassisRestitution: number;
+    noseRestitution: number;
+    arenaGroundRestitution: number;
+    arenaWallRestitution: number;
+    trackRestitution: number;
+    propRestitution: number;
+    barrelRestitution: number;
+  };
   recovery: {
     lift: number;
     autoDelaySeconds: number;

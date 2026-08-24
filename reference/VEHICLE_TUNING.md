@@ -1,8 +1,9 @@
 # Stage 4 vehicle feel tuning
 
 Status: the source-derived throttle build-up curve, `1000` chassis mass, reciprocal steering curve,
-relative `Grip / Handling` adapter, and accepted compliant suspension are integrated. Human A/B
-drives retained the faster browser brake-to-reverse transition and selected suspension `30/4/5`.
+relative `Grip / Handling` adapter, compliant suspension, and zero-bounce obstacle response are
+integrated. Human A/B drives retained the faster browser brake-to-reverse transition and selected
+suspension `30/4/5` plus the source-impact candidate.
 
 ## Purpose
 
@@ -16,7 +17,7 @@ If a different car, track, surface, or input device is used, it must be recorded
 
 ## Reproducible browser scenarios
 
-`pnpm vehicle:tune` runs six fixed 60 Hz input tapes:
+`pnpm vehicle:tune` runs seven fixed 60 Hz input tapes:
 
 | Scenario | Input tape | Main observations |
 |---|---|---|
@@ -26,8 +27,9 @@ If a different car, track, surface, or input device is used, it must be recorded
 | Drift | two seconds of throttle, then a 1.5 s turn with and without handbrake | rotation, slip and speed loss |
 | Cornering | two seconds of throttle, then three seconds at 82% steering | body tilt, wheel lift and stability |
 | Impact | full throttle into the first light crate, then 0.5 s neutral | impact force and retained speed |
+| Wall impact | full throttle into the arena end wall, then 0.5 s neutral | rebound and post-impact speed |
 
-The suite reports schema version 2. The committed browser regression baseline is
+The suite reports schema version 3. The committed browser regression baseline is
 [`vehicle-tuning-baseline.json`](./vehicle-tuning-baseline.json).
 
 ## Candidate comparison
@@ -59,7 +61,7 @@ Use `tools/reference/run-crossover.sh` for the original. A capture note belongs 
 `reference/captures/` directory and records:
 
 - date, reference build, vehicle, track, surface, input device, and game mode;
-- which of the six scenarios was repeated;
+- which of the seven scenarios was repeated;
 - a short directional verdict such as `browser accelerates too slowly`, `handbrake rotates too
   abruptly`, or `body is too rigid over the same corner`;
 - an optional timestamped clip or numeric measurement only when it helps decide a concrete change;
@@ -120,7 +122,7 @@ frictionSlipScale = sourceGrip / 35000
 sideFrictionScale = 0.9 / sourceHandling
 ```
 
-For Crusader both scales are exactly `1`, so all 33 deterministic metrics remain byte-for-byte at
+For Crusader both scales are exactly `1`, so all 37 deterministic metrics remain byte-for-byte at
 the accepted baseline. Mapping the first scale to Rapier friction slip and the inverse Handling
 scale to side-friction stiffness is a cross-engine adapter, not a claim that the raw original units
 are Rapier units. It becomes testable when a second source vehicle is added. `Power = 85` and
@@ -158,3 +160,18 @@ raises maximum body tilt from `0.926°` to `1.619°`, keeps all four wheels grou
 change at `4.772 rad` versus `4.773 rad`. The softer `20/3/4` probe reached `2.017°` but changed the
 slalom lateral offset from `8.691 m` to `6.087 m`, so it was excluded from the human comparison. A
 human A/B drive preferred the visible body response of `30/4/5`; it is now the committed default.
+
+Warzone's editable `COURSE.LUA` sets `BOUNCE = 0` and `FRICTION = 1` for every RenderWare Physics
+object. The same pair appears across the other extracted tracks. Warzone then supplies per-object
+masses through `RWP_Object_Properties`, ranging from `0.3` for small metal props to `2000` for the
+pontoon deck. `MFL.exe` confirms that these arguments become the RWP object's `bouncefriction`,
+`slidefriction`, and mass fields. They are object/contact coefficients, not the vehicle table's
+`Grip` or chassis mass.
+
+The source-impact candidate maps only the exact zero-bounce direction into Rapier by setting the
+obstacle restitution coefficients to `0`; it leaves chassis and road/track response, friction,
+masses, break thresholds, geometry, and the accepted vehicle tune unchanged. Compared with the
+current tune, the isolated wall probe lowers peak rebound from `7.164 km/h` to `0.925 km/h`. The
+heavy-block probe changes vehicle speed after half a second from `34.803 km/h` to `34.569 km/h`,
+while the regular prop tape changes retained speed from `85.2%` to `85.6%`. A human A/B drive
+preferred the source-aligned response with less rubber-like rebound; it is now the accepted default.

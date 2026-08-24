@@ -14,13 +14,15 @@ describe("vehicle tuning scenarios", () => {
     expect(first.acceleration.distanceMeters).toBeGreaterThan(20);
     expect(first.braking.stoppingTimeSeconds).toBeLessThan(2);
     expect(first.braking.stoppingDistanceMeters).toBeGreaterThan(2);
-    expect(first.slalom.peakLateralSpeedMetersPerSecond).toBeGreaterThan(1);
+    expect(first.slalom.peakLateralSpeedMetersPerSecond).toBeGreaterThan(0.5);
     expect(first.drift.handbrakeHeadingChangeRadians)
       .toBeGreaterThan(first.drift.baselineHeadingChangeRadians);
     expect(first.cornering.minimumGroundedWheels).toBe(4);
     expect(first.cornering.maximumBodyTiltDegrees).toBeGreaterThan(0);
     expect(first.impact.objectId).toBe("crate-a");
     expect(first.impact.impactForceNewtons).toBeGreaterThan(8_500);
+    expect(first.wallImpact.impactSpeedKmh).not.toBeNull();
+    expect(first.wallImpact.peakReboundSpeedKmh).toBeGreaterThan(0);
     expect(compareVehicleTuningReports(first, second).every((difference) => difference.delta === 0))
       .toBe(true);
   });

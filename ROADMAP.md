@@ -253,10 +253,12 @@ Idle rollover устранён исправлением направления u
 soak. Route-aware collision отделяет проезжую поверхность от декораций и добавляет непрерывную
 опорную ленту по 136 AI-чекпоинтам. Автоматизированный acceptance-driver завершает полный круг
 Warzone за 60,8 с через обычные input frames, без recovery, reverse и телепортов; сценарий запускается
-командой `pnpm lap:validate`. Tuning harness v2 принимает альтернативные JSON-профили, сравнивает их
-с baseline и измеряет шесть сценариев: разгон, торможение, slalom, drift, hard corner и impact.
-Следующий приоритет — провести первый A/B-заезд против оригинала, добавить
-столкновение двух машин, shared multiplayer camera и browser replay-проверку.
+командой `pnpm lap:validate`. Tuning harness v3 принимает альтернативные JSON-профили, сравнивает их
+с baseline и измеряет семь сценариев: разгон, торможение, slalom, drift, hard corner, prop impact и
+wall impact. Принятый impact-профиль использует извлечённую из трасс конвенцию `BOUNCE = 0` для стен
+арены и динамических props; схема v3 отделяет отскок от стены от свободной slalom-ленты.
+Следующий приоритет — добавить столкновение двух машин, shared multiplayer camera и browser
+replay-проверку.
 
 ### Этап 5. Вертикальный срез — 4–6 недель
 

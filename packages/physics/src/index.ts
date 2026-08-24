@@ -346,7 +346,7 @@ export class PhysicsRuntime {
         .setMass(0)
         .setFriction(0)
         .setFrictionCombineRule(RAPIER.CoefficientCombineRule.Min)
-        .setRestitution(0.08)
+        .setRestitution(this.#config.collisionResponse.chassisRestitution)
         .setActiveEvents(collisionEvents),
       this.#body,
     );
@@ -356,7 +356,7 @@ export class PhysicsRuntime {
         .setMass(0)
         .setFriction(0)
         .setFrictionCombineRule(RAPIER.CoefficientCombineRule.Min)
-        .setRestitution(0.12)
+        .setRestitution(this.#config.collisionResponse.noseRestitution)
         .setActiveEvents(collisionEvents),
       this.#body,
     );
@@ -486,7 +486,7 @@ export class PhysicsRuntime {
           this.#RAPIER.TriMeshFlags.FIX_INTERNAL_EDGES,
         )
           .setFriction(0.9)
-          .setRestitution(0.03)
+          .setRestitution(this.#config.collisionResponse.trackRestitution)
           .setActiveEvents(this.#RAPIER.ActiveEvents.COLLISION_EVENTS),
         body,
       );
@@ -607,7 +607,7 @@ export class PhysicsRuntime {
       this.#world.createCollider(
         RAPIER.ColliderDesc.cuboid(4, 0.2, 35)
           .setFriction(0.9)
-          .setRestitution(0.04)
+          .setRestitution(this.#config.collisionResponse.arenaGroundRestitution)
           .setActiveEvents(collisionEvents),
         body,
       );
@@ -626,7 +626,7 @@ export class PhysicsRuntime {
         RAPIER.ColliderDesc.cuboid(halfX, halfY, halfZ)
           .setTranslation(x, y, z)
           .setFriction(0.55)
-          .setRestitution(0.18)
+          .setRestitution(this.#config.collisionResponse.arenaWallRestitution)
           .setActiveEvents(collisionEvents),
         wallBody,
       );
@@ -654,7 +654,9 @@ export class PhysicsRuntime {
       colliderDesc
         .setMass(spec.mass)
         .setFriction(0.62)
-        .setRestitution(spec.kind === "barrel" ? 0.28 : 0.12)
+        .setRestitution(spec.kind === "barrel"
+          ? this.#config.collisionResponse.barrelRestitution
+          : this.#config.collisionResponse.propRestitution)
         .setActiveEvents(collisionEvents | (spec.destructible ? contactEvents : 0));
       if (spec.destructible) {
         colliderDesc.setContactForceEventThreshold(spec.breakForce);

@@ -10,7 +10,7 @@ import {
 } from "./index.js";
 
 interface TuningScenarios {
-  version: 2;
+  version: 3;
   stepSeconds: number;
   settleSteps: number;
   acceleration: { durationSteps: number; targetSpeedKmh: number };
@@ -19,10 +19,17 @@ interface TuningScenarios {
   drift: { accelerationSteps: number; turnSteps: number; steering: number; handbrake: number };
   cornering: { accelerationSteps: number; turnSteps: number; steering: number };
   impact: { maximumSteps: number; postImpactSteps: number };
+  wallImpact: {
+    maximumSteps: number;
+    postImpactSteps: number;
+    minimumZ: number;
+    minimumApproachSpeedMetersPerSecond: number;
+    impactSpeedRatio: number;
+  };
 }
 
 export interface VehicleTuningReport {
-  version: 2;
+  version: 3;
   configId: string;
   stepSeconds: number;
   acceleration: {
@@ -70,6 +77,12 @@ export interface VehicleTuningReport {
     impactForceNewtons: number | null;
     postImpactSpeedKmh: number | null;
     speedRetentionRatio: number | null;
+  };
+  wallImpact: {
+    impactTimeSeconds: number | null;
+    impactSpeedKmh: number | null;
+    peakReboundSpeedKmh: number | null;
+    postImpactSpeedKmh: number | null;
   };
 }
 
@@ -348,6 +361,50 @@ async function impactReport(config: VehicleConfig): Promise<VehicleTuningReport[
   }
 }
 
+async function wallImpactReport(config: VehicleConfig): Promise<VehicleTuningReport["wallImpact"]> {
+  const runtime = await tuningRuntime(config);
+  try {
+    let previousForwardSpeed = 0;
+    let impactStep: number | undefined;
+    let impactSpeed = 0;
+    let minimumForwardSpeed = 0;
+    for (let step = 1; step <= SCENARIOS.wallImpact.maximumSteps; step += 1) {
+      runtime.step(SCENARIOS.stepSeconds, impactStep === undefined ? DRIVE : NEUTRAL);
+      const forwardSpeed = runtime.telemetry.forwardSpeedMetersPerSecond;
+      const positionZ = runtime.transformHistory.current.position[2];
+      if (
+        impactStep === undefined
+        && positionZ > SCENARIOS.wallImpact.minimumZ
+        && previousForwardSpeed > SCENARIOS.wallImpact.minimumApproachSpeedMetersPerSecond
+        && forwardSpeed < previousForwardSpeed * SCENARIOS.wallImpact.impactSpeedRatio
+      ) {
+        impactStep = step;
+        impactSpeed = previousForwardSpeed;
+        minimumForwardSpeed = forwardSpeed;
+      } else if (impactStep !== undefined) {
+        minimumForwardSpeed = Math.min(minimumForwardSpeed, forwardSpeed);
+        if (step - impactStep >= SCENARIOS.wallImpact.postImpactSteps) {
+          return {
+            impactTimeSeconds: rounded(impactStep * SCENARIOS.stepSeconds),
+            impactSpeedKmh: rounded(impactSpeed * 3.6),
+            peakReboundSpeedKmh: rounded(Math.max(0, -minimumForwardSpeed) * 3.6),
+            postImpactSpeedKmh: rounded(runtime.telemetry.speedMetersPerSecond * 3.6),
+          };
+        }
+      }
+      previousForwardSpeed = forwardSpeed;
+    }
+    return {
+      impactTimeSeconds: null,
+      impactSpeedKmh: null,
+      peakReboundSpeedKmh: null,
+      postImpactSpeedKmh: null,
+    };
+  } finally {
+    runtime.dispose();
+  }
+}
+
 export async function runVehicleTuningSuite(
   config: VehicleConfig = DEFAULT_VEHICLE_CONFIG,
 ): Promise<VehicleTuningReport> {
@@ -359,6 +416,7 @@ export async function runVehicleTuningSuite(
     handbrakeDrift,
     cornering,
     impact,
+    wallImpact,
   ] = await Promise.all([
     accelerationReport(config),
     brakingReport(config),
@@ -367,9 +425,10 @@ export async function runVehicleTuningSuite(
     driftRun(config, SCENARIOS.drift.handbrake),
     corneringReport(config),
     impactReport(config),
+    wallImpactReport(config),
   ]);
   return {
-    version: 2,
+    version: 3,
     configId: config.id,
     stepSeconds: SCENARIOS.stepSeconds,
     acceleration,
@@ -387,6 +446,7 @@ export async function runVehicleTuningSuite(
     },
     cornering,
     impact,
+    wallImpact,
   };
 }
 
@@ -422,6 +482,7 @@ export function compareVehicleTuningReports(
     drift: reference.drift,
     cornering: reference.cornering,
     impact: reference.impact,
+    wallImpact: reference.wallImpact,
   });
   const candidateMetrics = numericMetrics({
     acceleration: candidate.acceleration,
@@ -430,6 +491,7 @@ export function compareVehicleTuningReports(
     drift: candidate.drift,
     cornering: candidate.cornering,
     impact: candidate.impact,
+    wallImpact: candidate.wallImpact,
   });
   return [...referenceMetrics].flatMap(([metric, referenceValue]) => {
     const candidateValue = candidateMetrics.get(metric);

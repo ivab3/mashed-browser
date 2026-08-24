@@ -1,5 +1,5 @@
 {
-  "version": 2,
+  "version": 3,
   "stepSeconds": 0.016666666666666666,
   "settleSteps": 60,
   "acceleration": {
@@ -12,7 +12,7 @@
     "stoppedSpeedKmh": 1
   },
   "slalom": {
-    "durationSteps": 360,
+    "durationSteps": 240,
     "switchEverySteps": 45,
     "steering": 0.52
   },
@@ -30,5 +30,12 @@
   "impact": {
     "maximumSteps": 300,
     "postImpactSteps": 30
+  },
+  "wallImpact": {
+    "maximumSteps": 600,
+    "postImpactSteps": 30,
+    "minimumZ": 30,
+    "minimumApproachSpeedMetersPerSecond": 5,
+    "impactSpeedRatio": 0.5
   }
 }

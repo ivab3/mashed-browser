@@ -2,7 +2,7 @@
   "kind": "browser-prototype-baseline",
   "note": "Regression baseline for the current browser tune; not a measured original-game target.",
   "report": {
-    "version": 2,
+    "version": 3,
     "configId": "arcade-default",
     "stepSeconds": 0.016666666666666666,
     "acceleration": {
@@ -19,10 +19,10 @@
       "finalSpeedKmh": 0.886
     },
     "slalom": {
-      "distanceMeters": 42.378,
-      "lateralOffsetMeters": 8.151,
-      "peakLateralSpeedMetersPerSecond": 7.363,
-      "peakSpeedKmh": 67.325
+      "distanceMeters": 31.888,
+      "lateralOffsetMeters": 1.945,
+      "peakLateralSpeedMetersPerSecond": 0.85,
+      "peakSpeedKmh": 58.95
     },
     "drift": {
       "baselinePeakLateralSpeedMetersPerSecond": 0.727,
@@ -47,9 +47,15 @@
       "objectId": "crate-a",
       "impactTimeSeconds": 2.5,
       "impactSpeedKmh": 37.651,
-      "impactForceNewtons": 31773.602,
-      "postImpactSpeedKmh": 32.082,
-      "speedRetentionRatio": 0.852
+      "impactForceNewtons": 30232.668,
+      "postImpactSpeedKmh": 32.237,
+      "speedRetentionRatio": 0.856
+    },
+    "wallImpact": {
+      "impactTimeSeconds": 4.433,
+      "impactSpeedKmh": 69.13,
+      "peakReboundSpeedKmh": 0.925,
+      "postImpactSpeedKmh": 0.878
     }
   }
 }

@@ -31,7 +31,8 @@ The runtime now replaces the falling Stage 3 proxy with a fixed-step arcade vehi
 - a deterministic full-lap acceptance driver that uses ordinary `VehicleInputFrame` records and
   completes all 136 Warzone checkpoints without recovery, reverse, or transform overrides;
 - a versioned vehicle-feel comparison suite that measures acceleration, braking, slalom, drift,
-  hard-corner stability, and impact response for the committed or an alternative JSON profile.
+  hard-corner stability, prop impact, and wall impact for the committed or an alternative JSON
+  profile.
 
 The four surfaces are exposed as adjacent strips in the test arena. This is deliberately a tuning
 lab rather than a race track. The collision binding is live: selecting a local
@@ -72,6 +73,10 @@ dimensions/mass, suspension, drive, grip, stabilization, recovery, and per-surfa
 Physics code consumes the typed `VehicleConfig` contract and accepts an alternative profile at
 runtime; vehicle constants do not need code changes. Source Grip and Handling are translated as
 relative coefficients anchored to Crusader rather than copied into unrelated Rapier units.
+
+Collision restitution is also part of this data contract. Separate fields cover the chassis, nose,
+arena ground/walls, imported track collision, regular props, and barrels so an impact candidate does
+not require hardcoded physics edits.
 
 `VehicleInputFrame` is plain replay-safe data:
 
@@ -127,15 +132,16 @@ pnpm vehicle:tune
 ```
 
 It uses the real fixed-step Rapier vehicle and reports acceleration, braking, slalom,
-handbrake-turn, hard-corner stability, and light-prop impact metrics. The current regression baseline is stored in
+handbrake-turn, hard-corner stability, light-prop impact, and wall-impact metrics. The current regression baseline is stored in
 [`reference/vehicle-tuning-baseline.json`](./vehicle-tuning-baseline.json); it describes the browser
 prototype and is not presented as a measurement of the original game. The accepted source-mass
 baseline reaches 50 km/h in 3.267 s and stops from 45.903 km/h in 6.080 m when the ordinary
 brake/reverse drive input is held. The handbrake scenario
 increases heading change from 1.341 to 1.618 radians over the same 90-frame turn. The accepted
 compliant suspension keeps all four wheels down with 1.619 degrees of peak body tilt. The impact
-tape hits the first crate at 37.651 km/h and retains 85.2% of that speed after 0.5 seconds of neutral
-input.
+tape hits the first crate at 37.651 km/h and retains 85.6% of that speed after 0.5 seconds of neutral
+input. The accepted zero-bounce obstacle response limits the 69.130 km/h wall probe to a 0.925 km/h
+rebound.
 
 An alternative data-driven profile can be compared without editing the committed tune:
 
@@ -178,7 +184,7 @@ time, and a clean console.
 
 Still required before Gate C:
 
-- run the six-scenario A/B session in the reference game, record directional differences, and tune
+- run the seven-scenario A/B session in the reference game, record directional differences, and tune
   the browser profile against those observations;
 - add a second vehicle and vehicle/vehicle collision cases;
 - add the shared multiplayer camera after multiple active vehicles exist;

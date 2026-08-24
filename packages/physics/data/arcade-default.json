@@ -46,6 +46,15 @@
     "uprightStrength": 1900,
     "uprightDamping": 165
   },
+  "collisionResponse": {
+    "chassisRestitution": 0.08,
+    "noseRestitution": 0.12,
+    "arenaGroundRestitution": 0.04,
+    "arenaWallRestitution": 0,
+    "trackRestitution": 0.03,
+    "propRestitution": 0,
+    "barrelRestitution": 0
+  },
   "recovery": {
     "lift": 1.1,
     "autoDelaySeconds": 2.25,

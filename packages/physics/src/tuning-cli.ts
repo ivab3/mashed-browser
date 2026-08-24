@@ -38,6 +38,7 @@ function parseConfig(value: unknown, path: string): VehicleConfig {
     "wheels",
     "drive",
     "handling",
+    "collisionResponse",
     "recovery",
     "surfaces",
   ]) {
@@ -55,8 +56,8 @@ function parseReport(value: unknown, path: string): VehicleTuningReport {
   const object = requireObject(value, path);
   const report = "report" in object ? object["report"] : object;
   const reportObject = requireObject(report, path);
-  if (reportObject["version"] !== 2 || typeof reportObject["stepSeconds"] !== "number") {
-    throw new Error(`${path} is not a version 2 vehicle tuning report`);
+  if (reportObject["version"] !== 3 || typeof reportObject["stepSeconds"] !== "number") {
+    throw new Error(`${path} is not a version 3 vehicle tuning report`);
   }
   return reportObject as unknown as VehicleTuningReport;
 }
