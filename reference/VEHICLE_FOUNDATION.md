@@ -32,20 +32,21 @@ The runtime now replaces the falling Stage 3 proxy with a fixed-step arcade vehi
   completes all 136 Warzone checkpoints without recovery, reverse, or transform overrides;
 - a versioned vehicle-feel comparison suite that measures acceleration, braking, slalom, drift,
   hard-corner stability, prop impact, and wall impact for the committed or an alternative JSON
-  profile.
-- an opt-in vehicle-pair collision lab whose neutral second vehicle reuses the accepted chassis
-  mass/inertia, compound colliders, ray-cast suspension, and upright stabilization.
+  profile;
+- an opt-in two-player collision lab whose second vehicle reuses the accepted chassis mass/inertia,
+  compound colliders, ray-cast suspension, controls, recovery, and upright stabilization.
 
 The four surfaces are exposed as adjacent strips in the test arena. This is deliberately a tuning
 lab rather than a race track. The collision binding is live: selecting a local
 `COLLIDE.BSP`/`COLLISIONS.BSP` in the runtime
 creates merged static drive/scenery colliders. Track spawn/orientation and lap flow are connected.
 
-The browser URL `?collisionLab=vehicle-pair` replaces the prop line with a blue neutral vehicle on
-the asphalt lane. Driving straight produces a repeatable equal-mass frontal impact; reset restores
-both chassis. This is the collision foundation, not yet a second player: the target has a full
-passive vehicle controller but no independent input stream, telemetry, original DFF instance, or
-camera participation.
+The browser URL `?collisionLab=vehicle-pair` replaces the prop line with a blue player-two vehicle
+beside P1 on the asphalt lane. Both cars start with the same heading, so P2's arrow-key axes match
+P1's screen-relative direction instead of appearing inverted. Each chassis consumes its own
+replay-safe input record and publishes its own telemetry; steering the parallel cars into each other
+exposes equal-mass side impacts, and reset restores the shared starting row. The second player still
+uses a debug render proxy and does not yet participate in a shared multiplayer camera.
 
 ## Original vehicle rendering
 
@@ -99,8 +100,10 @@ interface VehicleInputFrame {
 ```
 
 The browser adapter converts keyboard/gamepad state to this record, clamps invalid values, and
-applies a rescaled analog deadzone. `PhysicsRuntime.step` receives the record alongside the fixed
-timestep, keeping DOM and Gamepad APIs out of physics and preserving deterministic input tapes.
+applies a rescaled analog deadzone. `PhysicsRuntime.step` receives P1's record and an optional map of
+additional records keyed by vehicle ID alongside the fixed timestep. DOM and Gamepad APIs remain out
+of physics, so both local-player streams stay deterministic and replay-safe. Telemetry is available
+through the legacy P1 getter or `getVehicleTelemetry(id)` for either chassis.
 
 The default drive profile also reproduces the normalized throttle envelope found in `MFL.exe`:
 each forward/reverse press starts at 50% force and builds linearly to 100% over six seconds. The
@@ -121,6 +124,11 @@ regression metrics; the ratios only affect future vehicle profiles with differen
 - gamepad: left stick, triggers, A for brake, B for handbrake, Y for recovery;
 - `C`: toggle collider debug lines; the panel can enable the orbit camera.
 
+In the vehicle-pair lab the aliases are split into independent streams:
+
+- P1: `WASD`, left `Shift`, `Space`, `R`, and gamepad 1;
+- P2: arrow keys, right `Shift`, `Enter`, `\`, and gamepad 2.
+
 These are prototype controls, not a reconstruction of the original keyboard map. The original
 files expose `Accelerate`, `Brake/Reverse`, `Fire`, and `Powerup Toggle`; they do not expose a
 separate `Handbrake` action. Consequently, `Shift` service brake and `Space` handbrake were added
@@ -130,8 +138,10 @@ layout is intentionally not mirrored here.
 ## Current verification
 
 Physics tests run the same 300-frame steering/braking/handbrake tape through two independent Rapier
-worlds and require exact transform and telemetry equality. Additional tests cover fixed-timestep
-rejection, recovery, surface profiles, input clamping, and analog deadzones.
+worlds and require exact transform and telemetry equality. The vehicle-pair regressions cover
+equal-mass impulse transfer, independent P2 movement/telemetry/recovery, and reset of both chassis.
+Additional tests cover fixed-timestep rejection, surface profiles, input clamping, analog deadzones,
+and separation of the two browser keyboard streams.
 
 The reproducible measurement harness runs with:
 
@@ -194,6 +204,6 @@ Still required before Gate C:
 
 - run the seven-scenario A/B session in the reference game, record directional differences, and tune
   the browser profile against those observations;
-- promote the passive collision vehicle to a second input/telemetry/render-model stream;
 - add the shared multiplayer camera after multiple active vehicles exist;
+- replace the second player's debug proxy with an independently skinned original vehicle instance;
 - record a representative vehicle replay and verify it in every supported browser.

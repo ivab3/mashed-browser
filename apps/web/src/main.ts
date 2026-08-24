@@ -20,7 +20,11 @@ import {
   type FixedStepFrame,
   type RuntimeState,
 } from "@mashed/core";
-import { BrowserVehicleInput } from "@mashed/input";
+import {
+  BrowserVehicleInput,
+  PLAYER_ONE_KEYBOARD_BINDINGS,
+  PLAYER_TWO_KEYBOARD_BINDINGS,
+} from "@mashed/input";
 import {
   createPhysicsRuntime,
   deriveRouteCollisionLayers,
@@ -60,15 +64,16 @@ function assetSummary(asset: LoadedAsset): string {
 }
 
 const STEP_SECONDS = 1 / 60;
+const SECONDARY_VEHICLE_ID = "vehicle-two";
+const vehiclePairLab = new URLSearchParams(window.location.search).get("collisionLab") === "vehicle-pair";
 
 function selectedPhysicsOptions(): PhysicsRuntimeOptions {
-  const lab = new URLSearchParams(window.location.search).get("collisionLab");
-  return lab === "vehicle-pair"
+  return vehiclePairLab
     ? {
         collisionObjects: false,
         collisionVehicle: {
-          id: "vehicle-two",
-          spawn: { position: [-4, 1.05, 10], headingRadians: Math.PI },
+          id: SECONDARY_VEHICLE_ID,
+          spawn: { position: [-6, 1.05, -8], headingRadians: 0 },
         },
       }
     : {};
@@ -96,17 +101,37 @@ const metricDropped = element<HTMLElement>("metric-dropped");
 const metricSpeed = element<HTMLElement>("metric-speed");
 const metricWheels = element<HTMLElement>("metric-wheels");
 const metricSurface = element<HTMLElement>("metric-surface");
+const metricSpeedLabel = element<HTMLElement>("metric-speed-label");
+const metricWheelsLabel = element<HTMLElement>("metric-wheels-label");
+const metricSurfaceLabel = element<HTMLElement>("metric-surface-label");
+const metricPlayerTwoSpeedRow = element<HTMLElement>("metric-player-two-speed-row");
+const metricPlayerTwoWheelsRow = element<HTMLElement>("metric-player-two-wheels-row");
+const metricPlayerTwoSurfaceRow = element<HTMLElement>("metric-player-two-surface-row");
+const metricPlayerTwoSpeed = element<HTMLElement>("metric-player-two-speed");
+const metricPlayerTwoWheels = element<HTMLElement>("metric-player-two-wheels");
+const metricPlayerTwoSurface = element<HTMLElement>("metric-player-two-surface");
 const metricObjects = element<HTMLElement>("metric-objects");
 const metricTrack = element<HTMLElement>("metric-track");
 const metricLap = element<HTMLElement>("metric-lap");
 const metricCheckpoint = element<HTMLElement>("metric-checkpoint");
+const primaryDriveGuide = element<HTMLElement>("primary-drive-guide");
+const primaryActionGuide = element<HTMLElement>("primary-action-guide");
+const secondaryDriveGuide = element<HTMLElement>("secondary-drive-guide");
+const secondaryActionGuide = element<HTMLElement>("secondary-action-guide");
+const gamepadGuide = element<HTMLElement>("gamepad-guide");
+const runtimeShortcuts = element<HTMLElement>("runtime-shortcuts");
 
 const events = new RuntimeEventBus();
 const state = new RuntimeStateMachine(events);
 const clock = new FixedStepClock({ stepSeconds: STEP_SECONDS, maxSubSteps: 8, events });
 const audio = new AudioRuntime(events);
 const renderer = new RuntimeRenderer(viewport, events);
-const vehicleInput = new BrowserVehicleInput();
+const vehicleInput = new BrowserVehicleInput(window, vehiclePairLab
+  ? { gamepadIndex: 0, keyboard: PLAYER_ONE_KEYBOARD_BINDINGS }
+  : {});
+const secondaryVehicleInput = vehiclePairLab
+  ? new BrowserVehicleInput(window, { gamepadIndex: 1, keyboard: PLAYER_TWO_KEYBOARD_BINDINGS })
+  : undefined;
 const assetLoader = new AssetLoadingClient();
 const loadedAssets = new Map<string, LoadedAsset>();
 const trackParts: {
@@ -127,6 +152,22 @@ let smoothedFps = 60;
 let lastOverlayUpdate = 0;
 let physicsMilliseconds = 0;
 let totalDroppedSeconds = 0;
+
+if (vehiclePairLab) {
+  metricSpeedLabel.textContent = "P1 speed";
+  metricWheelsLabel.textContent = "P1 wheels";
+  metricSurfaceLabel.textContent = "P1 surface";
+  metricPlayerTwoSpeedRow.hidden = false;
+  metricPlayerTwoWheelsRow.hidden = false;
+  metricPlayerTwoSurfaceRow.hidden = false;
+  primaryDriveGuide.innerHTML = "<b>P1 · WASD</b> accelerate, reverse and steer";
+  primaryActionGuide.innerHTML = "<b>Space</b> handbrake · <b>Left Shift</b> brake · <b>R</b> recover";
+  secondaryDriveGuide.hidden = false;
+  secondaryActionGuide.hidden = false;
+  gamepadGuide.innerHTML = "<b>Gamepads 1 / 2</b> left stick · triggers · A/B/Y";
+  resetButton.textContent = "Reset vehicles";
+  runtimeShortcuts.textContent = "P1 WASD · P2 arrows · C colliders";
+}
 
 function applyState(next: RuntimeState): void {
   stateBadge.textContent = next;
@@ -376,7 +417,14 @@ function renderFrame(timestampMilliseconds: number): void {
   if (state.state === "race") {
     frame = clock.advance(timestampMilliseconds / 1000, (stepSeconds) => {
       const startedAt = performance.now();
-      physics?.step(stepSeconds, vehicleInput.sample());
+      const gamepads = navigator.getGamepads();
+      physics?.step(
+        stepSeconds,
+        vehicleInput.sample(gamepads),
+        secondaryVehicleInput
+          ? { [SECONDARY_VEHICLE_ID]: secondaryVehicleInput.sample(gamepads) }
+          : {},
+      );
       if (physics && lapSession?.update(
         physics.transformHistory.current.position,
         physics.transformHistory.previous.position,
@@ -421,6 +469,12 @@ function renderFrame(timestampMilliseconds: number): void {
     metricSpeed.textContent = `${(physics.telemetry.speedMetersPerSecond * 3.6).toFixed(0)} km/h`;
     metricWheels.textContent = `${physics.telemetry.groundedWheels} / 4`;
     metricSurface.textContent = physics.telemetry.surface;
+    const playerTwoTelemetry = physics.getVehicleTelemetry(SECONDARY_VEHICLE_ID);
+    if (playerTwoTelemetry) {
+      metricPlayerTwoSpeed.textContent = `${(playerTwoTelemetry.speedMetersPerSecond * 3.6).toFixed(0)} km/h`;
+      metricPlayerTwoWheels.textContent = `${playerTwoTelemetry.groundedWheels} / 4`;
+      metricPlayerTwoSurface.textContent = playerTwoTelemetry.surface;
+    }
     metricObjects.textContent = `${physicsMetrics.activeObjects} / ${physicsMetrics.destroyedObjects}`;
     metricTrack.textContent = physicsMetrics.trackTriangles.toLocaleString();
     const lapProgress = lapSession?.progress;
@@ -450,6 +504,7 @@ window.addEventListener("pagehide", () => {
   cancelAnimationFrame(animationFrame);
   assetLoader.dispose();
   vehicleInput.dispose();
+  secondaryVehicleInput?.dispose();
   physics?.dispose();
   renderer.dispose();
   void audio.dispose();

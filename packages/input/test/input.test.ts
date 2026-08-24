@@ -1,6 +1,12 @@
 import { describe, expect, it } from "vitest";
 
-import { applyDeadzone, BrowserVehicleInput, sanitizeVehicleInput } from "../src/index.js";
+import {
+  applyDeadzone,
+  BrowserVehicleInput,
+  PLAYER_ONE_KEYBOARD_BINDINGS,
+  PLAYER_TWO_KEYBOARD_BINDINGS,
+  sanitizeVehicleInput,
+} from "../src/index.js";
 
 function keyboardEvent(type: "keydown" | "keyup", code: string): Event {
   const event = new Event(type, { cancelable: true });
@@ -39,6 +45,31 @@ describe("vehicle input normalization", () => {
       expect(input.sample([]).steer).toBe(1);
     } finally {
       input.dispose();
+    }
+  });
+
+  it("keeps the two local keyboard streams independent", () => {
+    const target = new EventTarget();
+    const playerOne = new BrowserVehicleInput(target as Window, {
+      keyboard: PLAYER_ONE_KEYBOARD_BINDINGS,
+    });
+    const playerTwo = new BrowserVehicleInput(target as Window, {
+      gamepadIndex: 1,
+      keyboard: PLAYER_TWO_KEYBOARD_BINDINGS,
+    });
+    try {
+      target.dispatchEvent(keyboardEvent("keydown", "KeyW"));
+      target.dispatchEvent(keyboardEvent("keydown", "ArrowLeft"));
+      expect(playerOne.sample([])).toMatchObject({ drive: 1, steer: 0 });
+      expect(playerTwo.sample([])).toMatchObject({ drive: 0, steer: -1 });
+
+      target.dispatchEvent(keyboardEvent("keydown", "Backslash"));
+      expect(playerOne.sample([]).recover).toBe(false);
+      expect(playerTwo.sample([]).recover).toBe(true);
+      expect(playerTwo.sample([]).recover).toBe(false);
+    } finally {
+      playerOne.dispose();
+      playerTwo.dispose();
     }
   });
 });

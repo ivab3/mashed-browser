@@ -68,6 +68,9 @@ export interface VehicleTelemetry {
   surface: SurfaceType | "airborne";
 }
 
+export const PRIMARY_VEHICLE_ID = "vehicle-one";
+export type VehicleInputById = Readonly<Record<string, VehicleInputFrame>>;
+
 export type PhysicsSceneObjectKind = "crate" | "barrel" | "block" | "vehicle";
 
 export interface PhysicsSceneObject {
@@ -124,6 +127,24 @@ interface ArenaObjectSpec {
   breakForce: number;
 }
 
+interface VehicleControlState {
+  steeringRadians: number;
+  forwardDriveSeconds: number;
+  reverseDriveSeconds: number;
+  upsideDownSeconds: number;
+  recoveryWasPressed: boolean;
+  telemetry: VehicleTelemetry;
+}
+
+interface CollisionVehicleRuntime {
+  id: string;
+  spawn: VehicleSpawn;
+  body: RapierRigidBody;
+  controller: RapierVehicleController;
+  object: ArenaObject;
+  control: VehicleControlState;
+}
+
 const SURFACE_ORDER: readonly SurfaceType[] = ["ice", "asphalt", "sand", "mud"];
 const FRONT_WHEELS = new Set([0, 1]);
 const REAR_WHEELS = new Set([2, 3]);
@@ -172,6 +193,25 @@ function transformOf(body: RapierRigidBody): SimulationTransform {
   return {
     position: [position.x, position.y, position.z],
     rotation: [rotation.x, rotation.y, rotation.z, rotation.w],
+  };
+}
+
+function createVehicleControlState(): VehicleControlState {
+  return {
+    steeringRadians: 0,
+    forwardDriveSeconds: 0,
+    reverseDriveSeconds: 0,
+    upsideDownSeconds: 0,
+    recoveryWasPressed: false,
+    telemetry: {
+      speedMetersPerSecond: 0,
+      forwardSpeedMetersPerSecond: 0,
+      lateralSpeedMetersPerSecond: 0,
+      headingRadians: 0,
+      groundedWheels: 0,
+      steeringRadians: 0,
+      surface: "airborne",
+    },
   };
 }
 
@@ -288,29 +328,13 @@ export class PhysicsRuntime {
   readonly #contacts = new Set<string>();
   readonly #arenaBodies: RapierRigidBody[] = [];
   readonly #arenaObjects: ArenaObject[] = [];
-  readonly #collisionVehicles: Array<{
-    body: RapierRigidBody;
-    controller: RapierVehicleController;
-  }> = [];
+  readonly #collisionVehicles: CollisionVehicleRuntime[] = [];
   readonly #objectByCollider = new Map<number, ArenaObject>();
   readonly #trackBodies: RapierRigidBody[] = [];
   #trackTriangles = 0;
   #activeSpawn: VehicleSpawn;
   #history: PhysicsTransformHistory;
-  #steeringRadians = 0;
-  #forwardDriveSeconds = 0;
-  #reverseDriveSeconds = 0;
-  #upsideDownSeconds = 0;
-  #recoveryWasPressed = false;
-  #telemetry: VehicleTelemetry = {
-    speedMetersPerSecond: 0,
-    forwardSpeedMetersPerSecond: 0,
-    lateralSpeedMetersPerSecond: 0,
-    headingRadians: 0,
-    groundedWheels: 0,
-    steeringRadians: 0,
-    surface: "airborne",
-  };
+  readonly #control = createVehicleControlState();
 
   constructor(
     RAPIER: RapierModule,
@@ -425,7 +449,15 @@ export class PhysicsRuntime {
   }
 
   get telemetry(): VehicleTelemetry {
-    return { ...this.#telemetry };
+    return { ...this.#control.telemetry };
+  }
+
+  getVehicleTelemetry(id: string): VehicleTelemetry | undefined {
+    if (id === PRIMARY_VEHICLE_ID) {
+      return this.telemetry;
+    }
+    const vehicle = this.#collisionVehicles.find((candidate) => candidate.id === id);
+    return vehicle ? { ...vehicle.control.telemetry } : undefined;
   }
 
   get sceneObjects(): readonly PhysicsSceneObject[] {
@@ -545,15 +577,31 @@ export class PhysicsRuntime {
     this.resetDemo();
   }
 
-  step(stepSeconds: number, rawInput: VehicleInputFrame = NEUTRAL_VEHICLE_INPUT): void {
+  step(
+    stepSeconds: number,
+    rawInput: VehicleInputFrame = NEUTRAL_VEHICLE_INPUT,
+    rawVehicleInputs: VehicleInputById = {},
+  ): void {
     if (Math.abs(this.#world.timestep - stepSeconds) > 1e-7) {
       throw new Error(`Physics timestep changed from ${this.#world.timestep} to ${stepSeconds}`);
     }
     const input = sanitizeVehicleInput(rawInput);
-    const requestedRecovery = input.recover && !this.#recoveryWasPressed;
-    this.#recoveryWasPressed = input.recover;
+    const requestedRecovery = input.recover && !this.#control.recoveryWasPressed;
+    this.#control.recoveryWasPressed = input.recover;
     if (requestedRecovery) {
       this.recover();
+    }
+    const collisionInputs = new Map<CollisionVehicleRuntime, VehicleInputFrame>();
+    for (const collisionVehicle of this.#collisionVehicles) {
+      const vehicleInput = sanitizeVehicleInput(
+        rawVehicleInputs[collisionVehicle.id] ?? NEUTRAL_VEHICLE_INPUT,
+      );
+      const recover = vehicleInput.recover && !collisionVehicle.control.recoveryWasPressed;
+      collisionVehicle.control.recoveryWasPressed = vehicleInput.recover;
+      if (recover) {
+        this.#recoverCollisionVehicle(collisionVehicle);
+      }
+      collisionInputs.set(collisionVehicle, vehicleInput);
     }
 
     this.#history = {
@@ -568,7 +616,7 @@ export class PhysicsRuntime {
     }
     this.#body.resetForces(true);
     this.#body.resetTorques(true);
-    this.#applyVehicleControls(input, stepSeconds);
+    this.#applyVehicleControls(this.#body, this.#vehicle, this.#control, input, stepSeconds);
     this.#vehicle.updateVehicle(stepSeconds, undefined, undefined, (collider) => (
       collider.parent()?.handle !== this.#body.handle
       && (collider.parent()?.userData as SurfaceBodyData | undefined)?.wheelSurface !== false
@@ -577,6 +625,13 @@ export class PhysicsRuntime {
     for (const collisionVehicle of this.#collisionVehicles) {
       collisionVehicle.body.resetForces(true);
       collisionVehicle.body.resetTorques(true);
+      this.#applyVehicleControls(
+        collisionVehicle.body,
+        collisionVehicle.controller,
+        collisionVehicle.control,
+        collisionInputs.get(collisionVehicle) ?? NEUTRAL_VEHICLE_INPUT,
+        stepSeconds,
+      );
       collisionVehicle.controller.updateVehicle(stepSeconds, undefined, undefined, (collider) => (
         collider.parent()?.handle !== collisionVehicle.body.handle
         && (collider.parent()?.userData as SurfaceBodyData | undefined)?.wheelSurface !== false
@@ -597,7 +652,22 @@ export class PhysicsRuntime {
         };
       }
     }
-    this.#updateTelemetry(stepSeconds);
+    this.#updateTelemetry(
+      this.#body,
+      this.#vehicle,
+      this.#control,
+      stepSeconds,
+      () => this.recover(),
+    );
+    for (const collisionVehicle of this.#collisionVehicles) {
+      this.#updateTelemetry(
+        collisionVehicle.body,
+        collisionVehicle.controller,
+        collisionVehicle.control,
+        stepSeconds,
+        () => this.#recoverCollisionVehicle(collisionVehicle),
+      );
+    }
   }
 
   resetDemo(): void {
@@ -718,11 +788,13 @@ export class PhysicsRuntime {
   }
 
   #createCollisionVehicle(id: string, spawn: VehicleSpawn): void {
+    if (id === PRIMARY_VEHICLE_ID || this.#collisionVehicles.some((vehicle) => vehicle.id === id)) {
+      throw new Error(`Vehicle id must be unique: ${id}`);
+    }
     const created = this.#createChassisBody(spawn);
     const controller = this.#createVehicleController(created.body);
-    this.#collisionVehicles.push({ body: created.body, controller });
     const initial = transformOf(created.body);
-    this.#arenaObjects.push({
+    const object: ArenaObject = {
       id,
       kind: "vehicle",
       destructible: false,
@@ -733,6 +805,15 @@ export class PhysicsRuntime {
       initialPosition: spawn.position,
       initialRotation: [initial.rotation[0], initial.rotation[1], initial.rotation[2], initial.rotation[3]],
       history: { previous: cloneTransform(initial), current: initial },
+    };
+    this.#arenaObjects.push(object);
+    this.#collisionVehicles.push({
+      id,
+      spawn: { position: [...spawn.position], headingRadians: spawn.headingRadians },
+      body: created.body,
+      controller,
+      object,
+      control: createVehicleControlState(),
     });
   }
 
@@ -756,30 +837,39 @@ export class PhysicsRuntime {
       const initial = transformOf(object.body);
       object.history = { previous: cloneTransform(initial), current: initial };
     }
+    for (const collisionVehicle of this.#collisionVehicles) {
+      this.#resetControlState(collisionVehicle.control);
+    }
     this.#world.propagateModifiedBodyPositionsToColliders();
   }
 
-  #applyVehicleControls(input: VehicleInputFrame, stepSeconds: number): void {
+  #applyVehicleControls(
+    body: RapierRigidBody,
+    vehicle: RapierVehicleController,
+    control: VehicleControlState,
+    input: VehicleInputFrame,
+    stepSeconds: number,
+  ): void {
     if (input.drive > 0) {
-      this.#forwardDriveSeconds += stepSeconds;
-      this.#reverseDriveSeconds = 0;
+      control.forwardDriveSeconds += stepSeconds;
+      control.reverseDriveSeconds = 0;
     } else if (input.drive < 0) {
-      this.#reverseDriveSeconds += stepSeconds;
-      this.#forwardDriveSeconds = 0;
+      control.reverseDriveSeconds += stepSeconds;
+      control.forwardDriveSeconds = 0;
     } else {
-      this.#forwardDriveSeconds = 0;
-      this.#reverseDriveSeconds = 0;
+      control.forwardDriveSeconds = 0;
+      control.reverseDriveSeconds = 0;
     }
     const driveHeldSeconds = input.drive > 0
-      ? this.#forwardDriveSeconds
-      : this.#reverseDriveSeconds;
+      ? control.forwardDriveSeconds
+      : control.reverseDriveSeconds;
     const driveForceFactor = driveForceBuildUpFactor(
       driveHeldSeconds,
       this.#config.drive.initialThrottleFactor,
       this.#config.drive.throttleRampSeconds,
     );
-    const velocity = this.#body.linvel();
-    const forward = rotateVector({ x: 0, y: 0, z: 1 }, this.#body.rotation());
+    const velocity = body.linvel();
+    const forward = rotateVector({ x: 0, y: 0, z: 1 }, body.rotation());
     const forwardSpeed = velocity.x * forward.x + velocity.y * forward.y + velocity.z * forward.z;
     const steeringScale = steeringSpeedScale(
       forwardSpeed,
@@ -788,8 +878,8 @@ export class PhysicsRuntime {
       this.#config.drive.steeringSpeedAttenuation,
     );
     const steeringTarget = input.steer * this.#config.drive.maxSteeringAngle * steeringScale;
-    this.#steeringRadians = approach(
-      this.#steeringRadians,
+    control.steeringRadians = approach(
+      control.steeringRadians,
       steeringTarget,
       this.#config.drive.steeringResponse * stepSeconds,
     );
@@ -797,10 +887,10 @@ export class PhysicsRuntime {
     let drive = input.drive;
     let serviceBrake = input.brake * this.#config.drive.serviceBrakeForce;
     let groundedWheels = 0;
-    for (let wheel = 0; wheel < this.#vehicle.numWheels(); wheel += 1) {
-      groundedWheels += this.#vehicle.wheelIsInContact(wheel) ? 1 : 0;
+    for (let wheel = 0; wheel < vehicle.numWheels(); wheel += 1) {
+      groundedWheels += vehicle.wheelIsInContact(wheel) ? 1 : 0;
     }
-    const up = rotateVector({ x: 0, y: 1, z: 0 }, this.#body.rotation());
+    const up = rotateVector({ x: 0, y: 1, z: 0 }, body.rotation());
     const horizontalSpeed = Math.hypot(velocity.x, velocity.z);
     const counteringBackwardRoll = drive > 0
       && forwardSpeed < 0
@@ -809,7 +899,7 @@ export class PhysicsRuntime {
       && groundedWheels >= 2
       && up.y > 0.8;
     if (counteringBackwardRoll) {
-      this.#body.addForce({
+      body.addForce({
         x: forward.x * this.#config.drive.engineForce * driveForceFactor * 2,
         y: forward.y * this.#config.drive.engineForce * driveForceFactor * 2,
         z: forward.z * this.#config.drive.engineForce * driveForceFactor * 2,
@@ -830,7 +920,7 @@ export class PhysicsRuntime {
     let groundedDrivenWheels = 0;
     let engineSurfaceMultiplier = 0;
     for (const wheel of this.#config.drive.drivenWheels) {
-      const surface = this.#surfaceAtWheel(wheel);
+      const surface = this.#surfaceAtWheel(vehicle, wheel);
       if (surface) {
         groundedDrivenWheels += 1;
         engineSurfaceMultiplier += this.#config.surfaces[surface].engine;
@@ -843,17 +933,17 @@ export class PhysicsRuntime {
     const forcePerWheel = drive * driveForceFactor * engineForce * surfaceEngine
       / this.#config.drive.drivenWheels.length;
 
-    for (let wheel = 0; wheel < this.#vehicle.numWheels(); wheel += 1) {
-      const surface = this.#surfaceAtWheel(wheel) ?? "asphalt";
+    for (let wheel = 0; wheel < vehicle.numWheels(); wheel += 1) {
+      const surface = this.#surfaceAtWheel(vehicle, wheel) ?? "asphalt";
       const handling = this.#config.surfaces[surface];
       const rearGrip = REAR_WHEELS.has(wheel)
         ? 1 - input.handbrake * (1 - this.#config.handling.handbrakeRearGrip)
         : 1;
-      this.#vehicle.setWheelFrictionSlip(
+      vehicle.setWheelFrictionSlip(
         wheel,
         this.#config.handling.baseFrictionSlip * this.#sourceHandling.grip * handling.frictionSlip,
       );
-      this.#vehicle.setWheelSideFrictionStiffness(
+      vehicle.setWheelSideFrictionStiffness(
         wheel,
         this.#config.handling.baseSideFriction
           * this.#sourceHandling.handling
@@ -862,18 +952,18 @@ export class PhysicsRuntime {
       );
       // Rapier's +steering direction is mirrored relative to the input contract:
       // positive input means player-right, while the controller expects the opposite sign.
-      this.#vehicle.setWheelSteering(wheel, FRONT_WHEELS.has(wheel) ? -this.#steeringRadians : 0);
-      this.#vehicle.setWheelEngineForce(
+      vehicle.setWheelSteering(wheel, FRONT_WHEELS.has(wheel) ? -control.steeringRadians : 0);
+      vehicle.setWheelEngineForce(
         wheel,
         this.#config.drive.drivenWheels.includes(wheel) ? forcePerWheel : 0,
       );
       const handbrake = REAR_WHEELS.has(wheel)
         ? input.handbrake * this.#config.drive.handbrakeForce
         : 0;
-      this.#vehicle.setWheelBrake(wheel, serviceBrake + handbrake + handling.rollingBrake);
+      vehicle.setWheelBrake(wheel, serviceBrake + handbrake + handling.rollingBrake);
     }
     if (Math.abs(input.drive) > 0.01 || input.brake > 0.01 || input.handbrake > 0.01) {
-      this.#body.wakeUp();
+      body.wakeUp();
     }
   }
 
@@ -924,35 +1014,41 @@ export class PhysicsRuntime {
     }, true);
   }
 
-  #surfaceAtWheel(wheel: number): SurfaceType | undefined {
-    const data = this.#vehicle.wheelGroundObject(wheel)?.parent()?.userData;
+  #surfaceAtWheel(vehicle: RapierVehicleController, wheel: number): SurfaceType | undefined {
+    const data = vehicle.wheelGroundObject(wheel)?.parent()?.userData;
     return isSurfaceBodyData(data) ? data.surface : undefined;
   }
 
-  #updateTelemetry(stepSeconds: number): void {
+  #updateTelemetry(
+    body: RapierRigidBody,
+    vehicle: RapierVehicleController,
+    control: VehicleControlState,
+    stepSeconds: number,
+    recover: () => void,
+  ): void {
     const counts = new Map<SurfaceType, number>();
     let groundedWheels = 0;
-    for (let wheel = 0; wheel < this.#vehicle.numWheels(); wheel += 1) {
-      if (!this.#vehicle.wheelIsInContact(wheel)) {
+    for (let wheel = 0; wheel < vehicle.numWheels(); wheel += 1) {
+      if (!vehicle.wheelIsInContact(wheel)) {
         continue;
       }
       groundedWheels += 1;
-      const surface = this.#surfaceAtWheel(wheel);
+      const surface = this.#surfaceAtWheel(vehicle, wheel);
       if (surface) {
         counts.set(surface, (counts.get(surface) ?? 0) + 1);
       }
     }
-    const velocity = this.#body.linvel();
+    const velocity = body.linvel();
     const speed = Math.hypot(velocity.x, velocity.z);
-    const rotation = this.#body.rotation();
+    const rotation = body.rotation();
     const forward = rotateVector({ x: 0, y: 0, z: 1 }, rotation);
     const right = rotateVector({ x: 1, y: 0, z: 0 }, rotation);
     const up = rotateVector({ x: 0, y: 1, z: 0 }, rotation);
     const upsideDown = up.y < this.#config.recovery.maximumUprightDot
       && speed < this.#config.recovery.maximumAutoSpeed;
-    this.#upsideDownSeconds = upsideDown ? this.#upsideDownSeconds + stepSeconds : 0;
-    if (this.#upsideDownSeconds >= this.#config.recovery.autoDelaySeconds) {
-      this.recover();
+    control.upsideDownSeconds = upsideDown ? control.upsideDownSeconds + stepSeconds : 0;
+    if (control.upsideDownSeconds >= this.#config.recovery.autoDelaySeconds) {
+      recover();
     }
     let dominantSurface: SurfaceType | "airborne" = "airborne";
     let dominantCount = 0;
@@ -963,13 +1059,13 @@ export class PhysicsRuntime {
         dominantCount = count;
       }
     }
-    this.#telemetry = {
+    control.telemetry = {
       speedMetersPerSecond: speed,
       forwardSpeedMetersPerSecond: velocity.x * forward.x + velocity.z * forward.z,
       lateralSpeedMetersPerSecond: velocity.x * right.x + velocity.z * right.z,
       headingRadians: headingOf(rotation),
       groundedWheels,
-      steeringRadians: this.#steeringRadians,
+      steeringRadians: control.steeringRadians,
       surface: dominantSurface,
     };
   }
@@ -1028,20 +1124,53 @@ export class PhysicsRuntime {
     this.#events.emit({ type: "renderer:flash", color: 0xffd35c, durationSeconds: 0.18 });
   }
 
-  #placeVehicle(position: readonly [number, number, number], headingRadians: number): void {
-    this.#body.setTranslation({ x: position[0], y: position[1], z: position[2] }, true);
-    this.#body.setRotation(yawRotation(headingRadians), true);
-    this.#body.setLinvel({ x: 0, y: 0, z: 0 }, true);
-    this.#body.setAngvel({ x: 0, y: 0, z: 0 }, true);
+  #recoverCollisionVehicle(vehicle: CollisionVehicleRuntime): void {
+    const position = vehicle.body.translation();
+    this.#placeVehicleBody(
+      vehicle.body,
+      [position.x, Math.max(position.y + this.#config.recovery.lift, vehicle.spawn.position[1]), position.z],
+      headingOf(vehicle.body.rotation()),
+      vehicle.control,
+    );
+    const initial = transformOf(vehicle.body);
+    vehicle.object.history = { previous: cloneTransform(initial), current: initial };
     this.#world.propagateModifiedBodyPositionsToColliders();
     this.#contacts.clear();
     this.#eventQueue.clear();
-    this.#steeringRadians = 0;
-    this.#forwardDriveSeconds = 0;
-    this.#reverseDriveSeconds = 0;
-    this.#upsideDownSeconds = 0;
+  }
+
+  #placeVehicle(position: readonly [number, number, number], headingRadians: number): void {
+    this.#placeVehicleBody(this.#body, position, headingRadians, this.#control);
+    this.#world.propagateModifiedBodyPositionsToColliders();
+    this.#contacts.clear();
+    this.#eventQueue.clear();
     const initial = transformOf(this.#body);
     this.#history = { previous: cloneTransform(initial), current: initial };
+  }
+
+  #placeVehicleBody(
+    body: RapierRigidBody,
+    position: readonly [number, number, number],
+    headingRadians: number,
+    control: VehicleControlState,
+  ): void {
+    body.setTranslation({ x: position[0], y: position[1], z: position[2] }, true);
+    body.setRotation(yawRotation(headingRadians), true);
+    body.setLinvel({ x: 0, y: 0, z: 0 }, true);
+    body.setAngvel({ x: 0, y: 0, z: 0 }, true);
+    const recoveryWasPressed = control.recoveryWasPressed;
+    this.#resetControlState(control);
+    control.recoveryWasPressed = recoveryWasPressed;
+  }
+
+  #resetControlState(control: VehicleControlState): void {
+    const reset = createVehicleControlState();
+    control.steeringRadians = reset.steeringRadians;
+    control.forwardDriveSeconds = reset.forwardDriveSeconds;
+    control.reverseDriveSeconds = reset.reverseDriveSeconds;
+    control.upsideDownSeconds = reset.upsideDownSeconds;
+    control.recoveryWasPressed = reset.recoveryWasPressed;
+    control.telemetry = reset.telemetry;
   }
 }
 

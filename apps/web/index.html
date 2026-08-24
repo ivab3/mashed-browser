@@ -26,13 +26,16 @@
           <div><span>Contacts</span><strong id="metric-contacts">—</strong></div>
           <div><span>Sim step</span><strong id="metric-step">0</strong></div>
           <div><span>Dropped</span><strong id="metric-dropped">0 ms</strong></div>
-          <div><span>Speed</span><strong id="metric-speed">0 km/h</strong></div>
-          <div><span>Wheels</span><strong id="metric-wheels">0 / 4</strong></div>
+          <div><span id="metric-speed-label">Speed</span><strong id="metric-speed">0 km/h</strong></div>
+          <div><span id="metric-wheels-label">Wheels</span><strong id="metric-wheels">0 / 4</strong></div>
+          <div id="metric-player-two-speed-row" hidden><span>P2 speed</span><strong id="metric-player-two-speed">0 km/h</strong></div>
+          <div id="metric-player-two-wheels-row" hidden><span>P2 wheels</span><strong id="metric-player-two-wheels">0 / 4</strong></div>
           <div><span>Objects A / X</span><strong id="metric-objects">4 / 0</strong></div>
           <div><span>Track tris</span><strong id="metric-track">0</strong></div>
           <div><span>Lap</span><strong id="metric-lap">—</strong></div>
           <div><span>Checkpoint</span><strong id="metric-checkpoint">—</strong></div>
-          <div class="wide"><span>Surface</span><strong id="metric-surface">airborne</strong></div>
+          <div class="wide"><span id="metric-surface-label">Surface</span><strong id="metric-surface">airborne</strong></div>
+          <div id="metric-player-two-surface-row" class="wide" hidden><span>P2 surface</span><strong id="metric-player-two-surface">airborne</strong></div>
         </aside>
 
         <div class="hint">Load the track bundle; add COURSE.LUA/world DFFs and NAME0.DFF + NAME.TXD for an original vehicle.</div>
@@ -56,9 +59,11 @@
 
         <section class="control-guide" aria-label="Driving controls">
           <div class="section-label">Drive</div>
-          <p><b>WASD / arrows</b> accelerate, reverse and steer</p>
-          <p><b>Space</b> handbrake · <b>Shift</b> brake · <b>R</b> recover</p>
-          <p><b>Gamepad</b> left stick · triggers · A/B/Y</p>
+          <p id="primary-drive-guide"><b>WASD / arrows</b> accelerate, reverse and steer</p>
+          <p id="primary-action-guide"><b>Space</b> handbrake · <b>Shift</b> brake · <b>R</b> recover</p>
+          <p id="secondary-drive-guide" hidden><b>P2 arrows</b> accelerate, reverse and steer</p>
+          <p id="secondary-action-guide" hidden><b>Enter</b> handbrake · <b>Right Shift</b> brake · <b>\</b> recover</p>
+          <p id="gamepad-guide"><b>Gamepad</b> left stick · triggers · A/B/Y</p>
         </section>
 
         <section class="toggles">
@@ -77,7 +82,7 @@
 
         <footer>
           <span id="runtime-status">Preparing WebAssembly…</span>
-          <span>C toggles colliders · R recovers</span>
+          <span id="runtime-shortcuts">C toggles colliders · R recovers</span>
         </footer>
       </aside>
     </main>

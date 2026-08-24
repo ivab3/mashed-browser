@@ -257,10 +257,10 @@ Warzone за 60,8 с через обычные input frames, без recovery, re
 с baseline и измеряет семь сценариев: разгон, торможение, slalom, drift, hard corner, prop impact и
 wall impact. Принятый impact-профиль использует извлечённую из трасс конвенцию `BOUNCE = 0` для стен
 арены и динамических props; схема v3 отделяет отскок от стены от свободной slalom-ленты.
-Начат vehicle-pair collision slice: опциональная вторая машина использует те же mass/inertia,
-compound colliders и пассивный ray-cast controller; детерминированный фронтальный тест проверяет
-перенос импульса и reset обоих кузовов. Следующий слой — независимый input/telemetry stream для
-второй машины, затем shared multiplayer camera и browser replay-проверка.
+Vehicle-pair collision slice теперь даёт второй машине те же mass/inertia, compound colliders и
+ray-cast controller, а также независимый keyboard/gamepad input, recovery и telemetry stream.
+Детерминированные тесты проверяют фронтальный перенос импульса, самостоятельное движение P2 и reset
+обоих кузовов. Следующий слой — shared multiplayer camera, затем browser replay-проверка.
 
 ### Этап 5. Вертикальный срез — 4–6 недель
 

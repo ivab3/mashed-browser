@@ -87,8 +87,9 @@ bytes remain local and parsed typed arrays are transferred back without cloning.
 [`reference/RUNTIME_FOUNDATION.md`](./reference/RUNTIME_FOUNDATION.md) for runtime contracts and
 acceptance evidence. Loading a numbered vehicle DFF such as `CRUSADER0.DFF` together with its shared
 `CRUSADER.TXD` replaces the debug car proxy with the intact original model.
-Open `/buildings?collisionLab=vehicle-pair` to replace the arena props with the passive second-car
-collision target.
+Open `/buildings?collisionLab=vehicle-pair` for the two-player collision lab. P1 uses WASD and
+gamepad 1; P2 uses the arrow keys and gamepad 2. The cars start side by side, facing the same way,
+and both expose independent live telemetry.
 
 With extracted Warzone assets in the standard ignored `game-data/` location, `pnpm lap:validate`
 runs the deterministic 136-checkpoint full-lap acceptance scenario. An alternative track directory

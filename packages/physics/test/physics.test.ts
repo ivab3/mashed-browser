@@ -5,6 +5,7 @@ import {
   createPhysicsRuntime,
   DEFAULT_VEHICLE_CONFIG,
   driveForceBuildUpFactor,
+  PRIMARY_VEHICLE_ID,
   sourceHandlingScales,
   steeringSpeedScale,
 } from "../src/index.js";
@@ -169,6 +170,71 @@ describe("PhysicsRuntime", () => {
       first.dispose();
       second.dispose();
       control.dispose();
+    }
+  });
+
+  it("drives and reports the second vehicle through an independent input stream", async () => {
+    const spawn = { position: [4, 1.05, -8] as const, headingRadians: 0 };
+    const physics = await createPhysicsRuntime(
+      new RuntimeEventBus(),
+      1 / 60,
+      DEFAULT_VEHICLE_CONFIG,
+      {
+        collisionObjects: false,
+        collisionVehicle: { id: "vehicle-two", spawn },
+      },
+    );
+    try {
+      for (let step = 0; step < 60; step += 1) {
+        physics.step(1 / 60);
+      }
+      const primaryStart = physics.transformHistory.current.position;
+      const secondaryStart = physics.sceneObjects
+        .find((object) => object.id === "vehicle-two")!.history.current.position;
+
+      const secondaryInput = {
+        drive: 1,
+        steer: 0.25,
+        brake: 0,
+        handbrake: 0,
+        recover: false,
+      };
+      for (let step = 0; step < 180; step += 1) {
+        physics.step(1 / 60, undefined, { "vehicle-two": secondaryInput });
+      }
+
+      const secondary = physics.sceneObjects.find((object) => object.id === "vehicle-two")!;
+      expect(Math.hypot(
+        physics.transformHistory.current.position[0] - primaryStart[0],
+        physics.transformHistory.current.position[2] - primaryStart[2],
+      )).toBeLessThan(0.02);
+      expect(Math.hypot(
+        secondary.history.current.position[0] - secondaryStart[0],
+        secondary.history.current.position[2] - secondaryStart[2],
+      )).toBeGreaterThan(5);
+      expect(physics.getVehicleTelemetry(PRIMARY_VEHICLE_ID)).toEqual(physics.telemetry);
+      expect(physics.getVehicleTelemetry("missing-vehicle")).toBeUndefined();
+      expect(physics.getVehicleTelemetry("vehicle-two")).toMatchObject({
+        groundedWheels: 4,
+      });
+      expect(physics.getVehicleTelemetry("vehicle-two")!.speedMetersPerSecond).toBeGreaterThan(3);
+      expect(physics.getVehicleTelemetry("vehicle-two")!.steeringRadians).toBeGreaterThan(0);
+
+      const heightBeforeRecovery = secondary.history.current.position[1];
+      physics.step(1 / 60, undefined, {
+        "vehicle-two": { ...secondaryInput, drive: 0, steer: 0, recover: true },
+      });
+      expect(physics.sceneObjects
+        .find((object) => object.id === "vehicle-two")!.history.current.position[1])
+        .toBeGreaterThan(heightBeforeRecovery + 0.5);
+
+      physics.resetDemo();
+      physics.sceneObjects.find((object) => object.id === "vehicle-two")!
+        .history.current.position.forEach((component, index) => {
+          expect(component).toBeCloseTo(spawn.position[index]!);
+        });
+    } finally {
+      physics.dispose();
     }
   });
 
