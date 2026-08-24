@@ -14,9 +14,9 @@
     },
     "braking": {
       "initialSpeedKmh": 45.903,
-      "stoppingTimeSeconds": 1,
-      "stoppingDistanceMeters": 5.977,
-      "finalSpeedKmh": 0.927
+      "stoppingTimeSeconds": 1.117,
+      "stoppingDistanceMeters": 6.073,
+      "finalSpeedKmh": 0.886
     },
     "slalom": {
       "distanceMeters": 42.458,

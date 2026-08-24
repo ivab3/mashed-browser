@@ -1,9 +1,8 @@
 # Stage 4 vehicle feel tuning
 
-Status: the source-derived throttle build-up curve, `1000` chassis mass, and reciprocal steering
-curve are accepted. The original `Grip / Handling` values now feed a Crusader-anchored relative
-adapter without changing the accepted Crusader tune. The next human comparison isolates braking
-and brake-to-reverse behavior.
+Status: the source-derived throttle build-up curve, `1000` chassis mass, reciprocal steering curve,
+and relative `Grip / Handling` adapter are integrated. A human A/B drive rejected the literal
+`Brake/Reverse` counter-force candidate in favor of the faster browser brake-to-reverse transition.
 
 ## Purpose
 
@@ -22,7 +21,7 @@ If a different car, track, surface, or input device is used, it must be recorded
 | Scenario | Input tape | Main observations |
 |---|---|---|
 | Acceleration | four seconds of full throttle | 0–50 km/h time, distance, exit speed |
-| Braking | three seconds of throttle, then full service brake | stopping time and distance |
+| Braking | three seconds of throttle, then full `Brake/Reverse` | stopping time and distance |
 | Slalom | six seconds, alternating 52% steering every 0.75 s | lateral response and speed |
 | Drift | two seconds of throttle, then a 1.5 s turn with and without handbrake | rotation, slip and speed loss |
 | Cornering | two seconds of throttle, then three seconds at 82% steering | body tilt, wheel lift and stability |
@@ -89,6 +88,21 @@ a claim that `8000` occurs in the original executable.
 
 Two conditional executable paths add `0.75` and `1.5` multipliers. They are tied to special vehicle
 state flags, so neither is treated as the normal acceleration profile.
+
+The two normal input branches are otherwise mirror images. Both multiply their byte input by the
+same vehicle force field, `1/256` conversion, conditional state multipliers, and six-second envelope;
+the `Brake/Reverse` branch negates the result immediately before writing the same four wheel-force
+slots. No speed threshold or separate service-brake force appears between these branches. The
+tested source-braking candidate kept the accepted browser force calibration, applied the same
+`8000` magnitude in both directions, and let reverse force oppose forward motion immediately. The
+accepted browser behavior instead suppresses reverse above `1.4 m/s` and substitutes a Rapier
+service brake of `52` before engaging reverse.
+
+The deterministic `Brake/Reverse` tape starts at `45.903 km/h`. The earlier browser behavior stops
+in `1.117 s / 6.073 m`; the source counter-force candidate takes `2.267 s / 14.624 m`. All other
+suite metrics were unchanged. The driver preferred the shorter browser result because it better
+preserves the original game's fast arcade tempo. The counter-force candidate was rejected and its
+temporary URL selector removed.
 
 The executable also contains a 15-entry per-vehicle tuning table. Its vehicle-selection UI confirms
 the field order as `Power / Grip / Handling / Drag`. Crusader (internal id `48`) has the raw row

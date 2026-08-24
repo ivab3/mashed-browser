@@ -84,7 +84,7 @@ export interface VehicleTuningDifference {
 const SCENARIOS = rawScenarios as unknown as TuningScenarios;
 const NEUTRAL: VehicleInputFrame = { drive: 0, steer: 0, brake: 0, handbrake: 0, recover: false };
 const DRIVE: VehicleInputFrame = { drive: 1, steer: 0, brake: 0, handbrake: 0, recover: false };
-const BRAKE: VehicleInputFrame = { drive: 0, steer: 0, brake: 1, handbrake: 0, recover: false };
+const BRAKE_REVERSE: VehicleInputFrame = { drive: -1, steer: 0, brake: 0, handbrake: 0, recover: false };
 
 function rounded(value: number): number {
   return Math.round(value * 1_000) / 1_000;
@@ -158,7 +158,7 @@ async function brakingReport(config: VehicleConfig): Promise<VehicleTuningReport
     const start = runtime.transformHistory.current.position;
     let brakingSteps = SCENARIOS.braking.maximumBrakingSteps;
     for (let step = 1; step <= SCENARIOS.braking.maximumBrakingSteps; step += 1) {
-      runtime.step(SCENARIOS.stepSeconds, BRAKE);
+      runtime.step(SCENARIOS.stepSeconds, BRAKE_REVERSE);
       if (runtime.telemetry.speedMetersPerSecond * 3.6 <= SCENARIOS.braking.stoppedSpeedKmh) {
         brakingSteps = step;
         break;
