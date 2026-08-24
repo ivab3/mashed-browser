@@ -1,8 +1,7 @@
 # Stage 4 vehicle feel tuning
 
-Status: the comparison loop is ready. The source-derived throttle build-up curve and `1000` chassis
-mass are accepted; the remaining raw steering/grip values still need a cross-engine mapping before
-they can be applied to Rapier.
+Status: the source-derived throttle build-up curve, `1000` chassis mass, and reciprocal steering
+curve are accepted. The next comparison isolates the Crusader `Grip / Handling` relationship.
 
 ## Purpose
 
@@ -98,3 +97,18 @@ steering relationship instead of copying the raw numbers into unrelated Rapier c
 The vehicle constructor independently hardcodes chassis mass `1000` and inverse mass `0.001`. A
 single-variable browser candidate using that mass won the human A/B drive on Crusader/Warzone and is
 now the accepted default. It changed no chassis dimensions or other handling parameters.
+
+The normal steering path clamps each directional input byte to `160`. Its speed attenuation divides
+by `10 + 0.01 * speed`, while the same speed scalar is normalized elsewhere by the compiled `1/1500`
+constant. Mapping the source speed range to the browser's configured maximum speed removes the
+engine-specific units and yields the dimensionless curve:
+
+```text
+steeringScale = 1 / (1 + 1.5 * speedRatio)
+```
+
+The accepted candidate changed only the earlier linear curve `1 - 0.64 * speedRatio` to this
+reciprocal curve. It kept the `0.5` maximum steering angle, `4.8` response, and all Rapier grip
+coefficients unchanged. The source input cap is already represented by the calibrated maximum angle
+and is not applied a second time. A human Crusader/Warzone A/B drive found the reciprocal result close
+to the original, so it is now the default.

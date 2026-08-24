@@ -2,6 +2,7 @@ import rawDefaultConfig from "../data/arcade-default.json" with { type: "json" }
 
 export type Vector3Config = readonly [number, number, number];
 export type SurfaceType = "asphalt" | "ice" | "sand" | "mud";
+export type SteeringSpeedCurve = "linear" | "reciprocal";
 
 export interface SurfaceHandlingConfig {
   frictionSlip: number;
@@ -45,7 +46,8 @@ export interface VehicleConfig {
     maxReverseSpeed: number;
     maxSteeringAngle: number;
     steeringResponse: number;
-    highSpeedSteering: number;
+    steeringSpeedCurve: SteeringSpeedCurve;
+    steeringSpeedAttenuation: number;
     drivenWheels: readonly number[];
   };
   handling: {

@@ -5,6 +5,7 @@ import {
   createPhysicsRuntime,
   DEFAULT_VEHICLE_CONFIG,
   driveForceBuildUpFactor,
+  steeringSpeedScale,
 } from "../src/index.js";
 
 describe("PhysicsRuntime", () => {
@@ -13,6 +14,14 @@ describe("PhysicsRuntime", () => {
     expect(driveForceBuildUpFactor(3, 0.5, 6)).toBe(0.75);
     expect(driveForceBuildUpFactor(6, 0.5, 6)).toBe(1);
     expect(driveForceBuildUpFactor(12, 0.5, 6)).toBe(1);
+  });
+
+  it("supports the accepted linear and source-derived reciprocal steering curves", () => {
+    expect(steeringSpeedScale(0, 30, "linear", 0.64)).toBe(1);
+    expect(steeringSpeedScale(15, 30, "linear", 0.64)).toBeCloseTo(0.68);
+    expect(steeringSpeedScale(30, 30, "linear", 0.64)).toBeCloseTo(0.36);
+    expect(steeringSpeedScale(15, 30, "reciprocal", 1.5)).toBeCloseTo(1 / 1.75);
+    expect(steeringSpeedScale(30, 30, "reciprocal", 1.5)).toBeCloseTo(0.4);
   });
 
   it("keeps a neutral vehicle upright and stationary during an idle soak", async () => {

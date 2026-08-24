@@ -11,6 +11,7 @@ import {
 
 export {
   DEFAULT_VEHICLE_CONFIG,
+  type SteeringSpeedCurve,
   type SurfaceHandlingConfig,
   type SurfaceType,
   type VehicleConfig,
@@ -23,6 +24,7 @@ export {
 import type { RouteCollisionLayers } from "./route-collision.js";
 import {
   DEFAULT_VEHICLE_CONFIG,
+  type SteeringSpeedCurve,
   type SurfaceType,
   type VehicleConfig,
 } from "./vehicle-config.js";
@@ -189,6 +191,22 @@ export function driveForceBuildUpFactor(
   }
   const progress = Math.min(1, Math.max(0, heldSeconds) / rampSeconds);
   return start + (1 - start) * progress;
+}
+
+/** Speed-sensitive steering curve; reciprocal mode maps MFL's 10 + 0.01 * speed relationship. */
+export function steeringSpeedScale(
+  speedMetersPerSecond: number,
+  maximumSpeedMetersPerSecond: number,
+  curve: SteeringSpeedCurve,
+  attenuation: number,
+): number {
+  const speedRatio = maximumSpeedMetersPerSecond <= 0
+    ? 0
+    : Math.min(1, Math.abs(speedMetersPerSecond) / maximumSpeedMetersPerSecond);
+  const strength = Math.max(0, attenuation);
+  return curve === "reciprocal"
+    ? 1 / (1 + strength * speedRatio)
+    : Math.max(0, 1 - strength * speedRatio);
 }
 
 function rotateVector(vector: RapierVector, rotation: RapierRotation): RapierVector {
@@ -673,8 +691,12 @@ export class PhysicsRuntime {
     const velocity = this.#body.linvel();
     const forward = rotateVector({ x: 0, y: 0, z: 1 }, this.#body.rotation());
     const forwardSpeed = velocity.x * forward.x + velocity.y * forward.y + velocity.z * forward.z;
-    const speedRatio = Math.min(1, Math.abs(forwardSpeed) / this.#config.drive.maxForwardSpeed);
-    const steeringScale = 1 - speedRatio * (1 - this.#config.drive.highSpeedSteering);
+    const steeringScale = steeringSpeedScale(
+      forwardSpeed,
+      this.#config.drive.maxForwardSpeed,
+      this.#config.drive.steeringSpeedCurve,
+      this.#config.drive.steeringSpeedAttenuation,
+    );
     const steeringTarget = input.steer * this.#config.drive.maxSteeringAngle * steeringScale;
     this.#steeringRadians = approach(
       this.#steeringRadians,

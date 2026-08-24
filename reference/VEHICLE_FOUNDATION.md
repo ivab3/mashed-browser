@@ -125,8 +125,8 @@ handbrake-turn, hard-corner stability, and light-prop impact metrics. The curren
 [`reference/vehicle-tuning-baseline.json`](./vehicle-tuning-baseline.json); it describes the browser
 prototype and is not presented as a measurement of the original game. The accepted source-mass
 baseline reaches 50 km/h in 3.267 s and brakes from 45.903 km/h in 5.977 m. The handbrake scenario
-increases heading change from 1.576 to 1.892 radians over the same 90-frame turn. The hard-corner
-tape keeps all four wheels down with 1.168 degrees of peak body tilt. The impact tape hits the first
+increases heading change from 1.340 to 1.619 radians over the same 90-frame turn. The hard-corner
+tape keeps all four wheels down with 0.926 degrees of peak body tilt. The impact tape hits the first
 crate at 37.651 km/h and retains 85.5% of that speed after 0.5 seconds of neutral input.
 
 An alternative data-driven profile can be compared without editing the committed tune:

@@ -19,29 +19,29 @@
       "finalSpeedKmh": 0.927
     },
     "slalom": {
-      "distanceMeters": 42.415,
-      "lateralOffsetMeters": 7.885,
-      "peakLateralSpeedMetersPerSecond": 6.837,
-      "peakSpeedKmh": 66.41
+      "distanceMeters": 42.458,
+      "lateralOffsetMeters": 8.691,
+      "peakLateralSpeedMetersPerSecond": 7.429,
+      "peakSpeedKmh": 67.369
     },
     "drift": {
-      "baselinePeakLateralSpeedMetersPerSecond": 0.873,
-      "handbrakePeakLateralSpeedMetersPerSecond": 0.669,
-      "baselinePeakSlipAngleDegrees": 4.973,
-      "handbrakePeakSlipAngleDegrees": 4.511,
-      "baselineHeadingChangeRadians": 1.576,
-      "handbrakeHeadingChangeRadians": 1.892,
-      "baselineExitSpeedKmh": 49.422,
-      "handbrakeExitSpeedKmh": 47.307
+      "baselinePeakLateralSpeedMetersPerSecond": 0.736,
+      "handbrakePeakLateralSpeedMetersPerSecond": 0.575,
+      "baselinePeakSlipAngleDegrees": 4.239,
+      "handbrakePeakSlipAngleDegrees": 3.881,
+      "baselineHeadingChangeRadians": 1.34,
+      "handbrakeHeadingChangeRadians": 1.619,
+      "baselineExitSpeedKmh": 50.17,
+      "handbrakeExitSpeedKmh": 48.628
     },
     "cornering": {
-      "headingChangeRadians": 5.504,
-      "peakLateralSpeedMetersPerSecond": 1.616,
-      "peakSlipAngleDegrees": 8.681,
-      "maximumBodyTiltDegrees": 1.168,
+      "headingChangeRadians": 4.773,
+      "peakLateralSpeedMetersPerSecond": 1.237,
+      "peakSlipAngleDegrees": 7.358,
+      "maximumBodyTiltDegrees": 0.926,
       "minimumGroundedWheels": 4,
       "wheelLiftTimeSeconds": 0,
-      "exitSpeedKmh": 55.998
+      "exitSpeedKmh": 55.906
     },
     "impact": {
       "objectId": "crate-a",
