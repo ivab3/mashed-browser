@@ -212,5 +212,8 @@ Still required before Gate C:
 
 - run the seven-scenario A/B session in the reference game, record directional differences, and tune
   the browser profile against those observations;
-- replace the second player's debug proxy with an independently skinned original vehicle instance;
 - record a representative vehicle replay and verify it in every supported browser.
+
+Deferred to the Stage 5 multiplayer vertical slice:
+
+- replace the second player's debug proxy with an independently skinned original vehicle instance.

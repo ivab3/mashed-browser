@@ -220,7 +220,7 @@ WebGL/WASM boot, весь state flow, остановку simulation в results, 
 - [x] Боковое сцепление, контролируемый занос и стабилизация корпуса.
 - [x] Поверхности с разным сцеплением: асфальт, лёд, песок и грязь.
 - [x] Столкновения стен, динамических и разрушаемых объектов.
-- [ ] Столкновения машина–машина.
+- [x] Столкновения машина–машина.
 - [x] Reset/recovery при перевороте или застревании.
 - [x] Chase camera.
 - [x] Общая multiplayer camera.
@@ -242,7 +242,8 @@ WebGL/WASM boot, весь state flow, остановку simulation в results, 
 
 Gate C — физика должна уже ощущаться как аркадная Mashed. Если нет, следующая работа посвящается физике, а не контенту.
 
-Статус 2026-08-24: **этап 4 продолжается, Gate C открыт**. Реализован первый интерактивный срез:
+Статус 2026-08-24: **feature checklist этапа 4 закрыт, Gate C открыт до фиксации reference A/B
+evidence и browser replay acceptance**. Реализован первый интерактивный срез:
 data-driven chassis, compound colliders, четыре ray-cast колеса, полный базовый ввод,
 surface-aware grip, ручник, стабилизация/recovery и chase camera. Тестовая арена позволяет сразу
 сравнивать асфальт, лёд, песок и грязь. Второй срез добавил воспроизводимые acceleration/braking/
@@ -262,7 +263,9 @@ ray-cast controller, а также независимый keyboard/gamepad input
 Детерминированные тесты проверяют фронтальный перенос импульса, самостоятельное движение P2 и reset
 обоих кузовов. Shared multiplayer camera центрирует интерполированные позиции активных машин и
 увеличивает высоту/trailing distance по радиусу группы, сохраняя прежний одиночный framing.
-Следующий слой — browser replay-проверка и независимый original-vehicle render instance для P2.
+Оставшаяся closure-работа этапа 4 — зафиксировать reference-game A/B evidence и выполнить browser
+replay-проверку. Независимый original-vehicle render instance для P2 относится уже к multiplayer
+vertical slice этапа 5.
 
 ### Этап 5. Вертикальный срез — 4–6 недель
 
