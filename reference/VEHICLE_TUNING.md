@@ -1,8 +1,8 @@
 # Stage 4 vehicle feel tuning
 
 Status: the source-derived throttle build-up curve, `1000` chassis mass, reciprocal steering curve,
-and relative `Grip / Handling` adapter are integrated. A human A/B drive rejected the literal
-`Brake/Reverse` counter-force candidate in favor of the faster browser brake-to-reverse transition.
+relative `Grip / Handling` adapter, and accepted compliant suspension are integrated. Human A/B
+drives retained the faster browser brake-to-reverse transition and selected suspension `30/4/5`.
 
 ## Purpose
 
@@ -144,3 +144,17 @@ reciprocal curve. It kept the `0.5` maximum steering angle, `4.8` response, and 
 coefficients unchanged. The source input cap is already represented by the calibrated maximum angle
 and is not applied a second time. A human Crusader/Warzone A/B drive found the reciprocal result close
 to the original, so it is now the default.
+
+No separate spring-stiffness, compression, relaxation, or upright-torque table was found in the
+executable. The original vehicle uses a custom four-contact solver: its constructor derives body
+response from compiled contact locations, chassis mass/inverse mass, and inertia, while the update
+path accumulates linear and angular impulses from the active contacts. The browser uses Rapier's
+raycast vehicle controller, so the original contact geometry is evidence about the architecture but
+does not provide drop-in Rapier suspension coefficients.
+
+The suspension/body A/B therefore changed only the browser suspension family:
+stiffness/compression/relaxation moved from `60/6/7` to `30/4/5`. The deterministic hard-corner tape
+raises maximum body tilt from `0.926°` to `1.619°`, keeps all four wheels grounded, and leaves heading
+change at `4.772 rad` versus `4.773 rad`. The softer `20/3/4` probe reached `2.017°` but changed the
+slalom lateral offset from `8.691 m` to `6.087 m`, so it was excluded from the human comparison. A
+human A/B drive preferred the visible body response of `30/4/5`; it is now the committed default.

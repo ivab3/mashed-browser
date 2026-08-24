@@ -17,9 +17,9 @@
     "radius": 0.32,
     "suspensionRestLength": 0.46,
     "maxSuspensionTravel": 0.32,
-    "suspensionStiffness": 60,
-    "suspensionCompression": 6,
-    "suspensionRelaxation": 7,
+    "suspensionStiffness": 30,
+    "suspensionCompression": 4,
+    "suspensionRelaxation": 5,
     "maxSuspensionForce": 35000
   },
   "drive": {

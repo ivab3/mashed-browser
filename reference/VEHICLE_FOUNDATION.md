@@ -130,11 +130,12 @@ It uses the real fixed-step Rapier vehicle and reports acceleration, braking, sl
 handbrake-turn, hard-corner stability, and light-prop impact metrics. The current regression baseline is stored in
 [`reference/vehicle-tuning-baseline.json`](./vehicle-tuning-baseline.json); it describes the browser
 prototype and is not presented as a measurement of the original game. The accepted source-mass
-baseline reaches 50 km/h in 3.267 s and stops from 45.903 km/h in 6.073 m when the ordinary
+baseline reaches 50 km/h in 3.267 s and stops from 45.903 km/h in 6.080 m when the ordinary
 brake/reverse drive input is held. The handbrake scenario
-increases heading change from 1.340 to 1.619 radians over the same 90-frame turn. The hard-corner
-tape keeps all four wheels down with 0.926 degrees of peak body tilt. The impact tape hits the first
-crate at 37.651 km/h and retains 85.5% of that speed after 0.5 seconds of neutral input.
+increases heading change from 1.341 to 1.618 radians over the same 90-frame turn. The accepted
+compliant suspension keeps all four wheels down with 1.619 degrees of peak body tilt. The impact
+tape hits the first crate at 37.651 km/h and retains 85.2% of that speed after 0.5 seconds of neutral
+input.
 
 An alternative data-driven profile can be compared without editing the committed tune:
 
@@ -155,7 +156,7 @@ pnpm lap:validate
 
 It binds the original `AI1.BSP`, `COLLIDE.BSP`, and `LAPDATA.LUA`, drives through the same fixed-step
 input path as a player, and exits non-zero if the lap is incomplete or recovery was requested. The
-current deterministic result is 136/136 checkpoints in 61.867 s, 3,712 physics steps, 44.559 km/h peak,
+current deterministic result is 136/136 checkpoints in 61.883 s, 3,713 physics steps, 44.653 km/h peak,
 zero reverse frames, and zero recovery frames. The collision mesh contains 5,833 triangles after
 route filtering and application of the 272-triangle compatibility support ribbon.
 

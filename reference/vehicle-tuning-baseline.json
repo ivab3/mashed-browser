@@ -8,48 +8,48 @@
     "acceleration": {
       "targetSpeedKmh": 50,
       "targetTimeSeconds": 3.267,
-      "distanceMeters": 33.989,
+      "distanceMeters": 33.985,
       "finalSpeedKmh": 62.224,
       "peakSpeedKmh": 62.224
     },
     "braking": {
       "initialSpeedKmh": 45.903,
       "stoppingTimeSeconds": 1.117,
-      "stoppingDistanceMeters": 6.073,
+      "stoppingDistanceMeters": 6.08,
       "finalSpeedKmh": 0.886
     },
     "slalom": {
-      "distanceMeters": 42.458,
-      "lateralOffsetMeters": 8.691,
-      "peakLateralSpeedMetersPerSecond": 7.429,
-      "peakSpeedKmh": 67.369
+      "distanceMeters": 42.378,
+      "lateralOffsetMeters": 8.151,
+      "peakLateralSpeedMetersPerSecond": 7.363,
+      "peakSpeedKmh": 67.325
     },
     "drift": {
-      "baselinePeakLateralSpeedMetersPerSecond": 0.736,
-      "handbrakePeakLateralSpeedMetersPerSecond": 0.575,
-      "baselinePeakSlipAngleDegrees": 4.239,
-      "handbrakePeakSlipAngleDegrees": 3.881,
-      "baselineHeadingChangeRadians": 1.34,
-      "handbrakeHeadingChangeRadians": 1.619,
-      "baselineExitSpeedKmh": 50.17,
-      "handbrakeExitSpeedKmh": 48.628
+      "baselinePeakLateralSpeedMetersPerSecond": 0.727,
+      "handbrakePeakLateralSpeedMetersPerSecond": 0.563,
+      "baselinePeakSlipAngleDegrees": 4.148,
+      "handbrakePeakSlipAngleDegrees": 3.801,
+      "baselineHeadingChangeRadians": 1.341,
+      "handbrakeHeadingChangeRadians": 1.618,
+      "baselineExitSpeedKmh": 50.132,
+      "handbrakeExitSpeedKmh": 48.582
     },
     "cornering": {
-      "headingChangeRadians": 4.773,
-      "peakLateralSpeedMetersPerSecond": 1.237,
-      "peakSlipAngleDegrees": 7.358,
-      "maximumBodyTiltDegrees": 0.926,
+      "headingChangeRadians": 4.772,
+      "peakLateralSpeedMetersPerSecond": 1.223,
+      "peakSlipAngleDegrees": 7.209,
+      "maximumBodyTiltDegrees": 1.619,
       "minimumGroundedWheels": 4,
       "wheelLiftTimeSeconds": 0,
-      "exitSpeedKmh": 55.906
+      "exitSpeedKmh": 55.755
     },
     "impact": {
       "objectId": "crate-a",
       "impactTimeSeconds": 2.5,
       "impactSpeedKmh": 37.651,
-      "impactForceNewtons": 30556.277,
-      "postImpactSpeedKmh": 32.176,
-      "speedRetentionRatio": 0.855
+      "impactForceNewtons": 31773.602,
+      "postImpactSpeedKmh": 32.082,
+      "speedRetentionRatio": 0.852
     }
   }
 }
