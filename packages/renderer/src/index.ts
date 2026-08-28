@@ -47,6 +47,7 @@ export interface RenderFrame {
   history: PhysicsTransformHistory;
   interpolationAlpha: number;
   frameDeltaSeconds: number;
+  primaryVehicleActive?: boolean;
   objects?: readonly PhysicsSceneObject[];
   debugLines?: PhysicsDebugLines;
 }
@@ -493,43 +494,49 @@ export class RuntimeRenderer {
     );
     this.#vehicle.position.fromArray(transform.position);
     this.#vehicle.quaternion.fromArray(transform.rotation);
+    const primaryVehicleActive = frame.primaryVehicleActive ?? true;
+    this.#vehicle.visible = primaryVehicleActive;
     this.#syncSceneObjects(frame.objects ?? [], frame.interpolationAlpha);
 
     if (this.#debugCameraEnabled) {
       this.#controls.update();
     } else {
-      const cameraSubjects = [
-        transform,
-        ...(frame.objects ?? [])
-          .filter((object) => object.kind === "vehicle" && object.active)
-          .map((object) => interpolateTransform(
-            object.history.previous,
-            object.history.current,
-            frame.interpolationAlpha,
-          )),
-      ];
-      const fit = fitSharedCamera(cameraSubjects);
-      const cameraCenter = new THREE.Vector3(...fit.center);
-      const forward = new THREE.Vector3(0, 0, 1).applyQuaternion(this.#vehicle.quaternion);
-      forward.y = 0;
-      if (forward.lengthSq() < 0.001) {
-        forward.set(0, 0, 1);
-      } else {
-        forward.normalize();
+      const activeObjectTransforms = (frame.objects ?? [])
+        .filter((object) => object.kind === "vehicle" && object.active)
+        .map((object) => interpolateTransform(
+          object.history.previous,
+          object.history.current,
+          frame.interpolationAlpha,
+        ));
+      const cameraSubjects = primaryVehicleActive
+        ? [transform, ...activeObjectTransforms]
+        : activeObjectTransforms;
+      if (cameraSubjects.length > 0) {
+        const fit = fitSharedCamera(cameraSubjects);
+        const cameraCenter = new THREE.Vector3(...fit.center);
+        const heading = primaryVehicleActive ? transform : cameraSubjects[0]!;
+        const headingQuaternion = new THREE.Quaternion(...heading.rotation);
+        const forward = new THREE.Vector3(0, 0, 1).applyQuaternion(headingQuaternion);
+        forward.y = 0;
+        if (forward.lengthSq() < 0.001) {
+          forward.set(0, 0, 1);
+        } else {
+          forward.normalize();
+        }
+        const desired = cameraCenter.clone().addScaledVector(forward, -fit.trailMeters);
+        desired.y += fit.heightMeters;
+        const desiredTarget = cameraCenter.clone().addScaledVector(forward, fit.lookAheadMeters);
+        desiredTarget.y += 0.45;
+        const followAlpha = 1 - Math.exp(-5.2 * Math.min(frame.frameDeltaSeconds, 0.1));
+        if (this.#camera.position.distanceToSquared(desired) > 400) {
+          this.#camera.position.copy(desired);
+          this.#cameraTarget.copy(desiredTarget);
+        } else {
+          this.#camera.position.lerp(desired, followAlpha);
+          this.#cameraTarget.lerp(desiredTarget, followAlpha);
+        }
+        this.#camera.lookAt(this.#cameraTarget);
       }
-      const desired = cameraCenter.clone().addScaledVector(forward, -fit.trailMeters);
-      desired.y += fit.heightMeters;
-      const desiredTarget = cameraCenter.clone().addScaledVector(forward, fit.lookAheadMeters);
-      desiredTarget.y += 0.45;
-      const followAlpha = 1 - Math.exp(-5.2 * Math.min(frame.frameDeltaSeconds, 0.1));
-      if (this.#camera.position.distanceToSquared(desired) > 400) {
-        this.#camera.position.copy(desired);
-        this.#cameraTarget.copy(desiredTarget);
-      } else {
-        this.#camera.position.lerp(desired, followAlpha);
-        this.#cameraTarget.lerp(desiredTarget, followAlpha);
-      }
-      this.#camera.lookAt(this.#cameraTarget);
     }
 
     this.#updateDebugLines(frame.debugLines);

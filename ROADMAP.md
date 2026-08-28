@@ -300,8 +300,10 @@ original-vehicle render instance для P2 был завершён и обобщ
 показывает countdown/final-time banner. Второй срез заменил специальную P2-ветку на production roster:
 heading-aware сетка 1–4, четыре независимых input/physics/telemetry-потока, выбор всех загруженных
 DFF/TXD-пар и отдельный original render instance на каждый слот. P3/P4 используют gamepad 3/4;
-все машины пока разделяют принятый Crusader physics profile. Shared-camera elimination, оружие,
-полный HUD/audio и M1 hardening остаются следующими срезами.
+все машины пока разделяют принятый Crusader physics profile. Третий срез добавил deterministic
+shared-camera elimination: route-aware выбор лидера, 1,5-секундный grace period, физическую
+деактивацию выбывших машин, last-car-standing winner, полную таблицу результатов и rematch без
+перезагрузки страницы. Оружие, полный HUD/audio и M1 hardening остаются следующими срезами.
 
 Milestone M1: публично показываемый proof of concept.
 

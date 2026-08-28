@@ -141,6 +141,39 @@ describe("RaceSession", () => {
     expect(race.snapshot.results.map((result) => result.playerId)).toEqual(["p1", "p3", "p2"]);
   });
 
+  it("awards the final active player in last-player-standing matches", () => {
+    const race = new RaceSession({
+      course,
+      players: [{ id: "p1" }, { id: "p2" }, { id: "p3" }],
+      totalLaps: 1,
+      countdownSeconds: 0,
+      finishWhenOnePlayerRemains: true,
+    });
+    race.advance(1, { p1: [2, 0, 0], p2: [2, 0, 0], p3: [2, 0, 0] });
+    expect(race.eliminatePlayer("p2", "camera-distance")).toEqual([
+      { type: "player-eliminated", playerId: "p2", reason: "camera-distance" },
+    ]);
+    const decidingEvents = race.eliminatePlayer("p3", "camera-distance");
+    expect(decidingEvents.map((event) => event.type)).toEqual([
+      "player-eliminated",
+      "player-won",
+      "race-finished",
+    ]);
+    expect(race.snapshot).toMatchObject({
+      phase: "finished",
+      players: [
+        { id: "p1", status: "winner" },
+        { id: "p2", status: "eliminated" },
+        { id: "p3", status: "eliminated" },
+      ],
+      results: [
+        { rank: 1, playerId: "p1", status: "winner" },
+        { rank: 2, playerId: "p3", status: "eliminated" },
+        { rank: 3, playerId: "p2", status: "eliminated" },
+      ],
+    });
+  });
+
   it("replays the same multiplayer position tape to an identical snapshot", () => {
     const run = () => {
       const race = new RaceSession({

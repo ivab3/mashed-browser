@@ -343,6 +343,7 @@ export class PhysicsRuntime {
   #trackTriangles = 0;
   #activeSpawn: VehicleSpawn;
   #vehicleRosterIds: readonly string[] = [PRIMARY_VEHICLE_ID];
+  #primaryActive = true;
   #history: PhysicsTransformHistory;
   readonly #control = createVehicleControlState();
 
@@ -475,14 +476,23 @@ export class PhysicsRuntime {
 
   getVehicleTelemetry(id: string): VehicleTelemetry | undefined {
     if (id === PRIMARY_VEHICLE_ID) {
-      return this.telemetry;
+      return this.#primaryActive ? this.telemetry : undefined;
     }
     const vehicle = this.#collisionVehicles.find((candidate) => candidate.id === id);
-    return vehicle?.object.enabledOnReset ? { ...vehicle.control.telemetry } : undefined;
+    return vehicle?.object.active ? { ...vehicle.control.telemetry } : undefined;
   }
 
   get vehicleIds(): readonly string[] {
     return [...this.#vehicleRosterIds];
+  }
+
+  get activeVehicleIds(): readonly string[] {
+    return this.#vehicleRosterIds.filter((id) => {
+      if (id === PRIMARY_VEHICLE_ID) {
+        return this.#primaryActive;
+      }
+      return this.#collisionVehicles.some((vehicle) => vehicle.id === id && vehicle.object.active);
+    });
   }
 
   getVehicleTransformHistory(id: string): PhysicsTransformHistory | undefined {
@@ -662,6 +672,30 @@ export class PhysicsRuntime {
     this.resetDemo();
   }
 
+  deactivateVehicle(id: string): void {
+    if (!this.#vehicleRosterIds.includes(id)) {
+      throw new Error(`Unknown active-roster vehicle ${id}`);
+    }
+    if (id === PRIMARY_VEHICLE_ID) {
+      if (!this.#primaryActive) {
+        return;
+      }
+      this.#primaryActive = false;
+      this.#body.setEnabled(false);
+      this.#resetControlState(this.#control);
+    } else {
+      const vehicle = this.#collisionVehicles.find((candidate) => candidate.id === id);
+      if (!vehicle?.object.active) {
+        return;
+      }
+      vehicle.object.active = false;
+      vehicle.body.setEnabled(false);
+      this.#resetControlState(vehicle.control);
+    }
+    this.#contacts.clear();
+    this.#eventQueue.clear();
+  }
+
   step(
     stepSeconds: number,
     rawInput: VehicleInputFrame = NEUTRAL_VEHICLE_INPUT,
@@ -670,15 +704,17 @@ export class PhysicsRuntime {
     if (Math.abs(this.#world.timestep - stepSeconds) > 1e-7) {
       throw new Error(`Physics timestep changed from ${this.#world.timestep} to ${stepSeconds}`);
     }
-    const input = sanitizeVehicleInput(rawInput);
-    const requestedRecovery = input.recover && !this.#control.recoveryWasPressed;
-    this.#control.recoveryWasPressed = input.recover;
-    if (requestedRecovery) {
-      this.recover();
+    const input = this.#primaryActive ? sanitizeVehicleInput(rawInput) : NEUTRAL_VEHICLE_INPUT;
+    if (this.#primaryActive) {
+      const requestedRecovery = input.recover && !this.#control.recoveryWasPressed;
+      this.#control.recoveryWasPressed = input.recover;
+      if (requestedRecovery) {
+        this.recover();
+      }
     }
     const collisionInputs = new Map<CollisionVehicleRuntime, VehicleInputFrame>();
     for (const collisionVehicle of this.#collisionVehicles) {
-      if (!collisionVehicle.object.enabledOnReset) {
+      if (!collisionVehicle.object.active) {
         continue;
       }
       const vehicleInput = sanitizeVehicleInput(
@@ -702,16 +738,18 @@ export class PhysicsRuntime {
         current: object.history.current,
       };
     }
-    this.#body.resetForces(true);
-    this.#body.resetTorques(true);
-    this.#applyVehicleControls(this.#body, this.#vehicle, this.#control, input, stepSeconds);
-    this.#vehicle.updateVehicle(stepSeconds, undefined, undefined, (collider) => (
-      collider.parent()?.handle !== this.#body.handle
-      && (collider.parent()?.userData as SurfaceBodyData | undefined)?.wheelSurface !== false
-    ));
-    this.#applyStability();
+    if (this.#primaryActive) {
+      this.#body.resetForces(true);
+      this.#body.resetTorques(true);
+      this.#applyVehicleControls(this.#body, this.#vehicle, this.#control, input, stepSeconds);
+      this.#vehicle.updateVehicle(stepSeconds, undefined, undefined, (collider) => (
+        collider.parent()?.handle !== this.#body.handle
+        && (collider.parent()?.userData as SurfaceBodyData | undefined)?.wheelSurface !== false
+      ));
+      this.#applyStability();
+    }
     for (const collisionVehicle of this.#collisionVehicles) {
-      if (!collisionVehicle.object.enabledOnReset) {
+      if (!collisionVehicle.object.active) {
         continue;
       }
       collisionVehicle.body.resetForces(true);
@@ -743,15 +781,17 @@ export class PhysicsRuntime {
         };
       }
     }
-    this.#updateTelemetry(
-      this.#body,
-      this.#vehicle,
-      this.#control,
-      stepSeconds,
-      () => this.recover(),
-    );
+    if (this.#primaryActive) {
+      this.#updateTelemetry(
+        this.#body,
+        this.#vehicle,
+        this.#control,
+        stepSeconds,
+        () => this.recover(),
+      );
+    }
     for (const collisionVehicle of this.#collisionVehicles) {
-      if (!collisionVehicle.object.enabledOnReset) {
+      if (!collisionVehicle.object.active) {
         continue;
       }
       this.#updateTelemetry(
@@ -774,11 +814,16 @@ export class PhysicsRuntime {
 
   resetDemo(): void {
     const spawn = this.#activeSpawn;
+    this.#primaryActive = true;
+    this.#body.setEnabled(true);
     this.#placeVehicle(spawn.position, spawn.headingRadians);
     this.#resetCollisionObjects();
   }
 
   recover(): void {
+    if (!this.#primaryActive) {
+      return;
+    }
     const position = this.#body.translation();
     this.#placeVehicle(
       [position.x, Math.max(position.y + this.#config.recovery.lift, this.#activeSpawn.position[1]), position.z],

@@ -1,7 +1,7 @@
 # Stage 5 vertical slice
 
-Status: Stage 5 started on 2026-08-28. The deterministic race-rules foundation and production local
-roster are implemented; match elimination, combat, presentation, audio, and hardening remain open.
+Status: Stage 5 started on 2026-08-28. Deterministic race rules, the production local roster, and
+shared-camera match elimination are implemented; combat, presentation, audio, and hardening remain open.
 
 ## Slice 5.1 — race rules foundation
 
@@ -48,24 +48,44 @@ All four slots currently share the accepted Crusader physics profile. Per-vehicl
 profiles are a later content/tuning concern; this slice makes visual selection and runtime ownership
 data-driven without pretending that unverified car-specific Rapier tunes are already complete.
 
+## Slice 5.3 — shared-camera elimination and complete matches
+
+The multiplayer race loop now resolves a full last-car-standing match without page reloads:
+
+- a pure fixed-step `CameraEliminationTracker` selects the route leader by lap, ordered-checkpoint
+  progress, and distance to the next checkpoint, with stable roster order as its final tie-breaker;
+- non-leaders outside the accepted leader/pack radius receive a 1.5-second warning before elimination;
+  returning to the camera pack clears the accumulated danger time;
+- simultaneous eliminations retain deterministic input order, and the final racing player receives
+  an explicit `winner` result before the match enters `results`;
+- finished, eliminated, and winning vehicles are disabled in Rapier and removed from the shared
+  camera while their final transforms and result records remain available;
+- the renderer follows the first remaining active vehicle when P1 is out and holds the last camera
+  pose after every vehicle becomes terminal;
+- the runtime presents the knockout countdown and complete ordered standings; `Race again` resets
+  physics, race progress, elimination timers, and presentation without reloading the page.
+
+The elimination policy consumes track progress and positions as plain data. It does not depend on
+Three.js screen coordinates, DOM timing, or render FPS, so later combat destruction can use the same
+`RaceSession.eliminatePlayer` boundary.
+
 ## Planned slices
 
-1. **Multiplayer match:** shared-camera distance
-   elimination, restart/rematch flow, and final standings for complete matches.
-2. **Combat:** pickups plus at least three weapons/power-ups, damage, knockback, projectiles, and
+1. **Combat:** pickups plus at least three weapons/power-ups, damage, knockback, projectiles, and
    deterministic destruction/elimination events.
-3. **Presentation:** production HUD, pause, results, engine/impact/weapon/UI audio, and baseline
+2. **Presentation:** production HUD, pause, results, engine/impact/weapon/UI audio, and baseline
    effects usable for a complete battle/race loop.
-4. **M1 hardening:** browser replay matrix, 30-minute soak, four-player 1080p performance scene,
+3. **M1 hardening:** browser replay matrix, 30-minute soak, four-player 1080p performance scene,
    and verification that prepared game data causes no network request after initial loading.
 
 ## Verification
 
-The suites cover countdown gating, ordered multi-lap finish, independent multiplayer progress,
-elimination ordering, roster/grid validation, four independent physics slots, asset catalog order,
+The suites cover countdown gating, ordered multi-lap finish, last-player-standing results, fixed-step
+camera warnings/elimination/re-entry, independent multiplayer progress, roster/grid validation,
+vehicle deactivation/rematch reset, four independent physics slots, asset catalog order,
 keyboard/gamepad ownership, and repeated position-tape equality. Browser smoke covers live 1→4→1
-roster changes, four grounded bodies, the legacy two-player collision-lab default, `menu → race →
-results`, hidden-row behavior, prop metrics, and console cleanliness. Run the committed checks with:
+roster changes, four grounded bodies, repeated `menu → race → results → race`, hidden-row behavior,
+prop metrics, and console cleanliness. Run the committed checks with:
 
 ```bash
 pnpm test

@@ -8,7 +8,7 @@ import { LOCAL_PLAYER_SLOTS } from "./local-roster.js";
 
 export type RacePhase = "countdown" | "racing" | "finished";
 
-export type RacePlayerStatus = "ready" | "racing" | "finished" | "eliminated";
+export type RacePlayerStatus = "ready" | "racing" | "finished" | "winner" | "eliminated";
 
 export type RaceEliminationReason = "camera-distance" | "destroyed" | "retired";
 
@@ -22,6 +22,7 @@ export interface RaceSessionOptions {
   players: readonly RacePlayerDefinition[];
   totalLaps: number;
   countdownSeconds?: number;
+  finishWhenOnePlayerRemains?: boolean;
 }
 
 export interface RacePlayerSnapshot {
@@ -37,7 +38,7 @@ export interface RaceResult {
   rank: number;
   playerId: string;
   displayName: string;
-  status: "finished" | "eliminated";
+  status: "finished" | "winner" | "eliminated";
   timeSeconds: number;
   completedLaps: number;
   passedCheckpoints: number;
@@ -59,6 +60,7 @@ export type RaceEvent =
   | { type: "checkpoint-passed"; playerId: string; checkpointId: number }
   | { type: "lap-completed"; playerId: string; completedLaps: number }
   | { type: "player-finished"; playerId: string; timeSeconds: number }
+  | { type: "player-won"; playerId: string; timeSeconds: number }
   | { type: "player-eliminated"; playerId: string; reason: RaceEliminationReason }
   | { type: "race-finished"; results: readonly RaceResult[] };
 
@@ -92,6 +94,7 @@ function validateFiniteNonNegative(value: number, name: string): void {
 export class RaceSession {
   readonly #players: RacePlayerRuntime[];
   readonly #totalLaps: number;
+  readonly #finishWhenOnePlayerRemains: boolean;
   #phase: RacePhase;
   #countdownSecondsRemaining: number;
   #elapsedRaceSeconds = 0;
@@ -127,6 +130,7 @@ export class RaceSession {
       };
     });
     this.#totalLaps = options.totalLaps;
+    this.#finishWhenOnePlayerRemains = options.finishWhenOnePlayerRemains ?? false;
     this.#countdownSecondsRemaining = countdownSeconds;
     this.#phase = countdownSeconds > 0 ? "countdown" : "racing";
   }
@@ -242,8 +246,29 @@ export class RaceSession {
     player.terminalOrder = this.#terminalOrder;
     this.#terminalOrder += 1;
     const events: RaceEvent[] = [{ type: "player-eliminated", playerId, reason }];
+    this.#awardLastPlayerStanding(events);
     this.#finishIfTerminal(events);
     return events;
+  }
+
+  #awardLastPlayerStanding(events: RaceEvent[]): void {
+    if (!this.#finishWhenOnePlayerRemains || this.#players.length < 2) {
+      return;
+    }
+    const racing = this.#players.filter((player) => player.status === "racing");
+    if (racing.length !== 1) {
+      return;
+    }
+    const winner = racing[0]!;
+    winner.status = "winner";
+    winner.finishTimeSeconds = this.#elapsedRaceSeconds;
+    winner.terminalOrder = this.#terminalOrder;
+    this.#terminalOrder += 1;
+    events.push({
+      type: "player-won",
+      playerId: winner.definition.id,
+      timeSeconds: this.#elapsedRaceSeconds,
+    });
   }
 
   #rememberPositions(positions: RacePlayerPositions): void {
@@ -268,9 +293,12 @@ export class RaceSession {
     return [...this.#players]
       .sort((left, right) => {
         if (left.status !== right.status) {
-          return left.status === "finished" ? -1 : 1;
+          const priority = (status: RacePlayerStatus): number => (
+            status === "winner" ? 0 : status === "finished" ? 1 : 2
+          );
+          return priority(left.status) - priority(right.status);
         }
-        if (left.status === "finished") {
+        if (left.status === "finished" || left.status === "winner") {
           return (left.finishTimeSeconds ?? Infinity) - (right.finishTimeSeconds ?? Infinity)
             || (left.terminalOrder ?? Infinity) - (right.terminalOrder ?? Infinity);
         }
@@ -281,7 +309,9 @@ export class RaceSession {
         rank: index + 1,
         playerId: player.definition.id,
         displayName: player.displayName,
-        status: player.status === "finished" ? "finished" : "eliminated",
+        status: player.status === "winner"
+          ? "winner"
+          : player.status === "finished" ? "finished" : "eliminated",
         timeSeconds: player.finishTimeSeconds ?? player.eliminationTimeSeconds ?? this.#elapsedRaceSeconds,
         completedLaps: player.lap.progress.completedLaps,
         passedCheckpoints: player.lap.progress.passedCheckpoints,

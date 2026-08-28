@@ -291,6 +291,55 @@ describe("PhysicsRuntime", () => {
     }
   });
 
+  it("deactivates eliminated vehicles until the next match reset", async () => {
+    const roster = [
+      { id: PRIMARY_VEHICLE_ID, spawn: { position: [-2, 1.05, -8] as const, headingRadians: 0 } },
+      { id: "vehicle-two", spawn: { position: [2, 1.05, -8] as const, headingRadians: 0 } },
+    ];
+    const physics = await createPhysicsRuntime(
+      new RuntimeEventBus(),
+      1 / 60,
+      DEFAULT_VEHICLE_CONFIG,
+      { collisionObjects: false },
+    );
+    try {
+      physics.setVehicleRoster(roster);
+      const primaryBefore = physics.getVehicleTransformHistory(PRIMARY_VEHICLE_ID)!.current.position;
+      const secondBefore = physics.getVehicleTransformHistory("vehicle-two")!.current.position;
+      physics.deactivateVehicle(PRIMARY_VEHICLE_ID);
+      physics.deactivateVehicle("vehicle-two");
+      physics.deactivateVehicle("vehicle-two");
+      expect(physics.activeVehicleIds).toEqual([]);
+      expect(physics.getVehicleTelemetry(PRIMARY_VEHICLE_ID)).toBeUndefined();
+      expect(physics.getVehicleTelemetry("vehicle-two")).toBeUndefined();
+      expect(physics.sceneObjects.find((object) => object.id === "vehicle-two")?.active).toBe(false);
+
+      const input = { drive: 1, steer: 1, brake: 0, handbrake: 0, recover: true };
+      for (let step = 0; step < 30; step += 1) {
+        physics.stepVehicles(1 / 60, {
+          [PRIMARY_VEHICLE_ID]: input,
+          "vehicle-two": input,
+        });
+      }
+      expect(physics.getVehicleTransformHistory(PRIMARY_VEHICLE_ID)!.current.position).toEqual(primaryBefore);
+      expect(physics.getVehicleTransformHistory("vehicle-two")!.current.position).toEqual(secondBefore);
+
+      physics.resetDemo();
+      expect(physics.activeVehicleIds).toEqual([PRIMARY_VEHICLE_ID, "vehicle-two"]);
+      expect(physics.getVehicleTelemetry(PRIMARY_VEHICLE_ID)).toBeDefined();
+      expect(physics.getVehicleTelemetry("vehicle-two")).toBeDefined();
+      physics.getVehicleTransformHistory(PRIMARY_VEHICLE_ID)!.current.position.forEach((component, index) => {
+        expect(component).toBeCloseTo(roster[0]!.spawn.position[index]!);
+      });
+      physics.getVehicleTransformHistory("vehicle-two")!.current.position.forEach((component, index) => {
+        expect(component).toBeCloseTo(roster[1]!.spawn.position[index]!);
+      });
+      expect(() => physics.deactivateVehicle("missing")).toThrow(/Unknown active-roster vehicle/);
+    } finally {
+      physics.dispose();
+    }
+  });
+
   it("maps positive player steering to Rapier's mirrored wheel-steering direction", async () => {
     const physics = await createPhysicsRuntime(
       new RuntimeEventBus(),

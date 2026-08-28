@@ -1,3 +1,4 @@
+export * from "./camera-elimination.js";
 export * from "./events.js";
 export * from "./fixed-step.js";
 export * from "./lap-session.js";

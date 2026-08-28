@@ -14,6 +14,7 @@ import {
   type VehicleAssetPair,
 } from "@mashed/assets";
 import {
+  CameraEliminationTracker,
   createLocalPlayerGrid,
   FixedStepClock,
   LOCAL_PLAYER_SLOTS,
@@ -21,6 +22,7 @@ import {
   RuntimeEventBus,
   RuntimeStateMachine,
   type FixedStepFrame,
+  type CameraEliminationWarning,
   type LocalPlayerGridSlot,
   type RaceEvent,
   type RuntimeState,
@@ -38,6 +40,7 @@ import {
   createPhysicsRuntime,
   DEFAULT_VEHICLE_CONFIG,
   deriveRouteCollisionLayers,
+  PRIMARY_VEHICLE_ID,
   type PhysicsRuntime,
   type PhysicsRuntimeOptions,
   type VehicleInputById,
@@ -113,6 +116,8 @@ const metricCheckpoint = element<HTMLElement>("metric-checkpoint");
 const raceBanner = element<HTMLElement>("race-banner");
 const raceBannerLabel = element<HTMLElement>("race-banner-label");
 const raceBannerValue = element<HTMLElement>("race-banner-value");
+const raceResults = element<HTMLOListElement>("race-results");
+const eliminationWarning = element<HTMLElement>("elimination-warning");
 const primaryDriveGuide = element<HTMLElement>("primary-drive-guide");
 const primaryActionGuide = element<HTMLElement>("primary-action-guide");
 const secondaryDriveGuide = element<HTMLElement>("secondary-drive-guide");
@@ -166,6 +171,8 @@ const loadedTextureDictionaries = new Map<string, PiTextureDictionary>();
 let physics: PhysicsRuntime | undefined;
 let trackDefinition: DerivedTrackDefinition | undefined;
 let raceSession: RaceSession | undefined;
+const cameraElimination = new CameraEliminationTracker();
+let eliminationWarnings: readonly CameraEliminationWarning[] = [];
 let vehicleInputs: BrowserVehicleInput[] = [];
 let vehicleCatalog: readonly VehicleAssetPair[] = [];
 let animationFrame = 0;
@@ -269,24 +276,50 @@ function formatRaceTime(seconds: number): string {
   return `${minutes}:${remainder.toFixed(2).padStart(5, "0")}`;
 }
 
+function applyEliminationWarning(): void {
+  eliminationWarning.hidden = eliminationWarnings.length === 0;
+  eliminationWarning.textContent = eliminationWarnings
+    .map((warning) => `${LOCAL_PLAYER_SLOTS.find((slot) => slot.id === warning.playerId)?.label ?? warning.playerId} OUT · ${warning.secondsRemaining.toFixed(1)}s`)
+    .join("   ");
+}
+
+function resetCameraElimination(): void {
+  cameraElimination.reset();
+  eliminationWarnings = [];
+  applyEliminationWarning();
+}
+
 function applyRaceBanner(): void {
   const snapshot = raceSession?.snapshot;
   if (!snapshot || state.state === "menu" || snapshot.phase === "racing") {
     raceBanner.hidden = true;
+    raceResults.hidden = true;
     return;
   }
   raceBanner.hidden = false;
   if (snapshot.phase === "countdown") {
     raceBannerLabel.textContent = "Get ready";
     raceBannerValue.textContent = String(Math.max(1, Math.ceil(snapshot.countdownSecondsRemaining)));
+    raceResults.hidden = true;
     return;
   }
 
   const winner = snapshot.results[0];
-  raceBannerLabel.textContent = winner?.status === "finished"
-    ? `${winner.displayName} finished`
-    : "Race over";
-  raceBannerValue.textContent = winner ? formatRaceTime(winner.timeSeconds) : "—";
+  raceBannerLabel.textContent = winner?.status === "winner"
+    ? "Last car standing"
+    : winner?.status === "finished" ? `${winner.displayName} finished` : "Race over";
+  raceBannerValue.textContent = winner?.status === "winner"
+    ? `${winner.displayName} wins`
+    : winner ? formatRaceTime(winner.timeSeconds) : "—";
+  raceResults.replaceChildren(...snapshot.results.map((result) => {
+    const item = document.createElement("li");
+    const status = result.status === "winner"
+      ? "WIN"
+      : result.status === "finished" ? formatRaceTime(result.timeSeconds) : "OUT";
+    item.innerHTML = `<span>${result.rank}</span><b>${result.displayName}</b><em>${status}</em>`;
+    return item;
+  }));
+  raceResults.hidden = snapshot.results.length === 0;
 }
 
 function createTrackRaceSession(): RaceSession | undefined {
@@ -296,6 +329,7 @@ function createTrackRaceSession(): RaceSession | undefined {
         players: activePlayerSlots().map((slot) => ({ id: slot.id, displayName: slot.label })),
         totalLaps: 1,
         countdownSeconds: 3,
+        finishWhenOnePlayerRemains: selectedPlayerCount() > 1,
       })
     : undefined;
 }
@@ -318,15 +352,23 @@ function handleRaceEvents(raceEvents: readonly RaceEvent[]): string | undefined 
         runtimeStatus.textContent = `Lap ${event.completedLaps} completed`;
         break;
       case "player-finished":
-        finishReason = `Lap completed in ${formatRaceTime(event.timeSeconds)}`;
+        physics?.deactivateVehicle(event.playerId);
+        runtimeStatus.textContent = `${event.playerId} finished in ${formatRaceTime(event.timeSeconds)}`;
+        break;
+      case "player-won":
+        physics?.deactivateVehicle(event.playerId);
+        runtimeStatus.textContent = `${event.playerId} wins`;
         break;
       case "player-eliminated":
+        physics?.deactivateVehicle(event.playerId);
         runtimeStatus.textContent = `${event.playerId} eliminated: ${event.reason}`;
         break;
       case "race-finished": {
         const winner = event.results[0];
-        finishReason = winner?.status === "finished"
-          ? `${winner.displayName} finished in ${formatRaceTime(winner.timeSeconds)}`
+        finishReason = winner?.status === "winner"
+          ? `${winner.displayName} wins`
+          : winner?.status === "finished"
+            ? `${winner.displayName} finished in ${formatRaceTime(winner.timeSeconds)}`
           : "All players eliminated";
         break;
       }
@@ -352,6 +394,7 @@ async function startRace(): Promise<void> {
   }
   await audio.unlock();
   physics.resetDemo();
+  resetCameraElimination();
   raceSession = createTrackRaceSession();
   clock.restart(performance.now() / 1000);
   totalDroppedSeconds = 0;
@@ -368,6 +411,7 @@ startButton.addEventListener("click", () => {
 finishButton.addEventListener("click", () => {
   if (state.state === "race") {
     raceSession = undefined;
+    resetCameraElimination();
     state.transition("results", "Simulation completed without clock drift");
     applyRaceBanner();
     events.emit({ type: "audio:cue", cue: "race-finish", gain: 0.08 });
@@ -376,6 +420,7 @@ finishButton.addEventListener("click", () => {
 menuButton.addEventListener("click", () => {
   if (state.state === "race" || state.state === "results") {
     raceSession = undefined;
+    resetCameraElimination();
     state.transition("menu", "Runtime ready");
     applyRaceBanner();
     events.emit({ type: "audio:cue", cue: "menu", gain: 0.05 });
@@ -383,12 +428,14 @@ menuButton.addEventListener("click", () => {
 });
 resetButton.addEventListener("click", () => {
   physics?.resetDemo();
+  resetCameraElimination();
   raceSession = state.state === "race" ? createTrackRaceSession() : undefined;
   applyRaceBanner();
 });
 debugCamera.addEventListener("change", () => renderer.setDebugCamera(debugCamera.checked));
 playerCountSelect.addEventListener("change", () => {
   raceSession = undefined;
+  resetCameraElimination();
   rebuildVehicleInputs();
   applyRosterPresentation();
   configureLocalRoster();
@@ -629,6 +676,48 @@ function currentRacePositions(): Readonly<Record<string, readonly [number, numbe
   return positions;
 }
 
+function updateCameraEliminations(
+  stepSeconds: number,
+  positions: Readonly<Record<string, readonly [number, number, number]>>,
+): string | undefined {
+  if (!physics || !raceSession || !trackDefinition || raceSession.phase !== "racing") {
+    eliminationWarnings = [];
+    applyEliminationWarning();
+    return undefined;
+  }
+  const subjects = raceSession.snapshot.players.flatMap((player) => {
+    const position = positions[player.id];
+    const nextCheckpoint = trackDefinition?.checkpoints.find((checkpoint) => (
+      checkpoint.id === player.progress.nextCheckpointId
+    ));
+    if (player.status !== "racing" || !position || !nextCheckpoint) {
+      return [];
+    }
+    return [{
+      id: player.id,
+      position,
+      completedLaps: player.progress.completedLaps,
+      passedCheckpoints: player.progress.passedCheckpoints,
+      distanceToNextCheckpointMeters: Math.hypot(
+        position[0] - nextCheckpoint.center[0],
+        position[1] - nextCheckpoint.center[1],
+        position[2] - nextCheckpoint.center[2],
+      ),
+    }];
+  });
+  const update = cameraElimination.update(stepSeconds, subjects);
+  eliminationWarnings = update.warnings;
+  applyEliminationWarning();
+  let finishReason: string | undefined;
+  for (const playerId of update.eliminatedPlayerIds) {
+    const eventReason = handleRaceEvents(raceSession.eliminatePlayer(playerId, "camera-distance"));
+    if (eventReason) {
+      finishReason = eventReason;
+    }
+  }
+  return finishReason;
+}
+
 function sampleVehicleInputs(gamepads: readonly (Gamepad | null)[]): VehicleInputById {
   const sampled: Record<string, VehicleInputFrame> = {};
   const racePlayers = new Map(raceSession?.snapshot.players.map((player) => [player.id, player.status]));
@@ -663,10 +752,15 @@ function renderFrame(timestampMilliseconds: number): void {
     frame = clock.advance(timestampMilliseconds / 1000, (stepSeconds) => {
       const startedAt = performance.now();
       const gamepads = navigator.getGamepads();
-      const raceEvents = raceSession?.advance(stepSeconds, currentRacePositions()) ?? [];
+      const positions = currentRacePositions();
+      const raceEvents = raceSession?.advance(stepSeconds, positions) ?? [];
       const eventFinishReason = handleRaceEvents(raceEvents);
       if (eventFinishReason) {
         raceFinishReason = eventFinishReason;
+      }
+      const eliminationFinishReason = updateCameraEliminations(stepSeconds, positions);
+      if (eliminationFinishReason) {
+        raceFinishReason = eliminationFinishReason;
       }
       physics?.stepVehicles(stepSeconds, sampleVehicleInputs(gamepads));
       physicsMilliseconds += performance.now() - startedAt;
@@ -689,6 +783,7 @@ function renderFrame(timestampMilliseconds: number): void {
   renderer.render({
     history: physics.transformHistory,
     objects: physics.sceneObjects,
+    primaryVehicleActive: physics.activeVehicleIds.includes(PRIMARY_VEHICLE_ID),
     interpolationAlpha: frame.interpolationAlpha,
     frameDeltaSeconds: renderDeltaSeconds,
     ...(debugColliders.checked ? { debugLines: physics.debugLines() } : {}),
@@ -705,9 +800,12 @@ function renderFrame(timestampMilliseconds: number): void {
     metricContacts.textContent = String(physicsMetrics.contacts);
     metricStep.textContent = String(frame.simulationStep);
     metricDropped.textContent = `${(totalDroppedSeconds * 1000).toFixed(0)} ms`;
-    metricSpeed.textContent = `${(physics.telemetry.speedMetersPerSecond * 3.6).toFixed(0)} km/h`;
-    metricWheels.textContent = `${physics.telemetry.groundedWheels} / 4`;
-    metricSurface.textContent = physics.telemetry.surface;
+    const primaryTelemetry = physics.getVehicleTelemetry(PRIMARY_VEHICLE_ID);
+    metricSpeed.textContent = primaryTelemetry
+      ? `${(primaryTelemetry.speedMetersPerSecond * 3.6).toFixed(0)} km/h`
+      : "inactive";
+    metricWheels.textContent = primaryTelemetry ? `${primaryTelemetry.groundedWheels} / 4` : "—";
+    metricSurface.textContent = primaryTelemetry?.surface ?? "inactive";
     additionalPlayerMetrics.forEach((metric, index) => {
       const slot = LOCAL_PLAYER_SLOTS[index + 1];
       const telemetry = slot ? physics?.getVehicleTelemetry(slot.id) : undefined;
@@ -721,10 +819,10 @@ function renderFrame(timestampMilliseconds: number): void {
     const playerRace = raceSnapshot?.players[0];
     const lapProgress = playerRace?.progress;
     metricLap.textContent = lapProgress && raceSnapshot
-      ? `${Math.min(lapProgress.completedLaps + (playerRace.status === "finished" ? 0 : 1), raceSnapshot.totalLaps)} / ${raceSnapshot.totalLaps}`
+      ? `${Math.min(lapProgress.completedLaps + (playerRace.status === "finished" || playerRace.status === "winner" ? 0 : 1), raceSnapshot.totalLaps)} / ${raceSnapshot.totalLaps}`
       : "—";
     metricCheckpoint.textContent = lapProgress
-      ? playerRace.status === "finished"
+      ? playerRace.status === "finished" || playerRace.status === "winner"
         ? `${lapProgress.totalCheckpoints} / ${lapProgress.totalCheckpoints} ✓`
         : `${lapProgress.passedCheckpoints} / ${lapProgress.totalCheckpoints} → ${lapProgress.nextCheckpointId}`
       : "—";

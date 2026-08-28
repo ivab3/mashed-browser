@@ -120,6 +120,46 @@ h1 { margin: 3px 0 0; color: #fff8e9; font-size: 26px; letter-spacing: -0.04em; 
   letter-spacing: -0.06em;
 }
 
+.race-results {
+  display: grid;
+  gap: 7px;
+  min-width: 260px;
+  margin: 16px 0 0;
+  padding: 13px 0 0;
+  border-top: 1px solid rgb(255 255 255 / 10%);
+  list-style: none;
+  text-align: left;
+}
+
+.race-results li {
+  display: grid;
+  grid-template-columns: 24px 1fr auto;
+  gap: 10px;
+  color: #81949a;
+  font: 700 10px/1.2 ui-monospace, SFMono-Regular, Menlo, monospace;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.race-results b { color: #fff8e9; }
+.race-results em { color: #ffb182; font-style: normal; }
+
+.elimination-warning {
+  position: absolute;
+  z-index: 4;
+  right: 28px;
+  bottom: 54px;
+  padding: 11px 15px;
+  border: 1px solid rgb(255 88 70 / 70%);
+  border-radius: 9px;
+  color: #fff4ec;
+  background: rgb(93 18 14 / 88%);
+  font: 800 12px/1 ui-monospace, SFMono-Regular, Menlo, monospace;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  box-shadow: 0 12px 38px rgb(0 0 0 / 35%);
+}
+
 .hint {
   position: absolute;
   right: 24px;
