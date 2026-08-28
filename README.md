@@ -11,7 +11,9 @@ fixed-step core, replay checks, Rapier/Three.js/Web Audio adapters, debug toolin
 runtime shell. Stage 4 and Gate C are complete with a playable data-driven ray-cast vehicle,
 keyboard/gamepad controls, four grip surfaces, recovery, a shared multiplayer camera, collision BSP
 binding, dynamic/destructible props, a reproducible tuning harness, playable original track sessions,
-and runtime-bound original vehicle DFF/TXD models.
+and runtime-bound original vehicle DFF/TXD models. Stage 5 is underway with a deterministic
+one-to-four-player race session, countdown, independent lap progress, finish/elimination results,
+and the first one-player runtime binding.
 [ADR-0001](./reference/ADR-0001-runtime-asset-loading.md) selects direct runtime
 parsing in a loading Worker instead of mandatory pre-conversion.
 
@@ -48,6 +50,8 @@ metadata and acceptance scenarios live in [`REFERENCE.md`](./REFERENCE.md).
 Vehicle implementation notes and Gate C acceptance evidence live in
 [`reference/VEHICLE_FOUNDATION.md`](./reference/VEHICLE_FOUNDATION.md). The repeatable A/B workflow
 for vehicle feel lives in [`reference/VEHICLE_TUNING.md`](./reference/VEHICLE_TUNING.md).
+Stage 5 scope, completed slices, and next work live in
+[`reference/VERTICAL_SLICE.md`](./reference/VERTICAL_SLICE.md).
 
 ## Inspect Stage 2 fixtures
 
@@ -74,7 +78,7 @@ pnpm asset-viewer
 Current findings and the remaining Stage 2 questions are tracked in
 [`reference/ASSET_SPIKE.md`](./reference/ASSET_SPIKE.md).
 
-## Run the Stage 4 runtime
+## Run the Stage 5 runtime
 
 ```bash
 pnpm web
@@ -82,7 +86,9 @@ pnpm web
 
 The shell demonstrates the `boot → loading → menu → race → results` flow, a 60 Hz fixed simulation
 clock with interpolated presentation transforms, a live telemetry overlay, an orbit debug camera,
-and Rapier collider lines. Local DFF/TXD/BSP files can be parsed through the loading Worker; original
+Rapier collider lines, and the first fixed-step race-rules slice. A loaded track route adds a
+three-second countdown, ordered one-lap finish, and final-time banner. Local DFF/TXD/BSP files can
+be parsed through the loading Worker; original
 bytes remain local and parsed typed arrays are transferred back without cloning. See
 [`reference/RUNTIME_FOUNDATION.md`](./reference/RUNTIME_FOUNDATION.md) for runtime contracts and
 acceptance evidence. Loading a numbered vehicle DFF such as `CRUSADER0.DFF` together with its shared

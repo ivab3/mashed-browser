@@ -14,20 +14,23 @@ import {
 } from "@mashed/assets";
 import {
   FixedStepClock,
-  LapSession,
+  RaceSession,
   RuntimeEventBus,
   RuntimeStateMachine,
   type FixedStepFrame,
+  type RaceEvent,
   type RuntimeState,
 } from "@mashed/core";
 import {
   BrowserVehicleInput,
+  NEUTRAL_VEHICLE_INPUT,
   PLAYER_ONE_KEYBOARD_BINDINGS,
   PLAYER_TWO_KEYBOARD_BINDINGS,
 } from "@mashed/input";
 import {
   createPhysicsRuntime,
   deriveRouteCollisionLayers,
+  PRIMARY_VEHICLE_ID,
   type PhysicsRuntime,
   type PhysicsRuntimeOptions,
 } from "@mashed/physics";
@@ -114,6 +117,9 @@ const metricObjects = element<HTMLElement>("metric-objects");
 const metricTrack = element<HTMLElement>("metric-track");
 const metricLap = element<HTMLElement>("metric-lap");
 const metricCheckpoint = element<HTMLElement>("metric-checkpoint");
+const raceBanner = element<HTMLElement>("race-banner");
+const raceBannerLabel = element<HTMLElement>("race-banner-label");
+const raceBannerValue = element<HTMLElement>("race-banner-value");
 const primaryDriveGuide = element<HTMLElement>("primary-drive-guide");
 const primaryActionGuide = element<HTMLElement>("primary-action-guide");
 const secondaryDriveGuide = element<HTMLElement>("secondary-drive-guide");
@@ -145,7 +151,7 @@ const loadedDffs = new Map<string, DffModel>();
 const loadedTextureDictionaries = new Map<string, PiTextureDictionary>();
 let physics: PhysicsRuntime | undefined;
 let trackDefinition: DerivedTrackDefinition | undefined;
-let lapSession: LapSession | undefined;
+let raceSession: RaceSession | undefined;
 let animationFrame = 0;
 let lastRenderTimestamp: number | undefined;
 let smoothedFps = 60;
@@ -181,6 +187,79 @@ function applyState(next: RuntimeState): void {
   assetInput.disabled = next === "loading" || next === "race";
 }
 
+function formatRaceTime(seconds: number): string {
+  const minutes = Math.floor(seconds / 60);
+  const remainder = seconds - minutes * 60;
+  return `${minutes}:${remainder.toFixed(2).padStart(5, "0")}`;
+}
+
+function applyRaceBanner(): void {
+  const snapshot = raceSession?.snapshot;
+  if (!snapshot || state.state === "menu" || snapshot.phase === "racing") {
+    raceBanner.hidden = true;
+    return;
+  }
+  raceBanner.hidden = false;
+  if (snapshot.phase === "countdown") {
+    raceBannerLabel.textContent = "Get ready";
+    raceBannerValue.textContent = String(Math.max(1, Math.ceil(snapshot.countdownSecondsRemaining)));
+    return;
+  }
+
+  const winner = snapshot.results[0];
+  raceBannerLabel.textContent = winner?.status === "finished"
+    ? `${winner.displayName} finished`
+    : "Race over";
+  raceBannerValue.textContent = winner ? formatRaceTime(winner.timeSeconds) : "—";
+}
+
+function createTrackRaceSession(): RaceSession | undefined {
+  return trackDefinition
+    ? new RaceSession({
+        course: trackDefinition,
+        players: [{ id: PRIMARY_VEHICLE_ID, displayName: "Player 1" }],
+        totalLaps: 1,
+        countdownSeconds: 3,
+      })
+    : undefined;
+}
+
+function handleRaceEvents(raceEvents: readonly RaceEvent[]): string | undefined {
+  let finishReason: string | undefined;
+  for (const event of raceEvents) {
+    switch (event.type) {
+      case "countdown-tick":
+        runtimeStatus.textContent = `Race starts in ${event.secondsRemaining}`;
+        break;
+      case "race-started":
+        runtimeStatus.textContent = "Go!";
+        events.emit({ type: "audio:cue", cue: "race-start", gain: 0.08 });
+        break;
+      case "checkpoint-passed":
+        runtimeStatus.textContent = `Checkpoint ${event.checkpointId} passed`;
+        break;
+      case "lap-completed":
+        runtimeStatus.textContent = `Lap ${event.completedLaps} completed`;
+        break;
+      case "player-finished":
+        finishReason = `Lap completed in ${formatRaceTime(event.timeSeconds)}`;
+        break;
+      case "player-eliminated":
+        runtimeStatus.textContent = `${event.playerId} eliminated: ${event.reason}`;
+        break;
+      case "race-finished": {
+        const winner = event.results[0];
+        finishReason = winner?.status === "finished"
+          ? `${winner.displayName} finished in ${formatRaceTime(winner.timeSeconds)}`
+          : "All players eliminated";
+        break;
+      }
+    }
+  }
+  applyRaceBanner();
+  return finishReason;
+}
+
 events.subscribe((event) => {
   if (event.type === "runtime:state-changed") {
     applyState(event.to);
@@ -197,11 +276,14 @@ async function startRace(): Promise<void> {
   }
   await audio.unlock();
   physics.resetDemo();
-  lapSession?.reset();
+  raceSession = createTrackRaceSession();
   clock.restart(performance.now() / 1000);
   totalDroppedSeconds = 0;
-  state.transition("race", "Fixed-step simulation running");
-  events.emit({ type: "audio:cue", cue: "race-start", gain: 0.08 });
+  state.transition("race", raceSession ? "Race countdown started" : "Fixed-step simulation running");
+  applyRaceBanner();
+  if (!raceSession) {
+    events.emit({ type: "audio:cue", cue: "race-start", gain: 0.08 });
+  }
 }
 
 startButton.addEventListener("click", () => {
@@ -209,19 +291,24 @@ startButton.addEventListener("click", () => {
 });
 finishButton.addEventListener("click", () => {
   if (state.state === "race") {
+    raceSession = undefined;
     state.transition("results", "Simulation completed without clock drift");
+    applyRaceBanner();
     events.emit({ type: "audio:cue", cue: "race-finish", gain: 0.08 });
   }
 });
 menuButton.addEventListener("click", () => {
   if (state.state === "race" || state.state === "results") {
+    raceSession = undefined;
     state.transition("menu", "Runtime ready");
+    applyRaceBanner();
     events.emit({ type: "audio:cue", cue: "menu", gain: 0.05 });
   }
 });
 resetButton.addEventListener("click", () => {
   physics?.resetDemo();
-  lapSession?.reset();
+  raceSession = state.state === "race" ? createTrackRaceSession() : undefined;
+  applyRaceBanner();
 });
 debugCamera.addEventListener("change", () => renderer.setDebugCamera(debugCamera.checked));
 
@@ -273,7 +360,6 @@ function bindTrackParts(): string[] {
   const bound: string[] = [];
   if (trackParts.ai && trackParts.lapData && physics) {
     trackDefinition = deriveTrackDefinition(trackParts.ai, trackParts.lapData);
-    lapSession = new LapSession(trackDefinition);
     physics.setRaceSpawn(trackDefinition.spawn);
     renderer.setTrackRoute(trackDefinition.checkpoints);
     bound.push(`${trackDefinition.checkpoints.length} ordered checkpoints`);
@@ -324,6 +410,8 @@ assetInput.addEventListener("change", () => {
     return;
   }
   void (async () => {
+    raceSession = undefined;
+    applyRaceBanner();
     state.transition("loading", `Parsing ${files.length} local asset${files.length === 1 ? "" : "s"}…`);
     try {
       const summaries: string[] = [];
@@ -412,25 +500,27 @@ function renderFrame(timestampMilliseconds: number): void {
   }
 
   physicsMilliseconds = 0;
-  let completedLapThisFrame = false;
+  let raceFinishReason: string | undefined;
   let frame: FixedStepFrame;
   if (state.state === "race") {
     frame = clock.advance(timestampMilliseconds / 1000, (stepSeconds) => {
       const startedAt = performance.now();
       const gamepads = navigator.getGamepads();
+      const raceEvents = raceSession?.advance(stepSeconds, {
+        [PRIMARY_VEHICLE_ID]: physics?.transformHistory.current.position,
+      }) ?? [];
+      const eventFinishReason = handleRaceEvents(raceEvents);
+      if (eventFinishReason) {
+        raceFinishReason = eventFinishReason;
+      }
+      const controlsEnabled = !raceSession || raceSession.phase === "racing";
       physics?.step(
         stepSeconds,
-        vehicleInput.sample(gamepads),
+        controlsEnabled ? vehicleInput.sample(gamepads) : NEUTRAL_VEHICLE_INPUT,
         secondaryVehicleInput
           ? { [SECONDARY_VEHICLE_ID]: secondaryVehicleInput.sample(gamepads) }
           : {},
       );
-      if (physics && lapSession?.update(
-        physics.transformHistory.current.position,
-        physics.transformHistory.previous.position,
-      ).lapCompleted) {
-        completedLapThisFrame = true;
-      }
       physicsMilliseconds += performance.now() - startedAt;
     });
   } else {
@@ -443,8 +533,9 @@ function renderFrame(timestampMilliseconds: number): void {
       droppedSeconds: 0,
     };
   }
-  if (completedLapThisFrame && state.state === "race") {
-    state.transition("results", "Lap completed through every ordered checkpoint");
+  if (raceFinishReason && state.state === "race") {
+    state.transition("results", raceFinishReason);
+    applyRaceBanner();
     events.emit({ type: "audio:cue", cue: "race-finish", gain: 0.08 });
   }
   renderer.render({
@@ -477,10 +568,16 @@ function renderFrame(timestampMilliseconds: number): void {
     }
     metricObjects.textContent = `${physicsMetrics.activeObjects} / ${physicsMetrics.destroyedObjects}`;
     metricTrack.textContent = physicsMetrics.trackTriangles.toLocaleString();
-    const lapProgress = lapSession?.progress;
-    metricLap.textContent = lapProgress ? `${Math.min(lapProgress.completedLaps + 1, 1)} / 1` : "—";
+    const raceSnapshot = raceSession?.snapshot;
+    const playerRace = raceSnapshot?.players[0];
+    const lapProgress = playerRace?.progress;
+    metricLap.textContent = lapProgress && raceSnapshot
+      ? `${Math.min(lapProgress.completedLaps + (playerRace.status === "finished" ? 0 : 1), raceSnapshot.totalLaps)} / ${raceSnapshot.totalLaps}`
+      : "—";
     metricCheckpoint.textContent = lapProgress
-      ? `${lapProgress.passedCheckpoints} / ${lapProgress.totalCheckpoints} → ${lapProgress.nextCheckpointId}`
+      ? playerRace.status === "finished"
+        ? `${lapProgress.totalCheckpoints} / ${lapProgress.totalCheckpoints} ✓`
+        : `${lapProgress.passedCheckpoints} / ${lapProgress.totalCheckpoints} → ${lapProgress.nextCheckpointId}`
       : "—";
     lastOverlayUpdate = timestampMilliseconds;
   }

@@ -270,6 +270,8 @@ original-vehicle render instance для P2 также относится к mult
 
 ### Этап 5. Вертикальный срез — 4–6 недель
 
+Прогресс и порядок рабочих срезов: [reference/VERTICAL_SLICE.md](./reference/VERTICAL_SLICE.md).
+
 Содержание vertical slice:
 
 - одна законченная трасса;
@@ -291,6 +293,13 @@ original-vehicle render instance для P2 также относится к mult
 - Нет blocker-багов за 30 минут игры.
 - На целевом компьютере поддерживается 60 fps при 1080p.
 - После первой загрузки матч запускается без сетевых запросов к игровым данным.
+
+Статус 2026-08-28: **этап 5 начат**. Первый срез добавил чистую fixed-step `RaceSession` для 1–4
+игроков: трёхсекундный countdown, независимые ordered checkpoints/круги, финиш, явное выбывание и
+детерминированную таблицу результатов. Однопользовательский Warzone runtime использует этот цикл и
+показывает countdown/final-time banner. Это фундамент правил, а не закрытие multiplayer-задачи:
+подключение четырёх production vehicle slots, shared-camera elimination, оружие, полный HUD/audio и
+M1 hardening остаются следующими срезами.
 
 Milestone M1: публично показываемый proof of concept.
 

@@ -11,8 +11,8 @@
       <section id="viewport" class="viewport" aria-label="Runtime viewport">
         <header class="topbar">
           <div>
-            <span class="eyebrow">Mashed · Vehicle foundation</span>
-            <h1>Stage 04</h1>
+            <span class="eyebrow">Mashed · Vertical slice</span>
+            <h1>Stage 05</h1>
           </div>
           <div id="state-badge" class="state-badge" data-state="boot">boot</div>
         </header>
@@ -38,15 +38,20 @@
           <div id="metric-player-two-surface-row" class="wide" hidden><span>P2 surface</span><strong id="metric-player-two-surface">airborne</strong></div>
         </aside>
 
+        <div id="race-banner" class="race-banner" role="status" aria-live="polite" hidden>
+          <span id="race-banner-label">Get ready</span>
+          <strong id="race-banner-value">3</strong>
+        </div>
+
         <div class="hint">Load the track bundle; add COURSE.LUA/world DFFs and NAME0.DFF + NAME.TXD for an original vehicle.</div>
       </section>
 
       <aside class="control-panel">
         <div>
-          <p class="kicker">Arcade vehicle prototype</p>
-          <h2>Grip it.<br />Then drift it.</h2>
+          <p class="kicker">Race vertical slice</p>
+          <h2>Start it.<br />Finish it.</h2>
           <p class="intro">
-            Ray-cast suspension and surface-aware grip run at a fixed 60 Hz simulation step.
+            Fixed-step match rules now drive the countdown, ordered checkpoints, lap finish, and results.
           </p>
         </div>
 
