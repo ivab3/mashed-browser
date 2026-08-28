@@ -103,6 +103,13 @@ export interface VehicleRenderStats {
   missingTextureNames: readonly string[];
 }
 
+interface BurstEffect {
+  readonly points: THREE.Points<THREE.BufferGeometry, THREE.PointsMaterial>;
+  readonly velocities: Float32Array;
+  remainingSeconds: number;
+  readonly totalSeconds: number;
+}
+
 const ADDITIONAL_VEHICLE_PROXY_COLORS: Readonly<Record<string, number>> = Object.freeze({
   "vehicle-two": 0x3994d8,
   "vehicle-three": 0x58b86b,
@@ -126,6 +133,7 @@ export class RuntimeRenderer {
   readonly #sceneObjects = new Map<string, THREE.Object3D>();
   readonly #combatPickups = new Map<string, THREE.Object3D>();
   readonly #combatProjectiles = new Map<number, THREE.Object3D>();
+  readonly #burstEffects: BurstEffect[] = [];
   readonly #cameraTarget = new THREE.Vector3(-4, 0.8, -5);
   readonly #debugGeometry = new THREE.BufferGeometry();
   readonly #debugMaterial = new THREE.LineBasicMaterial({ vertexColors: true });
@@ -246,6 +254,8 @@ export class RuntimeRenderer {
       if (event.type === "renderer:flash") {
         this.#flashColor.setHex(event.color);
         this.#flashRemainingSeconds = Math.max(this.#flashRemainingSeconds, event.durationSeconds);
+      } else if (event.type === "renderer:burst") {
+        this.#spawnBurst(event.position, event.color, event.count, event.durationSeconds);
       }
     });
     this.resize(viewport.clientWidth, viewport.clientHeight);
@@ -555,6 +565,7 @@ export class RuntimeRenderer {
     }
 
     this.#updateDebugLines(frame.debugLines);
+    this.#updateBurstEffects(frame.frameDeltaSeconds);
     this.#flashRemainingSeconds = Math.max(0, this.#flashRemainingSeconds - frame.frameDeltaSeconds);
     const flashMix = Math.min(0.22, this.#flashRemainingSeconds * 1.8);
     if (this.#scene.background instanceof THREE.Color) {
@@ -707,6 +718,87 @@ export class RuntimeRenderer {
     }
   }
 
+  #spawnBurst(
+    position: readonly [number, number, number],
+    color: number,
+    requestedCount: number,
+    durationSeconds: number,
+  ): void {
+    if (
+      position.some((component) => !Number.isFinite(component))
+      || !Number.isFinite(requestedCount)
+      || !Number.isFinite(durationSeconds)
+      || durationSeconds <= 0
+    ) {
+      return;
+    }
+    const count = Math.min(64, Math.max(1, Math.round(requestedCount)));
+    const positions = new Float32Array(count * 3);
+    const velocities = new Float32Array(count * 3);
+    const goldenAngle = Math.PI * (3 - Math.sqrt(5));
+    for (let index = 0; index < count; index += 1) {
+      const offset = index * 3;
+      positions[offset] = position[0];
+      positions[offset + 1] = position[1];
+      positions[offset + 2] = position[2];
+      const angle = index * goldenAngle;
+      const vertical = 0.25 + ((index * 7) % 11) / 10;
+      const horizontal = Math.sqrt(Math.max(0, 1 - Math.min(0.92, vertical * 0.62) ** 2));
+      const speed = 2.2 + (index % 5) * 0.55;
+      velocities[offset] = Math.cos(angle) * horizontal * speed;
+      velocities[offset + 1] = vertical * speed;
+      velocities[offset + 2] = Math.sin(angle) * horizontal * speed;
+    }
+    const geometry = new THREE.BufferGeometry();
+    geometry.setAttribute("position", new THREE.BufferAttribute(positions, 3));
+    const material = new THREE.PointsMaterial({
+      color,
+      size: 0.2,
+      sizeAttenuation: true,
+      transparent: true,
+      opacity: 0.95,
+      depthWrite: false,
+      blending: THREE.AdditiveBlending,
+    });
+    const points = new THREE.Points(geometry, material);
+    points.frustumCulled = false;
+    this.#scene.add(points);
+    this.#burstEffects.push({
+      points,
+      velocities,
+      remainingSeconds: durationSeconds,
+      totalSeconds: durationSeconds,
+    });
+  }
+
+  #updateBurstEffects(frameDeltaSeconds: number): void {
+    const stepSeconds = Math.min(0.05, Math.max(0, frameDeltaSeconds));
+    for (let index = this.#burstEffects.length - 1; index >= 0; index -= 1) {
+      const effect = this.#burstEffects[index]!;
+      effect.remainingSeconds -= stepSeconds;
+      if (effect.remainingSeconds <= 0) {
+        effect.points.removeFromParent();
+        effect.points.geometry.dispose();
+        effect.points.material.dispose();
+        this.#burstEffects.splice(index, 1);
+        continue;
+      }
+      const positions = effect.points.geometry.getAttribute("position") as THREE.BufferAttribute;
+      for (let particle = 0; particle < positions.count; particle += 1) {
+        const offset = particle * 3;
+        effect.velocities[offset + 1] = (effect.velocities[offset + 1] ?? 0) - 5.5 * stepSeconds;
+        positions.setXYZ(
+          particle,
+          positions.getX(particle) + (effect.velocities[offset] ?? 0) * stepSeconds,
+          positions.getY(particle) + (effect.velocities[offset + 1] ?? 0) * stepSeconds,
+          positions.getZ(particle) + (effect.velocities[offset + 2] ?? 0) * stepSeconds,
+        );
+      }
+      positions.needsUpdate = true;
+      effect.points.material.opacity = Math.min(1, effect.remainingSeconds / effect.totalSeconds * 1.4);
+    }
+  }
+
   #removeSceneObject(id: string): void {
     const object = this.#sceneObjects.get(id);
     if (!object) {
@@ -748,6 +840,11 @@ export class RuntimeRenderer {
     }
     this.#combatPickups.clear();
     this.#combatProjectiles.clear();
+    for (const effect of this.#burstEffects) {
+      effect.points.geometry.dispose();
+      effect.points.material.dispose();
+    }
+    this.#burstEffects.length = 0;
     this.#debugGeometry.dispose();
     this.#debugMaterial.dispose();
     this.#renderer.dispose();

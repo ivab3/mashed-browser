@@ -63,6 +63,7 @@ h1 { margin: 3px 0 0; color: #fff8e9; font-size: 26px; letter-spacing: -0.04em; 
 }
 
 .state-badge[data-state="race"] { border-color: #ff8a4c; color: #ffb182; }
+.state-badge[data-state="paused"] { border-color: #d3b850; color: #f3dc79; }
 .state-badge[data-state="loading"] { border-color: #d3b850; color: #f3dc79; }
 
 .telemetry {
@@ -191,6 +192,29 @@ h1 { margin: 3px 0 0; color: #fff8e9; font-size: 26px; letter-spacing: -0.04em; 
   box-shadow: 0 12px 38px rgb(0 0 0 / 35%);
 }
 
+.pause-overlay {
+  position: absolute;
+  z-index: 5;
+  top: 50%;
+  left: 50%;
+  display: grid;
+  min-width: 280px;
+  gap: 7px;
+  padding: 24px 30px;
+  border: 1px solid rgb(255 255 255 / 18%);
+  border-radius: 16px;
+  color: #fff8e9;
+  background: rgb(8 16 23 / 92%);
+  box-shadow: 0 20px 80px rgb(0 0 0 / 55%);
+  text-align: center;
+  transform: translate(-50%, -50%);
+  backdrop-filter: blur(18px);
+}
+
+.pause-overlay span { color: #ffb182; font-size: 9px; font-weight: 800; letter-spacing: 0.2em; text-transform: uppercase; }
+.pause-overlay strong { font-size: 46px; line-height: 1; letter-spacing: -0.05em; }
+.pause-overlay small { color: #73878d; font-size: 10px; }
+
 .hint {
   position: absolute;
   right: 24px;
@@ -233,6 +257,7 @@ button {
 button:hover:not(:disabled) { border-color: #6d858e; transform: translateY(-1px); }
 button:disabled { cursor: default; opacity: 0.38; }
 button.primary { grid-column: 1 / -1; border-color: #ff8a4c; color: #191109; background: #ff8a4c; font-weight: 800; }
+button[data-action="resume"] { border-color: #ff8a4c; color: #ffb182; }
 
 .roster-config {
   display: grid;

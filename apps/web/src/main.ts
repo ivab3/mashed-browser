@@ -82,6 +82,11 @@ function assetSummary(asset: LoadedAsset): string {
 }
 
 const STEP_SECONDS = 1 / 60;
+const COMBAT_EFFECT_COLORS = Object.freeze({
+  "machine-gun": 0xffcf4a,
+  rocket: 0xff654f,
+  mine: 0x8d6be8,
+});
 const vehiclePairLab = new URLSearchParams(window.location.search).get("collisionLab") === "vehicle-pair";
 
 function selectedPhysicsOptions(): PhysicsRuntimeOptions {
@@ -94,6 +99,7 @@ const runtimeStatus = element<HTMLElement>("runtime-status");
 const assetStatus = element<HTMLElement>("asset-status");
 const assetInput = element<HTMLInputElement>("asset-files");
 const startButton = element<HTMLButtonElement>("start-race");
+const pauseButton = element<HTMLButtonElement>("pause-race");
 const finishButton = element<HTMLButtonElement>("finish-race");
 const menuButton = element<HTMLButtonElement>("back-menu");
 const resetButton = element<HTMLButtonElement>("reset-demo");
@@ -122,6 +128,7 @@ const raceBannerLabel = element<HTMLElement>("race-banner-label");
 const raceBannerValue = element<HTMLElement>("race-banner-value");
 const raceResults = element<HTMLOListElement>("race-results");
 const eliminationWarning = element<HTMLElement>("elimination-warning");
+const pauseOverlay = element<HTMLElement>("pause-overlay");
 const combatHud = element<HTMLElement>("combat-hud");
 const combatPlayerRows = [
   element<HTMLElement>("combat-player-one"),
@@ -186,6 +193,7 @@ let combatSession: CombatSession | undefined;
 const cameraElimination = new CameraEliminationTracker();
 let eliminationWarnings: readonly CameraEliminationWarning[] = [];
 let vehicleInputs: BrowserVehicleInput[] = [];
+let latestVehicleInputs: VehicleInputById = {};
 let vehicleCatalog: readonly VehicleAssetPair[] = [];
 let animationFrame = 0;
 let lastRenderTimestamp: number | undefined;
@@ -267,19 +275,25 @@ rebuildVehicleInputs();
 applyRosterPresentation();
 
 function applyState(next: RuntimeState): void {
+  const matchActive = next === "race" || next === "paused";
   stateBadge.textContent = next;
   stateBadge.dataset["state"] = next;
   startButton.disabled = next !== "menu" && next !== "results";
   startButton.textContent = next === "results"
     ? "Race again"
     : trackDefinition ? "Start lap" : "Start simulation";
+  pauseButton.disabled = !matchActive;
+  pauseButton.textContent = next === "paused" ? "Resume" : "Pause";
+  pauseButton.dataset["action"] = next === "paused" ? "resume" : "pause";
   finishButton.disabled = next !== "race";
-  menuButton.disabled = next !== "race" && next !== "results";
-  assetInput.disabled = next === "loading" || next === "race";
-  playerCountSelect.disabled = next === "loading" || next === "race";
+  menuButton.disabled = !matchActive && next !== "results";
+  resetButton.disabled = next === "paused";
+  assetInput.disabled = next === "loading" || matchActive;
+  playerCountSelect.disabled = next === "loading" || matchActive;
   vehicleSelects.forEach((select) => {
-    select.disabled = next === "loading" || next === "race";
+    select.disabled = next === "loading" || matchActive;
   });
+  pauseOverlay.hidden = next !== "paused";
   applyCombatHud();
 }
 
@@ -378,7 +392,7 @@ function createCombatSession(): CombatSession {
 
 function applyCombatHud(): void {
   const snapshot = combatSession?.snapshot;
-  combatHud.hidden = !snapshot || state.state !== "race";
+  combatHud.hidden = !snapshot || (state.state !== "race" && state.state !== "paused");
   combatPlayerRows.forEach((row, index) => {
     const player = snapshot?.players[index];
     row.hidden = !player;
@@ -452,21 +466,71 @@ function handleCombatEvents(combatEvents: readonly CombatEvent[]): string | unde
       case "pickup-collected":
         runtimeStatus.textContent = `${event.playerId} picked up ${event.weapon} ×${event.ammo}`;
         events.emit({ type: "audio:cue", cue: "pickup", gain: 0.07 });
+        {
+          const pickup = combatSession?.snapshot.pickups.find((candidate) => candidate.id === event.pickupId);
+          if (pickup) {
+            events.emit({
+              type: "renderer:burst",
+              position: pickup.position,
+              color: COMBAT_EFFECT_COLORS[event.weapon],
+              count: 14,
+              durationSeconds: 0.45,
+            });
+          }
+        }
         break;
       case "pickup-respawned":
         runtimeStatus.textContent = `${event.pickupId} respawned`;
         break;
       case "weapon-fired":
         events.emit({ type: "audio:cue", cue: "weapon-fire", gain: 0.07 });
+        {
+          const projectile = combatSession?.snapshot.projectiles.find((candidate) => (
+            candidate.id === event.projectileId
+          ));
+          const position = projectile?.position
+            ?? physics?.getVehicleTransformHistory(event.playerId)?.current.position;
+          if (position) {
+            events.emit({
+              type: "renderer:burst",
+              position,
+              color: COMBAT_EFFECT_COLORS[event.weapon],
+              count: event.weapon === "machine-gun" ? 5 : 9,
+              durationSeconds: 0.24,
+            });
+          }
+        }
         break;
       case "player-damaged":
         physics?.applyVehicleImpulse(event.playerId, event.knockbackImpulse);
         runtimeStatus.textContent = `${event.playerId} ${event.healthRemaining} HP`;
         events.emit({ type: "audio:cue", cue: "impact", gain: 0.1 });
         events.emit({ type: "renderer:flash", color: 0xff493d, durationSeconds: 0.12 });
+        {
+          const position = physics?.getVehicleTransformHistory(event.playerId)?.current.position;
+          if (position) {
+            events.emit({
+              type: "renderer:burst",
+              position,
+              color: COMBAT_EFFECT_COLORS[event.weapon],
+              count: 12,
+              durationSeconds: 0.42,
+            });
+          }
+        }
         break;
       case "player-destroyed": {
         events.emit({ type: "audio:cue", cue: "vehicle-destroyed", gain: 0.16 });
+        const position = physics?.getVehicleTransformHistory(event.playerId)?.current.position;
+        if (position) {
+          events.emit({
+            type: "renderer:burst",
+            position,
+            color: 0xff4c2f,
+            count: 36,
+            durationSeconds: 0.9,
+          });
+        }
         const raceEvents = raceSession?.eliminatePlayer(event.playerId, "destroyed") ?? [];
         if (!raceSession) {
           physics?.deactivateVehicle(event.playerId);
@@ -491,6 +555,14 @@ events.subscribe((event) => {
     runtimeStatus.textContent = event.reason;
   } else if (event.type === "simulation:overrun") {
     totalDroppedSeconds += event.droppedSeconds;
+  } else if (event.type === "physics:object-destroyed") {
+    events.emit({
+      type: "renderer:burst",
+      position: event.position,
+      color: 0xffcf4a,
+      count: 22,
+      durationSeconds: 0.7,
+    });
   }
 });
 applyState(state.state);
@@ -504,6 +576,7 @@ async function startRace(): Promise<void> {
   resetCameraElimination();
   raceSession = createTrackRaceSession();
   combatSession = createCombatSession();
+  latestVehicleInputs = {};
   clock.restart(performance.now() / 1000);
   totalDroppedSeconds = 0;
   state.transition("race", raceSession ? "Race countdown started" : "Fixed-step simulation running");
@@ -516,10 +589,37 @@ async function startRace(): Promise<void> {
 startButton.addEventListener("click", () => {
   void startRace();
 });
+function pauseRace(reason = "Match paused"): void {
+  if (state.state !== "race") {
+    return;
+  }
+  state.transition("paused", reason);
+  clock.reset(performance.now() / 1000);
+  events.emit({ type: "audio:cue", cue: "pause", gain: 0.055 });
+}
+
+function resumeRace(): void {
+  if (state.state !== "paused") {
+    return;
+  }
+  void audio.unlock();
+  clock.reset(performance.now() / 1000);
+  state.transition("race", "Match resumed");
+  events.emit({ type: "audio:cue", cue: "resume", gain: 0.055 });
+}
+
+pauseButton.addEventListener("click", () => {
+  if (state.state === "paused") {
+    resumeRace();
+  } else {
+    pauseRace();
+  }
+});
 finishButton.addEventListener("click", () => {
   if (state.state === "race") {
     raceSession = undefined;
     combatSession = undefined;
+    latestVehicleInputs = {};
     resetCameraElimination();
     state.transition("results", "Simulation completed without clock drift");
     applyRaceBanner();
@@ -527,9 +627,10 @@ finishButton.addEventListener("click", () => {
   }
 });
 menuButton.addEventListener("click", () => {
-  if (state.state === "race" || state.state === "results") {
+  if (state.state === "race" || state.state === "paused" || state.state === "results") {
     raceSession = undefined;
     combatSession = undefined;
+    latestVehicleInputs = {};
     resetCameraElimination();
     state.transition("menu", "Runtime ready");
     applyRaceBanner();
@@ -541,6 +642,7 @@ resetButton.addEventListener("click", () => {
   resetCameraElimination();
   raceSession = state.state === "race" ? createTrackRaceSession() : undefined;
   combatSession = state.state === "race" ? createCombatSession() : undefined;
+  latestVehicleInputs = {};
   applyRaceBanner();
   applyCombatHud();
 });
@@ -548,6 +650,7 @@ debugCamera.addEventListener("change", () => renderer.setDebugCamera(debugCamera
 playerCountSelect.addEventListener("change", () => {
   raceSession = undefined;
   combatSession = undefined;
+  latestVehicleInputs = {};
   resetCameraElimination();
   rebuildVehicleInputs();
   applyRosterPresentation();
@@ -701,6 +804,7 @@ assetInput.addEventListener("change", () => {
   void (async () => {
     raceSession = undefined;
     combatSession = undefined;
+    latestVehicleInputs = {};
     applyRaceBanner();
     applyCombatHud();
     state.transition("loading", `Parsing ${files.length} local asset${files.length === 1 ? "" : "s"}…`);
@@ -767,12 +871,27 @@ function resetPresentationClock(): void {
   });
 }
 
-document.addEventListener("visibilitychange", resetPresentationClock);
-window.addEventListener("blur", resetPresentationClock);
+document.addEventListener("visibilitychange", () => {
+  if (document.hidden) {
+    pauseRace("Paused while the tab was hidden");
+  }
+  resetPresentationClock();
+});
+window.addEventListener("blur", () => {
+  pauseRace("Paused after focus loss");
+  resetPresentationClock();
+});
 window.addEventListener("focus", resetPresentationClock);
 window.addEventListener("resize", () => renderer.resize(viewport.clientWidth, viewport.clientHeight));
 window.addEventListener("keydown", (event) => {
-  if (event.code === "KeyC") {
+  if (event.code === "Escape" && (state.state === "race" || state.state === "paused")) {
+    event.preventDefault();
+    if (state.state === "paused") {
+      resumeRace();
+    } else {
+      pauseRace();
+    }
+  } else if (event.code === "KeyC") {
     debugColliders.checked = !debugColliders.checked;
   }
 });
@@ -869,6 +988,28 @@ function sampleVehicleInputs(gamepads: readonly (Gamepad | null)[]): VehicleInpu
   return sampled;
 }
 
+function updateEngineAudio(): void {
+  if (!physics || (state.state !== "race" && state.state !== "paused")) {
+    audio.setEngineVoices([]);
+    return;
+  }
+  const activeIds = new Set(physics.activeVehicleIds);
+  audio.setEngineVoices(activePlayerSlots().flatMap((slot) => {
+    const telemetry = physics?.getVehicleTelemetry(slot.id);
+    if (!activeIds.has(slot.id) || !telemetry) {
+      return [];
+    }
+    return [{
+      id: slot.id,
+      normalizedSpeed: Math.min(
+        1,
+        telemetry.speedMetersPerSecond / DEFAULT_VEHICLE_CONFIG.drive.maxForwardSpeed,
+      ),
+      throttle: Math.abs(latestVehicleInputs[slot.id]?.drive ?? 0),
+    }];
+  }));
+}
+
 function renderFrame(timestampMilliseconds: number): void {
   if (!physics) {
     return;
@@ -900,6 +1041,7 @@ function renderFrame(timestampMilliseconds: number): void {
         raceFinishReason = eliminationFinishReason;
       }
       const sampledInputs = sampleVehicleInputs(gamepads);
+      latestVehicleInputs = sampledInputs;
       if (combatSession && (!raceSession || raceSession.phase === "racing")) {
         const useRequests = Object.fromEntries(Object.entries(sampledInputs).map(([id, input]) => (
           [id, Boolean(input.useItem)]
@@ -940,6 +1082,7 @@ function renderFrame(timestampMilliseconds: number): void {
     frameDeltaSeconds: renderDeltaSeconds,
     ...(debugColliders.checked ? { debugLines: physics.debugLines() } : {}),
   });
+  updateEngineAudio();
 
   if (timestampMilliseconds - lastOverlayUpdate >= 200) {
     const physicsMetrics = physics.metrics;

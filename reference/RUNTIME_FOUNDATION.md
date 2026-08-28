@@ -44,21 +44,26 @@ If more than eight steps are due, whole excess steps are discarded and reported 
 `focus`, and `visibilitychange` reset the presentation anchor and accumulator, so returning to the
 tab never tries to simulate the hidden interval.
 
-The browser calls the clock only in `race`. `menu`, `loading`, and `results` keep rendering but do
-not advance gameplay. Starting or restarting a race resets the step index and dropped-time counter.
+The browser calls the clock only in `race`. `menu`, `loading`, `paused`, and `results` keep rendering
+but do not advance gameplay. Starting or restarting a race resets the step index and dropped-time
+counter. Resuming from `paused` resets only the presentation anchor and accumulator, preserving the
+current simulation step so no hidden time is replayed or discarded.
 
 ## State and events
 
 The state machine validates transitions around the primary flow:
 
 ```text
-boot → loading → menu → race → results
+boot → loading → menu → race ⇄ paused
                    ↑       │       │
                    └───────┴───────┘
+                           │
+                           └────────→ results
 ```
 
-Menu/results may enter loading for local asset parsing and return to menu. Invalid transitions
-throw synchronously rather than producing a partially initialized runtime.
+Menu/results may enter loading for local asset parsing and return to menu. Pause can resume the race
+or return directly to menu. Invalid transitions throw synchronously rather than producing a partially
+initialized runtime.
 
 `RuntimeEventBus` carries discriminated, structured-clone-compatible records for state changes,
 focus, overruns, physics contacts, audio cues, and renderer flashes. This keeps Worker migration and
@@ -114,6 +119,7 @@ In-app browser smoke on the development build confirmed:
 - Rapier WASM and WebGL initialize into `menu`;
 - `menu → race → results` changes control availability correctly;
 - the simulation step advances only in `race` and remains frozen in `results`;
+- pause holds the current simulation step and resume continues it without a presentation-time catch-up;
 - enabling collider lines increases the draw-call count and a ground contact appears in telemetry;
 - no console errors or warnings occur during the flow.
 

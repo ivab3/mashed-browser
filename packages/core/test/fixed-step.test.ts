@@ -44,6 +44,7 @@ describe("FixedStepClock", () => {
       ticks += 1;
     });
     clock.reset(20);
+    expect(clock.simulationStep).toBe(1);
     clock.advance(20.016, () => {
       ticks += 1;
     });

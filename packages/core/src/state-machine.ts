@@ -4,7 +4,8 @@ const ALLOWED_TRANSITIONS: Readonly<Record<RuntimeState, ReadonlySet<RuntimeStat
   boot: new Set(["loading"]),
   loading: new Set(["menu"]),
   menu: new Set(["loading", "race"]),
-  race: new Set(["results", "menu"]),
+  race: new Set(["paused", "results", "menu"]),
+  paused: new Set(["race", "menu"]),
   results: new Set(["menu", "loading", "race"]),
 };
 

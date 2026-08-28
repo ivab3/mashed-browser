@@ -1,8 +1,8 @@
 # Stage 5 vertical slice
 
 Status: Stage 5 started on 2026-08-28. Deterministic race rules, the production local roster,
-shared-camera elimination, and the first playable combat loop are implemented; production
-presentation/audio and hardening remain open.
+shared-camera elimination, the first playable combat loop, and the presentation foundation are
+implemented; original-audio binding, world impacts, final polish, and hardening remain open.
 
 ## Slice 5.1 — race rules foundation
 
@@ -95,10 +95,31 @@ The current projectile contract resolves player hits and lifetime expiry but doe
 projectiles with track/scenery geometry. World impacts, explosion particles, fire trails, damage
 decals, and source-authored pickup placement belong to the presentation/content follow-up.
 
+## Slice 5.5 — pause, engine mix, and baseline effects
+
+The complete-match shell now has an explicit, deterministic presentation layer:
+
+- `paused` is a validated runtime state between `race` and `menu`/`race`; the pause button and
+  `Escape` toggle it, while page blur or visibility loss pauses an active match automatically;
+- pausing freezes the physics, race, combat, elimination, and simulation-step clocks. Resuming resets
+  only the presentation anchor, preserving the current step and preventing hidden-time catch-up;
+- the match HUD, standings, health, and ammo remain visible below a dedicated pause overlay, while
+  roster, asset-loading, finish, and reset controls are locked consistently with match state;
+- every active vehicle owns a synthesized engine voice driven by fixed-step speed and throttle
+  telemetry; voices fade during pause and are released on menu/results, alongside explicit pause and
+  resume UI cues;
+- deterministic additive particle bursts distinguish pickup collection, weapon fire, player damage,
+  vehicle destruction, and destructible scenery impacts without introducing simulation-side state;
+- effect events remain structured-clone-compatible plain data, so future authored effects can replace
+  the baseline renderer implementation without coupling core to Three.js.
+
+The engine and UI tones in this slice are an offline-safe fallback. Binding extracted original
+engine, collision, weapon, and interface samples is the next content slice.
+
 ## Planned slices
 
-1. **Presentation:** production HUD, pause, results, original engine/impact/weapon/UI audio, and baseline
-   effects usable for a complete battle/race loop.
+1. **Original content and impacts:** bind local engine/collision/weapon/UI audio, add projectile
+   collisions with track/scenery, and finish the battle-loop effects pass.
 2. **M1 hardening:** browser replay matrix, 30-minute soak, four-player 1080p performance scene,
    and verification that prepared game data causes no network request after initial loading.
 
@@ -110,7 +131,8 @@ vehicle deactivation/rematch reset, four independent physics slots, asset catalo
 keyboard/gamepad ownership and item-edge input, three weapon/projectile profiles, swept damage,
 knockback/destruction, pickup respawn, and repeated combat-tape equality. Browser smoke covers live 1→4→1
 roster changes, four grounded bodies, repeated `menu → race → results → race`, hidden-row behavior,
-combat HUD/pickup draw calls, prop metrics, and console cleanliness. Run the committed checks with:
+combat HUD/pickup draw calls, a constant simulation step throughout pause, continuous step numbering
+after resume, prop metrics, and console cleanliness. Run the committed checks with:
 
 ```bash
 pnpm test

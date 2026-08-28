@@ -18,7 +18,8 @@ original vehicle render instance for every active slot. The third slice adds a r
 shared-camera knockout rule, last-car-standing winner, complete standings, and rematch reset without
 a page reload. The fourth slice adds deterministic pickups and respawns, machine-gun/rocket/mine
 projectiles, damage, Rapier knockback, destruction, synthesized combat cues, and a four-player
-health/ammo HUD.
+health/ammo HUD. The fifth slice adds a deterministic pause/resume state, focus-loss auto-pause,
+per-player engine voices, pause/resume cues, and baseline pickup/weapon/damage/destruction particles.
 [ADR-0001](./reference/ADR-0001-runtime-asset-loading.md) selects direct runtime
 parsing in a loading Worker instead of mandatory pre-conversion.
 
@@ -89,7 +90,7 @@ Current findings and the remaining Stage 2 questions are tracked in
 pnpm web
 ```
 
-The shell demonstrates the `boot → loading → menu → race → results` flow, a 60 Hz fixed simulation
+The shell demonstrates the `boot → loading → menu → race ⇄ paused → results` flow, a 60 Hz fixed simulation
 clock with interpolated presentation transforms, a live telemetry overlay, an orbit debug camera,
 Rapier collider lines, and the first fixed-step race-rules slice. A loaded track route adds a
 three-second countdown, ordered one-lap finish, and final-time banner. Local DFF/TXD/BSP files can
@@ -108,6 +109,10 @@ remains as a compatibility shortcut that defaults to two players and removes the
 Three color-coded combat pickups are placed along the route (or the handling-lab center lane): yellow
 machine gun, red rocket, and purple mine. Use an item with `E` for P1, `/` for P2, or gamepad X;
 damage destruction feeds the same elimination and results flow as camera distance.
+Pause with the HUD button or `Escape`; losing page focus pauses automatically. Physics, race, combat,
+and elimination steps remain frozen while paused, and resume continues from the same simulation step
+without catching up hidden time. Per-player synthesized engine voices track speed and throttle until
+extracted original audio is bound in the next content slice.
 
 With extracted Warzone assets in the standard ignored `game-data/` location, `pnpm lap:validate`
 runs the deterministic 136-checkpoint full-lap acceptance scenario. An alternative track directory

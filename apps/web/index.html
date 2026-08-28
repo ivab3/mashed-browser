@@ -53,6 +53,12 @@
 
         <div id="elimination-warning" class="elimination-warning" role="alert" hidden></div>
 
+        <div id="pause-overlay" class="pause-overlay" role="status" hidden>
+          <span>Match suspended</span>
+          <strong>Paused</strong>
+          <small>Press Escape or Resume</small>
+        </div>
+
         <div class="hint">Load the track bundle; add COURSE.LUA/world DFFs and NAME0.DFF + NAME.TXD for an original vehicle.</div>
       </section>
 
@@ -67,6 +73,7 @@
 
         <section class="controls">
           <button id="start-race" class="primary" type="button">Start simulation</button>
+          <button id="pause-race" type="button" disabled>Pause</button>
           <button id="finish-race" type="button" disabled>Finish race</button>
           <button id="back-menu" type="button" disabled>Back to menu</button>
           <button id="reset-demo" type="button">Reset vehicle</button>

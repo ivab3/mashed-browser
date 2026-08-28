@@ -188,7 +188,7 @@ loading Worker во время runtime; обязательная предвар�
 - [x] Fixed-step simulation с шагом 1/60 секунды.
 - [x] Раздельные render loop и simulation loop.
 - [x] Интерполяция render transforms между physics frames.
-- [x] State machine: boot → loading → menu → race → results.
+- [x] State machine: boot → loading → menu → race ⇄ paused → results.
 - [x] Унифицированная система событий между core, audio и renderer.
 - [x] Debug overlay: FPS, frame time, physics time, draw calls, bodies и contacts.
 - [x] Debug camera и отображение Rapier colliders.
@@ -307,7 +307,10 @@ shared-camera elimination: route-aware выбор лидера, 1,5-секунд
 machine gun, splash rockets и proximity mines, ammo/cooldown/projectile lifetime, swept hits,
 damage, Rapier knockback и уничтожение через общий race-elimination flow. Runtime показывает
 цветные pickup/projectile meshes и health/weapon HUD; E, / и gamepad X активируют предмет.
-Production HUD/effects, original audio, world impacts projectiles и M1 hardening остаются следующими срезами.
+Пятый срез добавил явное состояние pause/resume, автоматическую паузу при потере фокуса без
+simulation catch-up, per-player engine voices, UI cues и baseline particles для pickup, выстрелов,
+урона и разрушений. Original audio, world impacts projectiles, финальный effects polish и M1
+hardening остаются следующими срезами.
 
 Milestone M1: публично показываемый proof of concept.
 

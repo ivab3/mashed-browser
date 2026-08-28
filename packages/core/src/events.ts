@@ -1,4 +1,4 @@
-export type RuntimeState = "boot" | "loading" | "menu" | "race" | "results";
+export type RuntimeState = "boot" | "loading" | "menu" | "race" | "paused" | "results";
 
 export type AudioCue =
   | "menu"
@@ -8,7 +8,9 @@ export type AudioCue =
   | "break"
   | "pickup"
   | "weapon-fire"
-  | "vehicle-destroyed";
+  | "vehicle-destroyed"
+  | "pause"
+  | "resume";
 
 export type RuntimeEvent =
   | {
@@ -46,6 +48,13 @@ export type RuntimeEvent =
   | {
       type: "renderer:flash";
       color: number;
+      durationSeconds: number;
+    }
+  | {
+      type: "renderer:burst";
+      position: readonly [number, number, number];
+      color: number;
+      count: number;
       durationSeconds: number;
     };
 
