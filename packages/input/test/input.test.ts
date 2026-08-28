@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   applyDeadzone,
   BrowserVehicleInput,
+  GAMEPAD_ONLY_KEYBOARD_BINDINGS,
   PLAYER_ONE_KEYBOARD_BINDINGS,
   PLAYER_TWO_KEYBOARD_BINDINGS,
   sanitizeVehicleInput,
@@ -70,6 +71,27 @@ describe("vehicle input normalization", () => {
     } finally {
       playerOne.dispose();
       playerTwo.dispose();
+    }
+  });
+
+  it("reserves keyboard-free slots for third and fourth gamepads", () => {
+    const target = new EventTarget();
+    const input = new BrowserVehicleInput(target as Window, {
+      gamepadIndex: 2,
+      keyboard: GAMEPAD_ONLY_KEYBOARD_BINDINGS,
+    });
+    try {
+      target.dispatchEvent(keyboardEvent("keydown", "KeyW"));
+      target.dispatchEvent(keyboardEvent("keydown", "ArrowUp"));
+      expect(input.sample([])).toEqual({
+        drive: 0,
+        steer: 0,
+        brake: 0,
+        handbrake: 0,
+        recover: false,
+      });
+    } finally {
+      input.dispose();
     }
   });
 });

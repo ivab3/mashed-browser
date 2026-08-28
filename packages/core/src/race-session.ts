@@ -4,6 +4,7 @@ import {
   type LapProgress,
   type TrackVector3,
 } from "./lap-session.js";
+import { LOCAL_PLAYER_SLOTS } from "./local-roster.js";
 
 export type RacePhase = "countdown" | "racing" | "finished";
 
@@ -75,7 +76,7 @@ interface RacePlayerRuntime {
   terminalOrder: number | undefined;
 }
 
-const MAX_LOCAL_PLAYERS = 4;
+const MAX_LOCAL_PLAYERS = LOCAL_PLAYER_SLOTS.length;
 const COUNTDOWN_EPSILON_SECONDS = 1e-9;
 
 function validateFiniteNonNegative(value: number, name: string): void {

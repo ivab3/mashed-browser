@@ -1,38 +1,46 @@
 import { AudioRuntime } from "@mashed/audio";
 import {
   deriveTrackDefinition,
+  listVehicleAssetPairs,
   parseVehicleDffName,
   parseCourseLua,
   parseLapDataLua,
-  selectVehicleAssetPair,
   type BspWorld,
   type CourseDefinition,
   type DerivedTrackDefinition,
   type DffModel,
   type LapDataDefinition,
   type PiTextureDictionary,
+  type VehicleAssetPair,
 } from "@mashed/assets";
 import {
+  createLocalPlayerGrid,
   FixedStepClock,
+  LOCAL_PLAYER_SLOTS,
   RaceSession,
   RuntimeEventBus,
   RuntimeStateMachine,
   type FixedStepFrame,
+  type LocalPlayerGridSlot,
   type RaceEvent,
   type RuntimeState,
 } from "@mashed/core";
 import {
   BrowserVehicleInput,
+  GAMEPAD_ONLY_KEYBOARD_BINDINGS,
   NEUTRAL_VEHICLE_INPUT,
   PLAYER_ONE_KEYBOARD_BINDINGS,
   PLAYER_TWO_KEYBOARD_BINDINGS,
+  SINGLE_PLAYER_KEYBOARD_BINDINGS,
+  type VehicleInputFrame,
 } from "@mashed/input";
 import {
   createPhysicsRuntime,
+  DEFAULT_VEHICLE_CONFIG,
   deriveRouteCollisionLayers,
-  PRIMARY_VEHICLE_ID,
   type PhysicsRuntime,
   type PhysicsRuntimeOptions,
+  type VehicleInputById,
 } from "@mashed/physics";
 import { RuntimeRenderer } from "@mashed/renderer";
 
@@ -67,19 +75,10 @@ function assetSummary(asset: LoadedAsset): string {
 }
 
 const STEP_SECONDS = 1 / 60;
-const SECONDARY_VEHICLE_ID = "vehicle-two";
 const vehiclePairLab = new URLSearchParams(window.location.search).get("collisionLab") === "vehicle-pair";
 
 function selectedPhysicsOptions(): PhysicsRuntimeOptions {
-  return vehiclePairLab
-    ? {
-        collisionObjects: false,
-        collisionVehicle: {
-          id: SECONDARY_VEHICLE_ID,
-          spawn: { position: [-6, 1.05, -8], headingRadians: 0 },
-        },
-      }
-    : {};
+  return vehiclePairLab ? { collisionObjects: false } : {};
 }
 
 const viewport = element<HTMLElement>("viewport");
@@ -107,12 +106,6 @@ const metricSurface = element<HTMLElement>("metric-surface");
 const metricSpeedLabel = element<HTMLElement>("metric-speed-label");
 const metricWheelsLabel = element<HTMLElement>("metric-wheels-label");
 const metricSurfaceLabel = element<HTMLElement>("metric-surface-label");
-const metricPlayerTwoSpeedRow = element<HTMLElement>("metric-player-two-speed-row");
-const metricPlayerTwoWheelsRow = element<HTMLElement>("metric-player-two-wheels-row");
-const metricPlayerTwoSurfaceRow = element<HTMLElement>("metric-player-two-surface-row");
-const metricPlayerTwoSpeed = element<HTMLElement>("metric-player-two-speed");
-const metricPlayerTwoWheels = element<HTMLElement>("metric-player-two-wheels");
-const metricPlayerTwoSurface = element<HTMLElement>("metric-player-two-surface");
 const metricObjects = element<HTMLElement>("metric-objects");
 const metricTrack = element<HTMLElement>("metric-track");
 const metricLap = element<HTMLElement>("metric-lap");
@@ -126,18 +119,39 @@ const secondaryDriveGuide = element<HTMLElement>("secondary-drive-guide");
 const secondaryActionGuide = element<HTMLElement>("secondary-action-guide");
 const gamepadGuide = element<HTMLElement>("gamepad-guide");
 const runtimeShortcuts = element<HTMLElement>("runtime-shortcuts");
+const playerCountSelect = element<HTMLSelectElement>("player-count");
+const vehicleSelectRows = [
+  element<HTMLElement>("vehicle-select-row-one"),
+  element<HTMLElement>("vehicle-select-row-two"),
+  element<HTMLElement>("vehicle-select-row-three"),
+  element<HTMLElement>("vehicle-select-row-four"),
+];
+const vehicleSelects = [
+  element<HTMLSelectElement>("vehicle-select-one"),
+  element<HTMLSelectElement>("vehicle-select-two"),
+  element<HTMLSelectElement>("vehicle-select-three"),
+  element<HTMLSelectElement>("vehicle-select-four"),
+];
+const additionalPlayerMetrics = [
+  {
+    row: element<HTMLElement>("metric-player-two-row"),
+    value: element<HTMLElement>("metric-player-two"),
+  },
+  {
+    row: element<HTMLElement>("metric-player-three-row"),
+    value: element<HTMLElement>("metric-player-three"),
+  },
+  {
+    row: element<HTMLElement>("metric-player-four-row"),
+    value: element<HTMLElement>("metric-player-four"),
+  },
+];
 
 const events = new RuntimeEventBus();
 const state = new RuntimeStateMachine(events);
 const clock = new FixedStepClock({ stepSeconds: STEP_SECONDS, maxSubSteps: 8, events });
 const audio = new AudioRuntime(events);
 const renderer = new RuntimeRenderer(viewport, events);
-const vehicleInput = new BrowserVehicleInput(window, vehiclePairLab
-  ? { gamepadIndex: 0, keyboard: PLAYER_ONE_KEYBOARD_BINDINGS }
-  : {});
-const secondaryVehicleInput = vehiclePairLab
-  ? new BrowserVehicleInput(window, { gamepadIndex: 1, keyboard: PLAYER_TWO_KEYBOARD_BINDINGS })
-  : undefined;
 const assetLoader = new AssetLoadingClient();
 const loadedAssets = new Map<string, LoadedAsset>();
 const trackParts: {
@@ -152,6 +166,8 @@ const loadedTextureDictionaries = new Map<string, PiTextureDictionary>();
 let physics: PhysicsRuntime | undefined;
 let trackDefinition: DerivedTrackDefinition | undefined;
 let raceSession: RaceSession | undefined;
+let vehicleInputs: BrowserVehicleInput[] = [];
+let vehicleCatalog: readonly VehicleAssetPair[] = [];
 let animationFrame = 0;
 let lastRenderTimestamp: number | undefined;
 let smoothedFps = 60;
@@ -159,21 +175,77 @@ let lastOverlayUpdate = 0;
 let physicsMilliseconds = 0;
 let totalDroppedSeconds = 0;
 
-if (vehiclePairLab) {
-  metricSpeedLabel.textContent = "P1 speed";
-  metricWheelsLabel.textContent = "P1 wheels";
-  metricSurfaceLabel.textContent = "P1 surface";
-  metricPlayerTwoSpeedRow.hidden = false;
-  metricPlayerTwoWheelsRow.hidden = false;
-  metricPlayerTwoSurfaceRow.hidden = false;
-  primaryDriveGuide.innerHTML = "<b>P1 · WASD</b> accelerate, reverse and steer";
-  primaryActionGuide.innerHTML = "<b>Space</b> handbrake · <b>Left Shift</b> brake · <b>R</b> recover";
-  secondaryDriveGuide.hidden = false;
-  secondaryActionGuide.hidden = false;
-  gamepadGuide.innerHTML = "<b>Gamepads 1 / 2</b> left stick · triggers · A/B/Y";
-  resetButton.textContent = "Reset vehicles";
-  runtimeShortcuts.textContent = "P1 WASD · P2 arrows · C colliders";
+playerCountSelect.value = vehiclePairLab ? "2" : "1";
+
+function selectedPlayerCount(): number {
+  const value = Number(playerCountSelect.value);
+  return Number.isInteger(value) && value >= 1 && value <= LOCAL_PLAYER_SLOTS.length ? value : 1;
 }
+
+function activePlayerSlots(): readonly (typeof LOCAL_PLAYER_SLOTS)[number][] {
+  return LOCAL_PLAYER_SLOTS.slice(0, selectedPlayerCount());
+}
+
+function localRosterGrid(): readonly LocalPlayerGridSlot[] {
+  return createLocalPlayerGrid(
+    trackDefinition?.spawn ?? DEFAULT_VEHICLE_CONFIG.spawn,
+    selectedPlayerCount(),
+  );
+}
+
+function rebuildVehicleInputs(): void {
+  vehicleInputs.forEach((input) => input.dispose());
+  const count = selectedPlayerCount();
+  vehicleInputs = activePlayerSlots().map((slot, index) => {
+    const keyboard = count === 1
+      ? SINGLE_PLAYER_KEYBOARD_BINDINGS
+      : index === 0
+        ? PLAYER_ONE_KEYBOARD_BINDINGS
+        : index === 1
+          ? PLAYER_TWO_KEYBOARD_BINDINGS
+          : GAMEPAD_ONLY_KEYBOARD_BINDINGS;
+    return new BrowserVehicleInput(window, { gamepadIndex: slot.gamepadIndex, keyboard });
+  });
+}
+
+function applyRosterPresentation(): void {
+  const count = selectedPlayerCount();
+  const multiplayer = count > 1;
+  metricSpeedLabel.textContent = multiplayer ? "P1 speed" : "Speed";
+  metricWheelsLabel.textContent = multiplayer ? "P1 wheels" : "Wheels";
+  metricSurfaceLabel.textContent = multiplayer ? "P1 surface" : "Surface";
+  vehicleSelectRows.forEach((row, index) => {
+    row.hidden = index >= count;
+  });
+  additionalPlayerMetrics.forEach((metric, index) => {
+    metric.row.hidden = index + 1 >= count;
+  });
+  if (multiplayer) {
+    primaryDriveGuide.innerHTML = "<b>P1 · WASD</b> accelerate, reverse and steer";
+    primaryActionGuide.innerHTML = "<b>Space</b> handbrake · <b>Left Shift</b> brake · <b>R</b> recover";
+    secondaryDriveGuide.hidden = false;
+    secondaryActionGuide.hidden = false;
+  } else {
+    primaryDriveGuide.innerHTML = "<b>WASD / arrows</b> accelerate, reverse and steer";
+    primaryActionGuide.innerHTML = "<b>Space</b> handbrake · <b>Shift</b> brake · <b>R</b> recover";
+    secondaryDriveGuide.hidden = true;
+    secondaryActionGuide.hidden = true;
+  }
+  gamepadGuide.innerHTML = `<b>Gamepads 1–${count}</b> left stick · triggers · A/B/Y${count > 2 ? " · P3/P4 gamepad only" : ""}`;
+  resetButton.textContent = multiplayer ? "Reset vehicles" : "Reset vehicle";
+  runtimeShortcuts.textContent = multiplayer
+    ? `P1 WASD · P2 arrows · ${count} gamepads · C colliders`
+    : "C toggles colliders · R recovers";
+}
+
+function configureLocalRoster(): void {
+  const grid = localRosterGrid();
+  physics?.setVehicleRoster(grid.map((slot) => ({ id: slot.id, spawn: slot.spawn })));
+  bindVehicleModels();
+}
+
+rebuildVehicleInputs();
+applyRosterPresentation();
 
 function applyState(next: RuntimeState): void {
   stateBadge.textContent = next;
@@ -185,6 +257,10 @@ function applyState(next: RuntimeState): void {
   finishButton.disabled = next !== "race";
   menuButton.disabled = next !== "race" && next !== "results";
   assetInput.disabled = next === "loading" || next === "race";
+  playerCountSelect.disabled = next === "loading" || next === "race";
+  vehicleSelects.forEach((select) => {
+    select.disabled = next === "loading" || next === "race";
+  });
 }
 
 function formatRaceTime(seconds: number): string {
@@ -217,7 +293,7 @@ function createTrackRaceSession(): RaceSession | undefined {
   return trackDefinition
     ? new RaceSession({
         course: trackDefinition,
-        players: [{ id: PRIMARY_VEHICLE_ID, displayName: "Player 1" }],
+        players: activePlayerSlots().map((slot) => ({ id: slot.id, displayName: slot.label })),
         totalLaps: 1,
         countdownSeconds: 3,
       })
@@ -311,6 +387,22 @@ resetButton.addEventListener("click", () => {
   applyRaceBanner();
 });
 debugCamera.addEventListener("change", () => renderer.setDebugCamera(debugCamera.checked));
+playerCountSelect.addEventListener("change", () => {
+  raceSession = undefined;
+  rebuildVehicleInputs();
+  applyRosterPresentation();
+  configureLocalRoster();
+  applyState(state.state);
+  runtimeStatus.textContent = `${selectedPlayerCount()} local player${selectedPlayerCount() === 1 ? "" : "s"} ready`;
+});
+vehicleSelects.forEach((select) => {
+  select.addEventListener("change", () => {
+    const bound = bindVehicleModels();
+    runtimeStatus.textContent = bound.length > 0
+      ? `${bound.length} original vehicle model${bound.length === 1 ? "" : "s"} bound`
+      : "Debug vehicle proxies selected";
+  });
+});
 
 function rememberBsp(fileName: string, world: BspWorld): string | undefined {
   const normalized = fileName.toLocaleLowerCase("en-US");
@@ -342,25 +434,61 @@ function trackTextureDictionary(): PiTextureDictionary | undefined {
   return candidates.length === 1 ? candidates[0]![1] : undefined;
 }
 
-function bindVehicleModel(): string | undefined {
-  const pair = selectVehicleAssetPair(loadedDffs.keys(), loadedTextureDictionaries.keys());
-  if (!pair) {
-    return undefined;
-  }
-  const model = loadedDffs.get(pair.fileName.toLocaleLowerCase("en-US"));
-  const textures = loadedTextureDictionaries.get(pair.textureFileName.toLocaleLowerCase("en-US"));
-  if (!model || !textures) {
-    return undefined;
-  }
-  const rendered = renderer.setVehicleModel(model, textures);
-  return `${pair.vehicleName} skin ${pair.variant} · ${rendered.atomics} intact atomics · ${rendered.triangles.toLocaleString()} triangles · ${rendered.lengthMeters.toFixed(2)} m long · ${rendered.textures} textures${rendered.missingTextureNames.length > 0 ? ` · ${rendered.missingTextureNames.length} missing vehicle maps` : ""}`;
+function vehiclePairKey(pair: VehicleAssetPair): string {
+  return pair.fileName.toLocaleLowerCase("en-US");
+}
+
+function refreshVehicleCatalog(): void {
+  vehicleCatalog = listVehicleAssetPairs(loadedDffs.keys(), loadedTextureDictionaries.keys());
+  const availableKeys = new Set(vehicleCatalog.map(vehiclePairKey));
+  vehicleSelects.forEach((select, index) => {
+    const previousValue = select.value;
+    const proxy = document.createElement("option");
+    proxy.value = "";
+    proxy.textContent = "Debug proxy";
+    const options = vehicleCatalog.map((pair) => {
+      const option = document.createElement("option");
+      option.value = vehiclePairKey(pair);
+      option.textContent = `${pair.vehicleName} · skin ${pair.variant}`;
+      return option;
+    });
+    select.replaceChildren(proxy, ...options);
+    const defaultPair = vehicleCatalog[index % Math.max(1, vehicleCatalog.length)];
+    select.value = availableKeys.has(previousValue)
+      ? previousValue
+      : defaultPair ? vehiclePairKey(defaultPair) : "";
+  });
+}
+
+function bindVehicleModels(): string[] {
+  const bound: string[] = [];
+  const activeIds = new Set(activePlayerSlots().map((slot) => slot.id));
+  LOCAL_PLAYER_SLOTS.forEach((slot, index) => {
+    const selectedKey = vehicleSelects[index]!.value;
+    const pair = vehicleCatalog.find((candidate) => vehiclePairKey(candidate) === selectedKey);
+    if (!activeIds.has(slot.id) || !pair) {
+      renderer.clearVehicleModelFor(slot.id);
+      return;
+    }
+    const model = loadedDffs.get(pair.fileName.toLocaleLowerCase("en-US"));
+    const textures = loadedTextureDictionaries.get(pair.textureFileName.toLocaleLowerCase("en-US"));
+    if (!model || !textures) {
+      renderer.clearVehicleModelFor(slot.id);
+      return;
+    }
+    const rendered = renderer.setVehicleModelFor(slot.id, model, textures);
+    bound.push(
+      `${slot.label} ${pair.vehicleName} skin ${pair.variant} · ${rendered.atomics} atomics · ${rendered.triangles.toLocaleString()} tris${rendered.missingTextureNames.length > 0 ? ` · ${rendered.missingTextureNames.length} missing maps` : ""}`,
+    );
+  });
+  return bound;
 }
 
 function bindTrackParts(): string[] {
   const bound: string[] = [];
   if (trackParts.ai && trackParts.lapData && physics) {
     trackDefinition = deriveTrackDefinition(trackParts.ai, trackParts.lapData);
-    physics.setRaceSpawn(trackDefinition.spawn);
+    configureLocalRoster();
     renderer.setTrackRoute(trackDefinition.checkpoints);
     bound.push(`${trackDefinition.checkpoints.length} ordered checkpoints`);
     applyState(state.state);
@@ -397,9 +525,10 @@ function bindTrackParts(): string[] {
       );
     }
   }
-  const vehicle = bindVehicleModel();
-  if (vehicle) {
-    bound.push(`vehicle ${vehicle}`);
+  refreshVehicleCatalog();
+  const vehicles = bindVehicleModels();
+  if (vehicles.length > 0) {
+    bound.push(`vehicles ${vehicles.join(" · ")}`);
   }
   return bound;
 }
@@ -486,6 +615,34 @@ window.addEventListener("keydown", (event) => {
   }
 });
 
+function currentRacePositions(): Readonly<Record<string, readonly [number, number, number]>> {
+  const positions: Record<string, readonly [number, number, number]> = {};
+  if (!physics) {
+    return positions;
+  }
+  for (const slot of activePlayerSlots()) {
+    const history = physics.getVehicleTransformHistory(slot.id);
+    if (history) {
+      positions[slot.id] = history.current.position;
+    }
+  }
+  return positions;
+}
+
+function sampleVehicleInputs(gamepads: readonly (Gamepad | null)[]): VehicleInputById {
+  const sampled: Record<string, VehicleInputFrame> = {};
+  const racePlayers = new Map(raceSession?.snapshot.players.map((player) => [player.id, player.status]));
+  activePlayerSlots().forEach((slot, index) => {
+    const canDrive = !raceSession || (
+      raceSession.phase === "racing" && racePlayers.get(slot.id) === "racing"
+    );
+    sampled[slot.id] = canDrive
+      ? vehicleInputs[index]?.sample(gamepads) ?? NEUTRAL_VEHICLE_INPUT
+      : NEUTRAL_VEHICLE_INPUT;
+  });
+  return sampled;
+}
+
 function renderFrame(timestampMilliseconds: number): void {
   if (!physics) {
     return;
@@ -506,21 +663,12 @@ function renderFrame(timestampMilliseconds: number): void {
     frame = clock.advance(timestampMilliseconds / 1000, (stepSeconds) => {
       const startedAt = performance.now();
       const gamepads = navigator.getGamepads();
-      const raceEvents = raceSession?.advance(stepSeconds, {
-        [PRIMARY_VEHICLE_ID]: physics?.transformHistory.current.position,
-      }) ?? [];
+      const raceEvents = raceSession?.advance(stepSeconds, currentRacePositions()) ?? [];
       const eventFinishReason = handleRaceEvents(raceEvents);
       if (eventFinishReason) {
         raceFinishReason = eventFinishReason;
       }
-      const controlsEnabled = !raceSession || raceSession.phase === "racing";
-      physics?.step(
-        stepSeconds,
-        controlsEnabled ? vehicleInput.sample(gamepads) : NEUTRAL_VEHICLE_INPUT,
-        secondaryVehicleInput
-          ? { [SECONDARY_VEHICLE_ID]: secondaryVehicleInput.sample(gamepads) }
-          : {},
-      );
+      physics?.stepVehicles(stepSeconds, sampleVehicleInputs(gamepads));
       physicsMilliseconds += performance.now() - startedAt;
     });
   } else {
@@ -560,12 +708,13 @@ function renderFrame(timestampMilliseconds: number): void {
     metricSpeed.textContent = `${(physics.telemetry.speedMetersPerSecond * 3.6).toFixed(0)} km/h`;
     metricWheels.textContent = `${physics.telemetry.groundedWheels} / 4`;
     metricSurface.textContent = physics.telemetry.surface;
-    const playerTwoTelemetry = physics.getVehicleTelemetry(SECONDARY_VEHICLE_ID);
-    if (playerTwoTelemetry) {
-      metricPlayerTwoSpeed.textContent = `${(playerTwoTelemetry.speedMetersPerSecond * 3.6).toFixed(0)} km/h`;
-      metricPlayerTwoWheels.textContent = `${playerTwoTelemetry.groundedWheels} / 4`;
-      metricPlayerTwoSurface.textContent = playerTwoTelemetry.surface;
-    }
+    additionalPlayerMetrics.forEach((metric, index) => {
+      const slot = LOCAL_PLAYER_SLOTS[index + 1];
+      const telemetry = slot ? physics?.getVehicleTelemetry(slot.id) : undefined;
+      metric.value.textContent = telemetry
+        ? `${(telemetry.speedMetersPerSecond * 3.6).toFixed(0)} km/h · ${telemetry.groundedWheels}/4 · ${telemetry.surface}`
+        : "inactive";
+    });
     metricObjects.textContent = `${physicsMetrics.activeObjects} / ${physicsMetrics.destroyedObjects}`;
     metricTrack.textContent = physicsMetrics.trackTriangles.toLocaleString();
     const raceSnapshot = raceSession?.snapshot;
@@ -588,6 +737,7 @@ async function boot(): Promise<void> {
   state.transition("loading", "Loading Rapier WebAssembly…");
   try {
     physics = await createPhysicsRuntime(events, STEP_SECONDS, undefined, selectedPhysicsOptions());
+    configureLocalRoster();
     state.transition("menu", "Runtime ready");
     clock.reset(performance.now() / 1000);
     animationFrame = requestAnimationFrame(renderFrame);
@@ -600,8 +750,7 @@ async function boot(): Promise<void> {
 window.addEventListener("pagehide", () => {
   cancelAnimationFrame(animationFrame);
   assetLoader.dispose();
-  vehicleInput.dispose();
-  secondaryVehicleInput?.dispose();
+  vehicleInputs.forEach((input) => input.dispose());
   physics?.dispose();
   renderer.dispose();
   void audio.dispose();

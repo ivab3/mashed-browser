@@ -13,7 +13,8 @@ keyboard/gamepad controls, four grip surfaces, recovery, a shared multiplayer ca
 binding, dynamic/destructible props, a reproducible tuning harness, playable original track sessions,
 and runtime-bound original vehicle DFF/TXD models. Stage 5 is underway with a deterministic
 one-to-four-player race session, countdown, independent lap progress, finish/elimination results,
-and the first one-player runtime binding.
+a production 1–4 local roster, heading-aware start grid, independent input/physics streams, and an
+original vehicle render instance for every active slot.
 [ADR-0001](./reference/ADR-0001-runtime-asset-loading.md) selects direct runtime
 parsing in a loading Worker instead of mandatory pre-conversion.
 
@@ -92,11 +93,12 @@ be parsed through the loading Worker; original
 bytes remain local and parsed typed arrays are transferred back without cloning. See
 [`reference/RUNTIME_FOUNDATION.md`](./reference/RUNTIME_FOUNDATION.md) for runtime contracts and
 acceptance evidence. Loading a numbered vehicle DFF such as `CRUSADER0.DFF` together with its shared
-`CRUSADER.TXD` replaces the debug car proxy with the intact original model.
-Open `/buildings?collisionLab=vehicle-pair` for the two-player collision lab. P1 uses WASD and
-gamepad 1; P2 uses the arrow keys and gamepad 2. The cars start side by side, facing the same way,
-and both expose independent live telemetry. The camera centers the active group and pulls back as
-the cars separate.
+`CRUSADER.TXD` adds it to the local roster selectors.
+Choose 1–4 local players in the runtime roster. P1 uses WASD and gamepad 1; P2 uses the arrow keys
+and gamepad 2; P3/P4 use gamepads 3/4. Every active slot has independent physics and telemetry, and
+can select any complete numbered DFF/shared-TXD pair loaded in the current session. The camera
+centers the active group and pulls back as the cars separate. `/buildings?collisionLab=vehicle-pair`
+remains as a compatibility shortcut that defaults to two players and removes the prop line.
 
 With extracted Warzone assets in the standard ignored `game-data/` location, `pnpm lap:validate`
 runs the deterministic 136-checkpoint full-lap acceptance scenario. An alternative track directory

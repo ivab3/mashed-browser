@@ -25,11 +25,10 @@ export function parseVehicleDffName(fileName: string): VehicleDffName | undefine
   };
 }
 
-/** Selects a loaded DFF/TXD vehicle pair, preferring player/skin variant zero. */
-export function selectVehicleAssetPair(
+function matchingVehicleAssetPairs(
   dffFileNames: Iterable<string>,
   textureFileNames: Iterable<string>,
-): VehicleAssetPair | undefined {
+): VehicleAssetPair[] {
   const textures = new Map(
     [...textureFileNames].map((fileName) => [fileName.toLocaleLowerCase("en-US"), fileName]),
   );
@@ -43,7 +42,26 @@ export function selectVehicleAssetPair(
         vehicle.textureDictionaryFileName.toLocaleLowerCase("en-US"),
       );
       return textureFileName ? [{ ...vehicle, textureFileName }] : [];
-    })
+    });
+}
+
+/** Lists every loaded DFF/TXD vehicle skin pair in stable vehicle/variant order. */
+export function listVehicleAssetPairs(
+  dffFileNames: Iterable<string>,
+  textureFileNames: Iterable<string>,
+): readonly VehicleAssetPair[] {
+  return matchingVehicleAssetPairs(dffFileNames, textureFileNames)
+    .sort((left, right) => left.vehicleName.localeCompare(right.vehicleName, "en-US")
+      || left.variant - right.variant
+      || left.fileName.localeCompare(right.fileName, "en-US"));
+}
+
+/** Selects a loaded DFF/TXD vehicle pair, preferring player/skin variant zero. */
+export function selectVehicleAssetPair(
+  dffFileNames: Iterable<string>,
+  textureFileNames: Iterable<string>,
+): VehicleAssetPair | undefined {
+  return matchingVehicleAssetPairs(dffFileNames, textureFileNames)
     .sort((left, right) => left.variant - right.variant
       || left.vehicleName.localeCompare(right.vehicleName, "en-US"))[0];
 }

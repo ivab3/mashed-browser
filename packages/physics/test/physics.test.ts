@@ -238,6 +238,59 @@ describe("PhysicsRuntime", () => {
     }
   });
 
+  it("configures and drives four production vehicle slots through one input map", async () => {
+    const roster = [
+      { id: PRIMARY_VEHICLE_ID, spawn: { position: [-12, 1.05, -8] as const, headingRadians: 0 } },
+      { id: "vehicle-two", spawn: { position: [-4, 1.05, -8] as const, headingRadians: 0 } },
+      { id: "vehicle-three", spawn: { position: [4, 1.05, -8] as const, headingRadians: 0 } },
+      { id: "vehicle-four", spawn: { position: [12, 1.05, -8] as const, headingRadians: 0 } },
+    ];
+    const physics = await createPhysicsRuntime(
+      new RuntimeEventBus(),
+      1 / 60,
+      DEFAULT_VEHICLE_CONFIG,
+      { collisionObjects: false },
+    );
+    try {
+      physics.setVehicleRoster(roster);
+      expect(physics.vehicleIds).toEqual(roster.map((entry) => entry.id));
+      expect(physics.sceneObjects.filter((object) => object.kind === "vehicle" && object.active))
+        .toHaveLength(3);
+
+      for (let step = 0; step < 60; step += 1) {
+        physics.stepVehicles(1 / 60);
+      }
+      const starts = new Map(roster.map((entry) => [
+        entry.id,
+        physics.getVehicleTransformHistory(entry.id)!.current.position,
+      ]));
+      const input = { drive: 1, steer: 0.2, brake: 0, handbrake: 0, recover: false };
+      for (let step = 0; step < 180; step += 1) {
+        physics.stepVehicles(1 / 60, { "vehicle-three": input });
+      }
+      for (const entry of roster) {
+        const start = starts.get(entry.id)!;
+        const finish = physics.getVehicleTransformHistory(entry.id)!.current.position;
+        const distance = Math.hypot(finish[0] - start[0], finish[2] - start[2]);
+        if (entry.id === "vehicle-three") {
+          expect(distance).toBeGreaterThan(5);
+          expect(physics.getVehicleTelemetry(entry.id)!.speedMetersPerSecond).toBeGreaterThan(3);
+        } else {
+          expect(distance).toBeLessThan(0.02);
+        }
+      }
+
+      physics.setVehicleRoster(roster.slice(0, 2));
+      expect(physics.vehicleIds).toEqual([PRIMARY_VEHICLE_ID, "vehicle-two"]);
+      expect(physics.getVehicleTransformHistory("vehicle-three")).toBeUndefined();
+      expect(physics.sceneObjects.filter((object) => object.kind === "vehicle" && object.active))
+        .toHaveLength(1);
+      expect(physics.metrics.destroyedObjects).toBe(0);
+    } finally {
+      physics.dispose();
+    }
+  });
+
   it("maps positive player steering to Rapier's mirrored wheel-steering direction", async () => {
     const physics = await createPhysicsRuntime(
       new RuntimeEventBus(),

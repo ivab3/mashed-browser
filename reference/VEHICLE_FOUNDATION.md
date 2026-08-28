@@ -42,12 +42,13 @@ lab rather than a race track. The collision binding is live: selecting a local
 `COLLIDE.BSP`/`COLLISIONS.BSP` in the runtime
 creates merged static drive/scenery colliders. Track spawn/orientation and lap flow are connected.
 
-The browser URL `?collisionLab=vehicle-pair` replaces the prop line with a blue player-two vehicle
-beside P1 on the asphalt lane. Both cars start with the same heading, so P2's arrow-key axes match
+The browser URL `?collisionLab=vehicle-pair` defaults the Stage 5 roster to two players and removes
+the prop line. Both cars start with the same heading, so P2's arrow-key axes match
 P1's screen-relative direction instead of appearing inverted. Each chassis consumes its own
 replay-safe input record and publishes its own telemetry; steering the parallel cars into each other
 exposes equal-mass side impacts, and reset restores the shared starting row. Both interpolated
-vehicle positions participate in the shared camera; P2 still uses a debug render proxy.
+vehicle positions participate in the shared camera. Stage 5 slice 5.2 later generalized this path to
+four slots and allows an independently selected original DFF/TXD render instance for every player.
 
 The pure camera-fit contract averages active vehicle positions and measures the maximum 3D radius
 around that center. The accepted single-car `10 m` trail and `7.2 m` height remain unchanged; both
@@ -219,5 +220,4 @@ remain explicitly documented tunes. This closes Gate C.
 
 Deferred as non-blocking Stage 5 multiplayer/hardening work:
 
-- replace the second player's debug proxy with an independently skinned original vehicle instance;
 - run a representative multiplayer replay across the supported browser matrix.

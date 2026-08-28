@@ -1,7 +1,7 @@
 # Stage 5 vertical slice
 
-Status: Stage 5 started on 2026-08-28. The deterministic race-rules foundation is implemented; the
-full multiplayer, combat, presentation, audio, and hardening slices remain open.
+Status: Stage 5 started on 2026-08-28. The deterministic race-rules foundation and production local
+roster are implemented; match elimination, combat, presentation, audio, and hardening remain open.
 
 ## Slice 5.1 — race rules foundation
 
@@ -23,28 +23,49 @@ checkpoint. A central HUD banner renders the countdown and final time. The asset
 keeps its immediate manual simulation flow so Stage 4 tuning remains available.
 
 This is the rules substrate for the vertical slice, not completion of the Stage 5 gameplay bullet.
-The off-screen camera policy still needs to decide when to call `eliminatePlayer`, additional cars
-need production render/physics slots, and combat damage will later call the same elimination boundary.
+The off-screen camera policy still needs to decide when to call `eliminatePlayer`, and combat damage
+will later call the same elimination boundary.
+
+## Slice 5.2 — production local roster
+
+The prototype-only primary/P2 split is replaced by one canonical local roster:
+
+- stable `vehicle-one` through `vehicle-four` slots own P1–P4 labels and gamepad indices;
+- a pure, tested grid builder places one centered car, two abreast, or up to four cars in a compact
+  heading-aware two-by-two starting grid around the authored track spawn;
+- physics can activate or disable any 1–4 slot roster, publishes transform/telemetry by ID, and
+  accepts every player's fixed-step input through one `stepVehicles` map;
+- P1/P2 keep independent keyboard streams while P3/P4 are explicitly gamepad-only; one-player mode
+  retains the combined WASD/arrow binding;
+- the asset catalog exposes every complete numbered DFF/shared-TXD pair instead of selecting only
+  one preferred vehicle;
+- the renderer can bind a separate intact original DFF/TXD instance to every active physics slot;
+  color-coded proxies remain available when local original assets are not loaded;
+- the browser menu selects 1–4 players and a loaded vehicle/skin for each slot, then feeds all active
+  positions into `RaceSession` and the shared camera.
+
+All four slots currently share the accepted Crusader physics profile. Per-vehicle source-stat
+profiles are a later content/tuning concern; this slice makes visual selection and runtime ownership
+data-driven without pretending that unverified car-specific Rapier tunes are already complete.
 
 ## Planned slices
 
-1. **Local roster:** data-driven four-car selection, spawn grid, four independent input/physics
-   streams, and an original render instance for every active player.
-2. **Multiplayer match:** all player positions connected to `RaceSession`, shared-camera distance
+1. **Multiplayer match:** shared-camera distance
    elimination, restart/rematch flow, and final standings for complete matches.
-3. **Combat:** pickups plus at least three weapons/power-ups, damage, knockback, projectiles, and
+2. **Combat:** pickups plus at least three weapons/power-ups, damage, knockback, projectiles, and
    deterministic destruction/elimination events.
-4. **Presentation:** production HUD, pause, results, engine/impact/weapon/UI audio, and baseline
+3. **Presentation:** production HUD, pause, results, engine/impact/weapon/UI audio, and baseline
    effects usable for a complete battle/race loop.
-5. **M1 hardening:** browser replay matrix, 30-minute soak, four-player 1080p performance scene,
+4. **M1 hardening:** browser replay matrix, 30-minute soak, four-player 1080p performance scene,
    and verification that prepared game data causes no network request after initial loading.
 
 ## Verification
 
-The core suite covers countdown gating, ordered multi-lap finish, independent multiplayer progress,
-elimination ordering, validation errors, and repeated position-tape equality. The web smoke covers
-`menu → race → results`, the Stage 4 asset-free fallback, and console cleanliness. Run the committed
-checks with:
+The suites cover countdown gating, ordered multi-lap finish, independent multiplayer progress,
+elimination ordering, roster/grid validation, four independent physics slots, asset catalog order,
+keyboard/gamepad ownership, and repeated position-tape equality. Browser smoke covers live 1→4→1
+roster changes, four grounded bodies, the legacy two-player collision-lab default, `menu → race →
+results`, hidden-row behavior, prop metrics, and console cleanliness. Run the committed checks with:
 
 ```bash
 pnpm test

@@ -1,8 +1,9 @@
 import { interpolateTransform, type RuntimeEventBus } from "@mashed/core";
-import type {
-  PhysicsDebugLines,
-  PhysicsSceneObject,
-  PhysicsTransformHistory,
+import {
+  PRIMARY_VEHICLE_ID,
+  type PhysicsDebugLines,
+  type PhysicsSceneObject,
+  type PhysicsTransformHistory,
 } from "@mashed/physics";
 import * as THREE from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
@@ -95,6 +96,12 @@ export interface VehicleRenderStats {
   missingTextureNames: readonly string[];
 }
 
+const ADDITIONAL_VEHICLE_PROXY_COLORS: Readonly<Record<string, number>> = Object.freeze({
+  "vehicle-two": 0x3994d8,
+  "vehicle-three": 0x58b86b,
+  "vehicle-four": 0xe0a43b,
+});
+
 export class RuntimeRenderer {
   readonly #renderer: THREE.WebGLRenderer;
   readonly #scene = new THREE.Scene();
@@ -103,7 +110,7 @@ export class RuntimeRenderer {
   readonly #vehicle: THREE.Group;
   readonly #vehicleProxy = new THREE.Group();
   readonly #demoRoot = new THREE.Group();
-  readonly #sceneObjects = new Map<string, THREE.Mesh>();
+  readonly #sceneObjects = new Map<string, THREE.Object3D>();
   readonly #cameraTarget = new THREE.Vector3(-4, 0.8, -5);
   readonly #debugGeometry = new THREE.BufferGeometry();
   readonly #debugMaterial = new THREE.LineBasicMaterial({ vertexColors: true });
@@ -117,8 +124,8 @@ export class RuntimeRenderer {
   #trackTextures: THREE.DataTexture[] = [];
   #trackTextureMap: ReadonlyMap<string, THREE.DataTexture> = new Map();
   #courseRoot: THREE.Group | undefined;
-  #vehicleModelRoot: THREE.Group | undefined;
-  #vehicleTextures: THREE.DataTexture[] = [];
+  readonly #vehicleModelRoots = new Map<string, THREE.Group>();
+  readonly #vehicleTextureSets = new Map<string, THREE.DataTexture[]>();
   #trackRoute: THREE.LineLoop | undefined;
 
   constructor(viewport: HTMLElement, events: RuntimeEventBus) {
@@ -355,16 +362,34 @@ export class RuntimeRenderer {
     model: RenderWareModel,
     dictionary?: RenderWareTrackTextureDictionary,
   ): VehicleRenderStats {
-    this.clearVehicleModel();
+    return this.setVehicleModelFor(PRIMARY_VEHICLE_ID, model, dictionary);
+  }
+
+  setVehicleModelFor(
+    vehicleId: string,
+    model: RenderWareModel,
+    dictionary?: RenderWareTrackTextureDictionary,
+  ): VehicleRenderStats {
+    if (vehicleId.length === 0) {
+      throw new Error("Vehicle render id cannot be empty");
+    }
+    this.clearVehicleModelFor(vehicleId);
     const textureSet = buildRenderWareTextures(dictionary);
     const atomicIndices = selectIntactVehicleAtomicIndices(model);
     const built = buildRenderWareModel(model, textureSet.byName, { atomicIndices });
     const fit = fitVehicleModelRoot(built.root);
-    built.root.name = "loaded-vehicle-model";
-    this.#vehicleModelRoot = built.root;
-    this.#vehicleTextures = textureSet.owned;
-    this.#vehicle.add(built.root);
-    this.#vehicleProxy.visible = false;
+    built.root.name = `loaded-vehicle-model-${vehicleId}`;
+    this.#vehicleModelRoots.set(vehicleId, built.root);
+    this.#vehicleTextureSets.set(vehicleId, textureSet.owned);
+    if (vehicleId === PRIMARY_VEHICLE_ID) {
+      this.#vehicle.add(built.root);
+      this.#vehicleProxy.visible = false;
+    } else {
+      this.#removeSceneObject(vehicleId);
+      built.root.visible = false;
+      this.#sceneObjects.set(vehicleId, built.root);
+      this.#scene.add(built.root);
+    }
     return {
       atomics: built.atomics,
       triangles: built.triangles,
@@ -376,14 +401,29 @@ export class RuntimeRenderer {
   }
 
   clearVehicleModel(): void {
-    if (this.#vehicleModelRoot) {
-      this.#vehicle.remove(this.#vehicleModelRoot);
-      disposeRenderableRoot(this.#vehicleModelRoot);
-      this.#vehicleModelRoot = undefined;
+    this.clearVehicleModelFor(PRIMARY_VEHICLE_ID);
+  }
+
+  clearVehicleModelFor(vehicleId: string): void {
+    const root = this.#vehicleModelRoots.get(vehicleId);
+    if (root) {
+      root.removeFromParent();
+      disposeRenderableRoot(root);
+      this.#vehicleModelRoots.delete(vehicleId);
     }
-    this.#vehicleTextures.forEach((texture) => texture.dispose());
-    this.#vehicleTextures = [];
-    this.#vehicleProxy.visible = true;
+    this.#vehicleTextureSets.get(vehicleId)?.forEach((texture) => texture.dispose());
+    this.#vehicleTextureSets.delete(vehicleId);
+    if (vehicleId === PRIMARY_VEHICLE_ID) {
+      this.#vehicleProxy.visible = true;
+    } else if (this.#sceneObjects.get(vehicleId) === root) {
+      this.#sceneObjects.delete(vehicleId);
+    }
+  }
+
+  clearVehicleModels(): void {
+    for (const vehicleId of [...this.#vehicleModelRoots.keys()]) {
+      this.clearVehicleModelFor(vehicleId);
+    }
   }
 
   setTrackRoute(points: readonly TrackRoutePoint[]): void {
@@ -546,7 +586,7 @@ export class RuntimeRenderer {
     }
   }
 
-  #createSceneObject(object: PhysicsSceneObject): THREE.Mesh {
+  #createSceneObject(object: PhysicsSceneObject): THREE.Object3D {
     const geometry = object.kind === "barrel"
       ? new THREE.CylinderGeometry(0.42, 0.42, 1.1, 18)
       : object.kind === "vehicle"
@@ -557,7 +597,7 @@ export class RuntimeRenderer {
     const color = object.kind === "barrel"
       ? 0xd94b3d
       : object.kind === "vehicle"
-        ? 0x3994d8
+        ? ADDITIONAL_VEHICLE_PROXY_COLORS[object.id] ?? 0x3994d8
         : object.kind === "block" ? 0x718087 : 0xe0a43b;
     const material = new THREE.MeshStandardMaterial({
       color,
@@ -571,11 +611,21 @@ export class RuntimeRenderer {
     return mesh;
   }
 
+  #removeSceneObject(id: string): void {
+    const object = this.#sceneObjects.get(id);
+    if (!object) {
+      return;
+    }
+    object.removeFromParent();
+    disposeRenderableRoot(object);
+    this.#sceneObjects.delete(id);
+  }
+
   dispose(): void {
     this.#unsubscribe();
     this.#controls.dispose();
     this.clearTrackGeometry();
-    this.clearVehicleModel();
+    this.clearVehicleModels();
     if (this.#trackRoute) {
       this.#scene.remove(this.#trackRoute);
       this.#trackRoute.geometry.dispose();
@@ -593,13 +643,8 @@ export class RuntimeRenderer {
         object.material.dispose();
       }
     });
-    for (const mesh of this.#sceneObjects.values()) {
-      mesh.geometry.dispose();
-      if (Array.isArray(mesh.material)) {
-        mesh.material.forEach((material) => material.dispose());
-      } else {
-        mesh.material.dispose();
-      }
+    for (const object of this.#sceneObjects.values()) {
+      disposeRenderableRoot(object);
     }
     this.#sceneObjects.clear();
     this.#debugGeometry.dispose();

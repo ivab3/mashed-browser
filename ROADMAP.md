@@ -266,7 +266,7 @@ ray-cast controller, а также независимый keyboard/gamepad input
 обоих кузовов. Shared multiplayer camera центрирует интерполированные позиции активных машин и
 увеличивает высоту/trailing distance по радиусу группы, сохраняя прежний одиночный framing.
 Расширенная browser replay matrix остаётся неблокирующей hardening-задачей этапа 5. Независимый
-original-vehicle render instance для P2 также относится к multiplayer vertical slice этапа 5.
+original-vehicle render instance для P2 был завершён и обобщён до P1–P4 в срезе 5.2.
 
 ### Этап 5. Вертикальный срез — 4–6 недель
 
@@ -297,9 +297,11 @@ original-vehicle render instance для P2 также относится к mult
 Статус 2026-08-28: **этап 5 начат**. Первый срез добавил чистую fixed-step `RaceSession` для 1–4
 игроков: трёхсекундный countdown, независимые ordered checkpoints/круги, финиш, явное выбывание и
 детерминированную таблицу результатов. Однопользовательский Warzone runtime использует этот цикл и
-показывает countdown/final-time banner. Это фундамент правил, а не закрытие multiplayer-задачи:
-подключение четырёх production vehicle slots, shared-camera elimination, оружие, полный HUD/audio и
-M1 hardening остаются следующими срезами.
+показывает countdown/final-time banner. Второй срез заменил специальную P2-ветку на production roster:
+heading-aware сетка 1–4, четыре независимых input/physics/telemetry-потока, выбор всех загруженных
+DFF/TXD-пар и отдельный original render instance на каждый слот. P3/P4 используют gamepad 3/4;
+все машины пока разделяют принятый Crusader physics profile. Shared-camera elimination, оружие,
+полный HUD/audio и M1 hardening остаются следующими срезами.
 
 Milestone M1: публично показываемый proof of concept.
 

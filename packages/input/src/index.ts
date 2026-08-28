@@ -83,7 +83,17 @@ export const PLAYER_TWO_KEYBOARD_BINDINGS: VehicleKeyboardBindings = Object.free
   recover: ["Backslash"],
 });
 
-const DEFAULT_KEYBOARD_BINDINGS: VehicleKeyboardBindings = Object.freeze({
+export const GAMEPAD_ONLY_KEYBOARD_BINDINGS: VehicleKeyboardBindings = Object.freeze({
+  forward: [],
+  reverse: [],
+  left: [],
+  right: [],
+  brake: [],
+  handbrake: [],
+  recover: [],
+});
+
+export const SINGLE_PLAYER_KEYBOARD_BINDINGS: VehicleKeyboardBindings = Object.freeze({
   forward: [...PLAYER_ONE_KEYBOARD_BINDINGS.forward, ...PLAYER_TWO_KEYBOARD_BINDINGS.forward],
   reverse: [...PLAYER_ONE_KEYBOARD_BINDINGS.reverse, ...PLAYER_TWO_KEYBOARD_BINDINGS.reverse],
   left: [...PLAYER_ONE_KEYBOARD_BINDINGS.left, ...PLAYER_TWO_KEYBOARD_BINDINGS.left],
@@ -108,7 +118,7 @@ export class BrowserVehicleInput {
     this.#target = target;
     this.#gamepadIndex = options.gamepadIndex ?? 0;
     this.#deadzone = options.deadzone ?? 0.12;
-    this.#keyboard = options.keyboard ?? DEFAULT_KEYBOARD_BINDINGS;
+    this.#keyboard = options.keyboard ?? SINGLE_PLAYER_KEYBOARD_BINDINGS;
     this.#onKeyDown = (event) => {
       if (this.#keyboard.recover.includes(event.code) && !event.repeat) {
         this.#recoveryLatched = true;

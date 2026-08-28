@@ -1,5 +1,6 @@
 import {
   cloneTransform,
+  LOCAL_PLAYER_SLOTS,
   type RuntimeEventBus,
   type SimulationTransform,
 } from "@mashed/core";
@@ -91,8 +92,15 @@ export interface VehicleSpawn {
   headingRadians: number;
 }
 
+export interface VehicleRosterEntry {
+  id: string;
+  spawn: VehicleSpawn;
+}
+
 export interface PhysicsRuntimeOptions {
   collisionObjects?: boolean;
+  vehicles?: readonly VehicleRosterEntry[];
+  /** @deprecated Use vehicles or setVehicleRoster for production local-player slots. */
   collisionVehicle?: {
     id: string;
     spawn: VehicleSpawn;
@@ -114,6 +122,7 @@ interface ArenaObject {
   body: RapierRigidBody;
   initialPosition: readonly [number, number, number];
   initialRotation: readonly [number, number, number, number];
+  enabledOnReset: boolean;
   history: PhysicsTransformHistory;
 }
 
@@ -333,6 +342,7 @@ export class PhysicsRuntime {
   readonly #trackBodies: RapierRigidBody[] = [];
   #trackTriangles = 0;
   #activeSpawn: VehicleSpawn;
+  #vehicleRosterIds: readonly string[] = [PRIMARY_VEHICLE_ID];
   #history: PhysicsTransformHistory;
   readonly #control = createVehicleControlState();
 
@@ -363,8 +373,19 @@ export class PhysicsRuntime {
     if (options.collisionObjects !== false) {
       this.#createCollisionObjects();
     }
-    if (options.collisionVehicle) {
+    if (options.vehicles && options.collisionVehicle) {
+      throw new Error("PhysicsRuntimeOptions cannot combine vehicles and collisionVehicle");
+    }
+    if (options.vehicles) {
+      for (const entry of options.vehicles) {
+        if (entry.id !== PRIMARY_VEHICLE_ID) {
+          this.#createCollisionVehicle(entry.id, entry.spawn);
+        }
+      }
+      this.setVehicleRoster(options.vehicles);
+    } else if (options.collisionVehicle) {
       this.#createCollisionVehicle(options.collisionVehicle.id, options.collisionVehicle.spawn);
+      this.#vehicleRosterIds = [PRIMARY_VEHICLE_ID, options.collisionVehicle.id];
     }
     const initial = transformOf(this.#body);
     this.#history = { previous: cloneTransform(initial), current: initial };
@@ -457,7 +478,29 @@ export class PhysicsRuntime {
       return this.telemetry;
     }
     const vehicle = this.#collisionVehicles.find((candidate) => candidate.id === id);
-    return vehicle ? { ...vehicle.control.telemetry } : undefined;
+    return vehicle?.object.enabledOnReset ? { ...vehicle.control.telemetry } : undefined;
+  }
+
+  get vehicleIds(): readonly string[] {
+    return [...this.#vehicleRosterIds];
+  }
+
+  getVehicleTransformHistory(id: string): PhysicsTransformHistory | undefined {
+    if (id === PRIMARY_VEHICLE_ID) {
+      return {
+        previous: cloneTransform(this.#history.previous),
+        current: cloneTransform(this.#history.current),
+      };
+    }
+    const vehicle = this.#collisionVehicles.find((candidate) => (
+      candidate.id === id && candidate.object.enabledOnReset
+    ));
+    return vehicle
+      ? {
+          previous: cloneTransform(vehicle.object.history.previous),
+          current: cloneTransform(vehicle.object.history.current),
+        }
+      : undefined;
   }
 
   get sceneObjects(): readonly PhysicsSceneObject[] {
@@ -478,8 +521,8 @@ export class PhysicsRuntime {
       bodies: this.#world.bodies.len(),
       colliders: this.#world.colliders.len(),
       contacts: this.#contacts.size,
-      activeObjects: this.#arenaObjects.filter((object) => object.active).length,
-      destroyedObjects: this.#arenaObjects.filter((object) => !object.active).length,
+      activeObjects: this.#arenaObjects.filter((object) => object.kind !== "vehicle" && object.active).length,
+      destroyedObjects: this.#arenaObjects.filter((object) => object.kind !== "vehicle" && !object.active).length,
       trackTriangles: this.#trackTriangles,
     };
   }
@@ -564,16 +607,58 @@ export class PhysicsRuntime {
   }
 
   setRaceSpawn(spawn: VehicleSpawn): void {
-    if (
-      spawn.position.some((component) => !Number.isFinite(component))
-      || !Number.isFinite(spawn.headingRadians)
-    ) {
-      throw new Error("Vehicle spawn must contain finite coordinates and heading");
-    }
+    this.#validateVehicleSpawn(spawn);
     this.#activeSpawn = {
       position: [...spawn.position],
       headingRadians: spawn.headingRadians,
     };
+    this.resetDemo();
+  }
+
+  setVehicleRoster(entries: readonly VehicleRosterEntry[]): void {
+    if (entries.length < 1 || entries.length > LOCAL_PLAYER_SLOTS.length) {
+      throw new Error(`Vehicle roster must contain between 1 and ${LOCAL_PLAYER_SLOTS.length} entries`);
+    }
+    const ids = new Set<string>();
+    for (const entry of entries) {
+      if (entry.id.length === 0 || ids.has(entry.id)) {
+        throw new Error(`Vehicle roster id ${JSON.stringify(entry.id)} is empty or duplicated`);
+      }
+      this.#validateVehicleSpawn(entry.spawn);
+      ids.add(entry.id);
+    }
+    const primary = entries.find((entry) => entry.id === PRIMARY_VEHICLE_ID);
+    if (!primary) {
+      throw new Error(`Vehicle roster must include ${PRIMARY_VEHICLE_ID}`);
+    }
+
+    for (const entry of entries) {
+      if (
+        entry.id !== PRIMARY_VEHICLE_ID
+        && !this.#collisionVehicles.some((vehicle) => vehicle.id === entry.id)
+      ) {
+        this.#createCollisionVehicle(entry.id, entry.spawn);
+      }
+    }
+    this.#activeSpawn = {
+      position: [...primary.spawn.position],
+      headingRadians: primary.spawn.headingRadians,
+    };
+    for (const vehicle of this.#collisionVehicles) {
+      const entry = entries.find((candidate) => candidate.id === vehicle.id);
+      vehicle.object.enabledOnReset = entry !== undefined;
+      if (!entry) {
+        continue;
+      }
+      vehicle.spawn = {
+        position: [...entry.spawn.position],
+        headingRadians: entry.spawn.headingRadians,
+      };
+      vehicle.object.initialPosition = [...entry.spawn.position];
+      const rotation = yawRotation(entry.spawn.headingRadians);
+      vehicle.object.initialRotation = [rotation.x, rotation.y, rotation.z, rotation.w];
+    }
+    this.#vehicleRosterIds = entries.map((entry) => entry.id);
     this.resetDemo();
   }
 
@@ -593,6 +678,9 @@ export class PhysicsRuntime {
     }
     const collisionInputs = new Map<CollisionVehicleRuntime, VehicleInputFrame>();
     for (const collisionVehicle of this.#collisionVehicles) {
+      if (!collisionVehicle.object.enabledOnReset) {
+        continue;
+      }
       const vehicleInput = sanitizeVehicleInput(
         rawVehicleInputs[collisionVehicle.id] ?? NEUTRAL_VEHICLE_INPUT,
       );
@@ -623,6 +711,9 @@ export class PhysicsRuntime {
     ));
     this.#applyStability();
     for (const collisionVehicle of this.#collisionVehicles) {
+      if (!collisionVehicle.object.enabledOnReset) {
+        continue;
+      }
       collisionVehicle.body.resetForces(true);
       collisionVehicle.body.resetTorques(true);
       this.#applyVehicleControls(
@@ -660,6 +751,9 @@ export class PhysicsRuntime {
       () => this.recover(),
     );
     for (const collisionVehicle of this.#collisionVehicles) {
+      if (!collisionVehicle.object.enabledOnReset) {
+        continue;
+      }
       this.#updateTelemetry(
         collisionVehicle.body,
         collisionVehicle.controller,
@@ -668,6 +762,14 @@ export class PhysicsRuntime {
         () => this.#recoverCollisionVehicle(collisionVehicle),
       );
     }
+  }
+
+  stepVehicles(stepSeconds: number, rawVehicleInputs: VehicleInputById = {}): void {
+    this.step(
+      stepSeconds,
+      rawVehicleInputs[PRIMARY_VEHICLE_ID] ?? NEUTRAL_VEHICLE_INPUT,
+      rawVehicleInputs,
+    );
   }
 
   resetDemo(): void {
@@ -780,6 +882,7 @@ export class PhysicsRuntime {
         body,
         initialPosition: spec.position,
         initialRotation: [0, 0, 0, 1],
+        enabledOnReset: true,
         history: { previous: cloneTransform(initial), current: initial },
       };
       this.#arenaObjects.push(object);
@@ -788,7 +891,12 @@ export class PhysicsRuntime {
   }
 
   #createCollisionVehicle(id: string, spawn: VehicleSpawn): void {
-    if (id === PRIMARY_VEHICLE_ID || this.#collisionVehicles.some((vehicle) => vehicle.id === id)) {
+    this.#validateVehicleSpawn(spawn);
+    if (
+      id.length === 0
+      || id === PRIMARY_VEHICLE_ID
+      || this.#collisionVehicles.some((vehicle) => vehicle.id === id)
+    ) {
       throw new Error(`Vehicle id must be unique: ${id}`);
     }
     const created = this.#createChassisBody(spawn);
@@ -804,6 +912,7 @@ export class PhysicsRuntime {
       body: created.body,
       initialPosition: spawn.position,
       initialRotation: [initial.rotation[0], initial.rotation[1], initial.rotation[2], initial.rotation[3]],
+      enabledOnReset: true,
       history: { previous: cloneTransform(initial), current: initial },
     };
     this.#arenaObjects.push(object);
@@ -819,7 +928,7 @@ export class PhysicsRuntime {
 
   #resetCollisionObjects(): void {
     for (const object of this.#arenaObjects) {
-      object.body.setEnabled(true);
+      object.body.setEnabled(object.enabledOnReset);
       object.body.setTranslation({
         x: object.initialPosition[0],
         y: object.initialPosition[1],
@@ -833,7 +942,7 @@ export class PhysicsRuntime {
       }, true);
       object.body.setLinvel({ x: 0, y: 0, z: 0 }, true);
       object.body.setAngvel({ x: 0, y: 0, z: 0 }, true);
-      object.active = true;
+      object.active = object.enabledOnReset;
       const initial = transformOf(object.body);
       object.history = { previous: cloneTransform(initial), current: initial };
     }
@@ -1161,6 +1270,15 @@ export class PhysicsRuntime {
     const recoveryWasPressed = control.recoveryWasPressed;
     this.#resetControlState(control);
     control.recoveryWasPressed = recoveryWasPressed;
+  }
+
+  #validateVehicleSpawn(spawn: VehicleSpawn): void {
+    if (
+      spawn.position.some((component) => !Number.isFinite(component))
+      || !Number.isFinite(spawn.headingRadians)
+    ) {
+      throw new Error("Vehicle spawn must contain finite coordinates and heading");
+    }
   }
 
   #resetControlState(control: VehicleControlState): void {

@@ -1,6 +1,7 @@
 export * from "./events.js";
 export * from "./fixed-step.js";
 export * from "./lap-session.js";
+export * from "./local-roster.js";
 export * from "./random.js";
 export * from "./race-session.js";
 export * from "./state-machine.js";
