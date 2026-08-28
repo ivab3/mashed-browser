@@ -1,7 +1,7 @@
 # Milestone M1 hardening evidence
 
-Status: in progress. The combined match replay matrix is complete; the 30-minute soak and target
-browser performance/offline checks are the remaining M1 gates.
+Status: in progress. The combined match replay matrix and automated 30-minute soak are complete;
+target-browser performance and offline checks are the remaining M1 gate.
 
 ## M1.1 — combined match replay matrix
 
@@ -32,10 +32,36 @@ winner. It exits non-zero on any divergence. The browser fixed-step callback als
 sessions immediately after a terminal event; this matters when one 30 Hz presentation frame contains
 two 60 Hz simulation callbacks.
 
+## M1.2 — automated 30-minute soak
+
+Run the accepted soak with:
+
+```bash
+pnpm m1:soak
+```
+
+The accelerated harness ran 1,029 complete matches across alternating 30/60/120 Hz presentation
+rates for 1,800.75 simulated seconds (108,045 fixed steps). Every rematch reconstructed the complete
+rules stack and matched the baseline snapshot/event log exactly. Fifty-two matches also exercised
+the legal `race → paused → race` path; all 2,164 runtime state transitions passed through the
+production `RuntimeStateMachine`.
+
+Accepted bounds on 2026-08-28:
+
+| Invariant | Observed peak/result | Accepted budget |
+| --- | ---: | ---: |
+| Live projectiles | 9 | ≤ 12 |
+| Combat runtime objects | 15 | ≤ 18 |
+| Concurrent renderer bursts | 8 | ≤ 8 |
+| Concurrent particles | 125 | ≤ 128 |
+| Retained heap after explicit GC | +425,472 bytes | < 16 MiB |
+| Non-finite snapshot values | 0 | 0 |
+| Reset divergences | 0 / 1,029 | 0 |
+
+The renderer budgets are derived from the production combat-event mapping and advanced on the same
+fixed-step event timeline. Browser/WebGL resource counts and frame-time evidence remain part of M1.3.
+
 ## Remaining evidence
 
-1. **M1.2 soak:** run 30 simulated minutes through the complete match stack, assert finite values,
-   bounded projectile/particle/object counts, legal state transitions, and repeatable match resets.
-2. **M1.3 browser acceptance:** capture four-player 1080p frame/physics metrics and prove that a
-   prepared local asset session performs no game-data network requests after initial loading.
-
+**M1.3 browser acceptance:** capture four-player 1080p frame/physics metrics and prove that a prepared
+local asset session performs no game-data network requests after initial loading.

@@ -33,6 +33,7 @@ describe("combined Stage 5 match replay", () => {
     expect(hasEvent(runs[0]!.outcome.events, "pickup-collected")).toBe(true);
     expect(hasEvent(runs[0]!.outcome.events, "weapon-fired")).toBe(true);
     expect(hasEvent(runs[0]!.outcome.events, "projectile-world-impact")).toBe(true);
+    expect(hasEvent(runs[0]!.outcome.events, "projectile-expired")).toBe(true);
     expect(hasEvent(runs[0]!.outcome.events, "player-destroyed")).toBe(true);
     expect(hasEvent(runs[0]!.outcome.events, "race-finished")).toBe(true);
   });

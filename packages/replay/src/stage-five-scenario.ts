@@ -23,8 +23,18 @@ export function createStageFiveReplayScenario(): StageFiveReplayScenario {
     };
     recorder.record({
       positions,
-      headingsRadians: Object.fromEntries(PLAYER_IDS.map((id) => [id, 0])),
-      useRequests: step === 1 ? { "vehicle-one": true } : {},
+      headingsRadians: {
+        "vehicle-one": 0,
+        "vehicle-two": Math.PI,
+        "vehicle-three": 0,
+        "vehicle-four": 0,
+      },
+      useRequests: {
+        ...(step === 1 ? { "vehicle-one": true } : {}),
+        ...(step >= 2 && step <= 82 && (step - 2) % 8 === 0
+          ? { "vehicle-two": true }
+          : {}),
+      },
       distanceToNextCheckpointMeters: Object.fromEntries(PLAYER_IDS.map((id) => [id, 10])),
       worldHits: step === 1
         ? { 1: { fraction: 0.5, normal: [0, 0, -1], objectId: "arena-wall" } }
@@ -56,7 +66,10 @@ export function createStageFiveReplayScenario(): StageFiveReplayScenario {
       },
       combat: {
         players: PLAYER_IDS.map((id, index) => ({ id, displayName: `P${index + 1}` })),
-        pickups: [{ id: "rocket-pickup", weapon: "rocket", position: [0, 0, 0] }],
+        pickups: [
+          { id: "rocket-pickup", weapon: "rocket", position: [0, 0, 0] },
+          { id: "machine-gun-pickup", weapon: "machine-gun", position: [6, 0, 0] },
+        ],
         maximumHealth: 30,
       },
       camera: {
@@ -68,4 +81,3 @@ export function createStageFiveReplayScenario(): StageFiveReplayScenario {
     tape: recorder.finish(),
   };
 }
-

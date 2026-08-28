@@ -23,7 +23,7 @@ per-player engine voices, pause/resume cues, and baseline pickup/weapon/damage/d
 The sixth slice parses original PC RWS dictionaries in the loading Worker, binds named engine/combat/UI
 samples with synthesized fallback, and resolves projectile impacts against track/scenery and props.
 M1 hardening now includes a combined race/combat/camera replay whose complete outcome is identical at
-30, 60, and 120 Hz presentation rates.
+30, 60, and 120 Hz presentation rates, plus a bounded 30-minute automated rematch soak.
 [ADR-0001](./reference/ADR-0001-runtime-asset-loading.md) selects direct runtime
 parsing in a loading Worker instead of mandatory pre-conversion.
 
@@ -53,6 +53,7 @@ pnpm test
 pnpm build
 pnpm vehicle:tune
 pnpm match:replay
+pnpm m1:soak
 ```
 
 Project direction, gates, and scope live in [`ROADMAP.md`](./ROADMAP.md). Reference-build
