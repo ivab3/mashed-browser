@@ -86,6 +86,37 @@ h1 { margin: 3px 0 0; color: #fff8e9; font-size: 26px; letter-spacing: -0.04em; 
 .telemetry strong { display: block; margin-top: 3px; color: #dce7e6; font: 600 12px/1.2 ui-monospace, SFMono-Regular, Menlo, monospace; }
 .telemetry .wide { grid-column: 1 / -1; border-right: 0; }
 
+.combat-hud {
+  position: absolute;
+  z-index: 3;
+  top: 104px;
+  right: 30px;
+  display: grid;
+  min-width: 220px;
+  overflow: hidden;
+  border: 1px solid rgb(255 138 76 / 30%);
+  border-radius: 11px;
+  background: rgb(8 16 23 / 82%);
+  backdrop-filter: blur(14px);
+}
+
+.combat-hud div {
+  display: grid;
+  grid-template-columns: 28px 1fr auto;
+  gap: 9px;
+  padding: 9px 11px;
+  border-bottom: 1px solid rgb(255 255 255 / 7%);
+  align-items: center;
+  font: 700 10px/1 ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+.combat-hud div:last-child { border-bottom: 0; }
+.combat-hud b { color: #fff8e9; }
+.combat-hud span { color: #ff8a4c; }
+.combat-hud em { color: #93a6ab; font-style: normal; text-transform: uppercase; }
+.combat-hud div[data-destroyed="true"] { opacity: 0.45; }
+.combat-hud div[data-destroyed="true"] span { color: #ff5948; }
+
 .race-banner {
   position: absolute;
   z-index: 4;

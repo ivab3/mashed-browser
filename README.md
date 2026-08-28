@@ -16,7 +16,9 @@ one-to-four-player race session, countdown, independent lap progress, finish/eli
 a production 1–4 local roster, heading-aware start grid, independent input/physics streams, and an
 original vehicle render instance for every active slot. The third slice adds a route-aware
 shared-camera knockout rule, last-car-standing winner, complete standings, and rematch reset without
-a page reload.
+a page reload. The fourth slice adds deterministic pickups and respawns, machine-gun/rocket/mine
+projectiles, damage, Rapier knockback, destruction, synthesized combat cues, and a four-player
+health/ammo HUD.
 [ADR-0001](./reference/ADR-0001-runtime-asset-loading.md) selects direct runtime
 parsing in a loading Worker instead of mandatory pre-conversion.
 
@@ -103,6 +105,9 @@ centers the active group and pulls back as the cars separate; on a loaded route,
 outside the accepted pack receives a fixed-step warning and is then eliminated. Results list the
 complete final order, and `Race again` resets the same match runtime. `/buildings?collisionLab=vehicle-pair`
 remains as a compatibility shortcut that defaults to two players and removes the prop line.
+Three color-coded combat pickups are placed along the route (or the handling-lab center lane): yellow
+machine gun, red rocket, and purple mine. Use an item with `E` for P1, `/` for P2, or gamepad X;
+damage destruction feeds the same elimination and results flow as camera distance.
 
 With extracted Warzone assets in the standard ignored `game-data/` location, `pnpm lap:validate`
 runs the deterministic 136-checkpoint full-lap acceptance scenario. An alternative track directory

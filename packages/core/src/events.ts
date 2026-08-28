@@ -1,6 +1,14 @@
 export type RuntimeState = "boot" | "loading" | "menu" | "race" | "results";
 
-export type AudioCue = "menu" | "race-start" | "race-finish" | "impact" | "break";
+export type AudioCue =
+  | "menu"
+  | "race-start"
+  | "race-finish"
+  | "impact"
+  | "break"
+  | "pickup"
+  | "weapon-fire"
+  | "vehicle-destroyed";
 
 export type RuntimeEvent =
   | {

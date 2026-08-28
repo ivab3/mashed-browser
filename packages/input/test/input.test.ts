@@ -32,7 +32,8 @@ describe("vehicle input normalization", () => {
       brake: -2,
       handbrake: 3,
       recover: true,
-    })).toEqual({ drive: 1, steer: 0, brake: 0, handbrake: 1, recover: true });
+      useItem: true,
+    })).toEqual({ drive: 1, steer: 0, brake: 0, handbrake: 1, recover: true, useItem: true });
   });
 
   it("maps A/left to negative steering and D/right to positive steering", () => {
@@ -68,6 +69,10 @@ describe("vehicle input normalization", () => {
       expect(playerOne.sample([]).recover).toBe(false);
       expect(playerTwo.sample([]).recover).toBe(true);
       expect(playerTwo.sample([]).recover).toBe(false);
+      target.dispatchEvent(keyboardEvent("keydown", "KeyE"));
+      expect(playerOne.sample([]).useItem).toBe(true);
+      expect(playerOne.sample([]).useItem).toBe(false);
+      expect(playerTwo.sample([]).useItem).toBe(false);
     } finally {
       playerOne.dispose();
       playerTwo.dispose();
@@ -89,7 +94,29 @@ describe("vehicle input normalization", () => {
         brake: 0,
         handbrake: 0,
         recover: false,
+        useItem: false,
       });
+    } finally {
+      input.dispose();
+    }
+  });
+
+  it("emits gamepad X as a one-shot item request", () => {
+    const target = new EventTarget();
+    const input = new BrowserVehicleInput(target as Window);
+    const gamepad = (pressed: boolean): Gamepad => ({
+      axes: [0],
+      buttons: Array.from({ length: 8 }, (_, index) => ({
+        pressed: index === 2 && pressed,
+        touched: index === 2 && pressed,
+        value: index === 2 && pressed ? 1 : 0,
+      })),
+    }) as unknown as Gamepad;
+    try {
+      expect(input.sample([gamepad(true)]).useItem).toBe(true);
+      expect(input.sample([gamepad(true)]).useItem).toBe(false);
+      expect(input.sample([gamepad(false)]).useItem).toBe(false);
+      expect(input.sample([gamepad(true)]).useItem).toBe(true);
     } finally {
       input.dispose();
     }

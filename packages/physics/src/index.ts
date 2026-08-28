@@ -696,6 +696,25 @@ export class PhysicsRuntime {
     this.#eventQueue.clear();
   }
 
+  applyVehicleImpulse(id: string, impulse: readonly [number, number, number]): void {
+    if (impulse.some((component) => !Number.isFinite(component))) {
+      throw new Error("Vehicle impulse must contain finite components");
+    }
+    if (!this.#vehicleRosterIds.includes(id)) {
+      throw new Error(`Unknown active-roster vehicle ${id}`);
+    }
+    if (id === PRIMARY_VEHICLE_ID) {
+      if (this.#primaryActive) {
+        this.#body.applyImpulse({ x: impulse[0], y: impulse[1], z: impulse[2] }, true);
+      }
+      return;
+    }
+    const vehicle = this.#collisionVehicles.find((candidate) => candidate.id === id);
+    if (vehicle?.object.active) {
+      vehicle.body.applyImpulse({ x: impulse[0], y: impulse[1], z: impulse[2] }, true);
+    }
+  }
+
   step(
     stepSeconds: number,
     rawInput: VehicleInputFrame = NEUTRAL_VEHICLE_INPUT,

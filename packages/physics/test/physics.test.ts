@@ -340,6 +340,32 @@ describe("PhysicsRuntime", () => {
     }
   });
 
+  it("applies deterministic combat knockback impulses to active roster vehicles", async () => {
+    const physics = await createPhysicsRuntime(
+      new RuntimeEventBus(),
+      1 / 60,
+      DEFAULT_VEHICLE_CONFIG,
+      { collisionObjects: false },
+    );
+    try {
+      for (let step = 0; step < 60; step += 1) {
+        physics.stepVehicles(1 / 60);
+      }
+      const start = physics.transformHistory.current.position;
+      physics.applyVehicleImpulse(PRIMARY_VEHICLE_ID, [6_000, 1_000, 0]);
+      for (let step = 0; step < 30; step += 1) {
+        physics.stepVehicles(1 / 60);
+      }
+      expect(physics.transformHistory.current.position[0] - start[0]).toBeGreaterThan(0.4);
+      expect(() => physics.applyVehicleImpulse(PRIMARY_VEHICLE_ID, [NaN, 0, 0])).toThrow(/finite/);
+      expect(() => physics.applyVehicleImpulse("missing", [1, 0, 0])).toThrow(/Unknown active-roster/);
+      physics.deactivateVehicle(PRIMARY_VEHICLE_ID);
+      expect(() => physics.applyVehicleImpulse(PRIMARY_VEHICLE_ID, [1, 0, 0])).not.toThrow();
+    } finally {
+      physics.dispose();
+    }
+  });
+
   it("maps positive player steering to Rapier's mirrored wheel-steering direction", async () => {
     const physics = await createPhysicsRuntime(
       new RuntimeEventBus(),

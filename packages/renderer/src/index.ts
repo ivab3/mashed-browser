@@ -1,4 +1,9 @@
-import { interpolateTransform, type RuntimeEventBus } from "@mashed/core";
+import {
+  interpolateTransform,
+  type CombatSnapshot,
+  type CombatWeaponType,
+  type RuntimeEventBus,
+} from "@mashed/core";
 import {
   PRIMARY_VEHICLE_ID,
   type PhysicsDebugLines,
@@ -48,6 +53,7 @@ export interface RenderFrame {
   interpolationAlpha: number;
   frameDeltaSeconds: number;
   primaryVehicleActive?: boolean;
+  combat?: CombatSnapshot;
   objects?: readonly PhysicsSceneObject[];
   debugLines?: PhysicsDebugLines;
 }
@@ -103,6 +109,12 @@ const ADDITIONAL_VEHICLE_PROXY_COLORS: Readonly<Record<string, number>> = Object
   "vehicle-four": 0xe0a43b,
 });
 
+const COMBAT_COLORS: Readonly<Record<CombatWeaponType, number>> = Object.freeze({
+  "machine-gun": 0xffcf4a,
+  rocket: 0xff654f,
+  mine: 0x8d6be8,
+});
+
 export class RuntimeRenderer {
   readonly #renderer: THREE.WebGLRenderer;
   readonly #scene = new THREE.Scene();
@@ -112,6 +124,8 @@ export class RuntimeRenderer {
   readonly #vehicleProxy = new THREE.Group();
   readonly #demoRoot = new THREE.Group();
   readonly #sceneObjects = new Map<string, THREE.Object3D>();
+  readonly #combatPickups = new Map<string, THREE.Object3D>();
+  readonly #combatProjectiles = new Map<number, THREE.Object3D>();
   readonly #cameraTarget = new THREE.Vector3(-4, 0.8, -5);
   readonly #debugGeometry = new THREE.BufferGeometry();
   readonly #debugMaterial = new THREE.LineBasicMaterial({ vertexColors: true });
@@ -497,6 +511,7 @@ export class RuntimeRenderer {
     const primaryVehicleActive = frame.primaryVehicleActive ?? true;
     this.#vehicle.visible = primaryVehicleActive;
     this.#syncSceneObjects(frame.objects ?? [], frame.interpolationAlpha);
+    this.#syncCombat(frame.combat, frame.interpolationAlpha);
 
     if (this.#debugCameraEnabled) {
       this.#controls.update();
@@ -618,6 +633,80 @@ export class RuntimeRenderer {
     return mesh;
   }
 
+  #syncCombat(combat: CombatSnapshot | undefined, interpolationAlpha: number): void {
+    const pickupIds = new Set<string>();
+    for (const pickup of combat?.pickups ?? []) {
+      pickupIds.add(pickup.id);
+      let mesh = this.#combatPickups.get(pickup.id);
+      if (!mesh) {
+        mesh = new THREE.Mesh(
+          new THREE.OctahedronGeometry(0.62, 0),
+          new THREE.MeshStandardMaterial({
+            color: COMBAT_COLORS[pickup.weapon],
+            emissive: COMBAT_COLORS[pickup.weapon],
+            emissiveIntensity: 0.34,
+            roughness: 0.28,
+            metalness: 0.35,
+          }),
+        );
+        mesh.name = pickup.id;
+        mesh.castShadow = true;
+        this.#combatPickups.set(pickup.id, mesh);
+        this.#scene.add(mesh);
+      }
+      mesh.visible = pickup.active;
+      mesh.position.fromArray(pickup.position);
+      mesh.rotation.y += 0.018;
+    }
+    for (const [id, mesh] of this.#combatPickups) {
+      if (!pickupIds.has(id)) {
+        mesh.visible = false;
+      }
+    }
+
+    const projectileIds = new Set<number>();
+    for (const projectile of combat?.projectiles ?? []) {
+      projectileIds.add(projectile.id);
+      let mesh = this.#combatProjectiles.get(projectile.id);
+      if (!mesh) {
+        const geometry = projectile.weapon === "mine"
+          ? new THREE.CylinderGeometry(0.48, 0.58, 0.22, 12)
+          : projectile.weapon === "rocket"
+            ? new THREE.CapsuleGeometry(0.18, 0.65, 4, 8)
+            : new THREE.SphereGeometry(0.13, 8, 6);
+        mesh = new THREE.Mesh(
+          geometry,
+          new THREE.MeshStandardMaterial({
+            color: COMBAT_COLORS[projectile.weapon],
+            emissive: COMBAT_COLORS[projectile.weapon],
+            emissiveIntensity: 0.58,
+            roughness: 0.3,
+          }),
+        );
+        mesh.name = `projectile-${projectile.id}`;
+        mesh.castShadow = true;
+        this.#combatProjectiles.set(projectile.id, mesh);
+        this.#scene.add(mesh);
+      }
+      mesh.position.set(
+        projectile.previousPosition[0]
+          + (projectile.position[0] - projectile.previousPosition[0]) * interpolationAlpha,
+        projectile.previousPosition[1]
+          + (projectile.position[1] - projectile.previousPosition[1]) * interpolationAlpha,
+        projectile.previousPosition[2]
+          + (projectile.position[2] - projectile.previousPosition[2]) * interpolationAlpha,
+      );
+    }
+    for (const [id, mesh] of this.#combatProjectiles) {
+      if (projectileIds.has(id)) {
+        continue;
+      }
+      mesh.removeFromParent();
+      disposeRenderableRoot(mesh);
+      this.#combatProjectiles.delete(id);
+    }
+  }
+
   #removeSceneObject(id: string): void {
     const object = this.#sceneObjects.get(id);
     if (!object) {
@@ -654,6 +743,11 @@ export class RuntimeRenderer {
       disposeRenderableRoot(object);
     }
     this.#sceneObjects.clear();
+    for (const object of [...this.#combatPickups.values(), ...this.#combatProjectiles.values()]) {
+      disposeRenderableRoot(object);
+    }
+    this.#combatPickups.clear();
+    this.#combatProjectiles.clear();
     this.#debugGeometry.dispose();
     this.#debugMaterial.dispose();
     this.#renderer.dispose();

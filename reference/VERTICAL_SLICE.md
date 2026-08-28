@@ -1,7 +1,8 @@
 # Stage 5 vertical slice
 
-Status: Stage 5 started on 2026-08-28. Deterministic race rules, the production local roster, and
-shared-camera match elimination are implemented; combat, presentation, audio, and hardening remain open.
+Status: Stage 5 started on 2026-08-28. Deterministic race rules, the production local roster,
+shared-camera elimination, and the first playable combat loop are implemented; production
+presentation/audio and hardening remain open.
 
 ## Slice 5.1 — race rules foundation
 
@@ -69,13 +70,36 @@ The elimination policy consumes track progress and positions as plain data. It d
 Three.js screen coordinates, DOM timing, or render FPS, so later combat destruction can use the same
 `RaceSession.eliminatePlayer` boundary.
 
+## Slice 5.4 — pickups, projectiles, damage, and destruction
+
+`@mashed/core` now owns a pure fixed-step `CombatSession` for the local roster:
+
+- three data-driven weapon types are playable: a 12-round rapid machine gun, three splash-damage
+  rockets, and two delayed-arming proximity mines;
+- stable pickup ownership, finite ammo, per-weapon cooldowns, eight-second pickup respawn, projectile
+  lifetime, swept hit detection, splash targets, owner immunity, damage, and destruction all use
+  simulation time rather than render time;
+- plain events report collection, respawn, firing, damage with a world-space knockback impulse,
+  destruction, and projectile expiry; replaying the same position/use tape produces the same snapshot;
+- keyboard item activation is one-shot on `E` for P1 and `/` for P2; gamepad X is edge-triggered for
+  every slot while remaining backward-compatible with older recorded vehicle frames;
+- Rapier accepts deterministic per-vehicle combat impulses, and destroyed players flow through the
+  existing `RaceSession` `destroyed` elimination reason, last-car-standing result, physics disable,
+  shared-camera removal, standings, and rematch reset;
+- Three.js renders color-coded pickup and projectile meshes with interpolated projectile positions;
+  the live combat HUD exposes health and held weapon/ammo for all active slots;
+- temporary synthesized pickup/fire/destroy cues and impact flashes make the loop readable before
+  original-audio binding and the production effects pass.
+
+The current projectile contract resolves player hits and lifetime expiry but does not yet collide
+projectiles with track/scenery geometry. World impacts, explosion particles, fire trails, damage
+decals, and source-authored pickup placement belong to the presentation/content follow-up.
+
 ## Planned slices
 
-1. **Combat:** pickups plus at least three weapons/power-ups, damage, knockback, projectiles, and
-   deterministic destruction/elimination events.
-2. **Presentation:** production HUD, pause, results, engine/impact/weapon/UI audio, and baseline
+1. **Presentation:** production HUD, pause, results, original engine/impact/weapon/UI audio, and baseline
    effects usable for a complete battle/race loop.
-3. **M1 hardening:** browser replay matrix, 30-minute soak, four-player 1080p performance scene,
+2. **M1 hardening:** browser replay matrix, 30-minute soak, four-player 1080p performance scene,
    and verification that prepared game data causes no network request after initial loading.
 
 ## Verification
@@ -83,9 +107,10 @@ Three.js screen coordinates, DOM timing, or render FPS, so later combat destruct
 The suites cover countdown gating, ordered multi-lap finish, last-player-standing results, fixed-step
 camera warnings/elimination/re-entry, independent multiplayer progress, roster/grid validation,
 vehicle deactivation/rematch reset, four independent physics slots, asset catalog order,
-keyboard/gamepad ownership, and repeated position-tape equality. Browser smoke covers live 1→4→1
+keyboard/gamepad ownership and item-edge input, three weapon/projectile profiles, swept damage,
+knockback/destruction, pickup respawn, and repeated combat-tape equality. Browser smoke covers live 1→4→1
 roster changes, four grounded bodies, repeated `menu → race → results → race`, hidden-row behavior,
-prop metrics, and console cleanliness. Run the committed checks with:
+combat HUD/pickup draw calls, prop metrics, and console cleanliness. Run the committed checks with:
 
 ```bash
 pnpm test

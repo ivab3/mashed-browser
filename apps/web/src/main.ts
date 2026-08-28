@@ -15,6 +15,7 @@ import {
 } from "@mashed/assets";
 import {
   CameraEliminationTracker,
+  CombatSession,
   createLocalPlayerGrid,
   FixedStepClock,
   LOCAL_PLAYER_SLOTS,
@@ -23,6 +24,9 @@ import {
   RuntimeStateMachine,
   type FixedStepFrame,
   type CameraEliminationWarning,
+  type CombatEvent,
+  type CombatPickupDefinition,
+  type CombatPlayerFrames,
   type LocalPlayerGridSlot,
   type RaceEvent,
   type RuntimeState,
@@ -118,6 +122,13 @@ const raceBannerLabel = element<HTMLElement>("race-banner-label");
 const raceBannerValue = element<HTMLElement>("race-banner-value");
 const raceResults = element<HTMLOListElement>("race-results");
 const eliminationWarning = element<HTMLElement>("elimination-warning");
+const combatHud = element<HTMLElement>("combat-hud");
+const combatPlayerRows = [
+  element<HTMLElement>("combat-player-one"),
+  element<HTMLElement>("combat-player-two"),
+  element<HTMLElement>("combat-player-three"),
+  element<HTMLElement>("combat-player-four"),
+];
 const primaryDriveGuide = element<HTMLElement>("primary-drive-guide");
 const primaryActionGuide = element<HTMLElement>("primary-action-guide");
 const secondaryDriveGuide = element<HTMLElement>("secondary-drive-guide");
@@ -171,6 +182,7 @@ const loadedTextureDictionaries = new Map<string, PiTextureDictionary>();
 let physics: PhysicsRuntime | undefined;
 let trackDefinition: DerivedTrackDefinition | undefined;
 let raceSession: RaceSession | undefined;
+let combatSession: CombatSession | undefined;
 const cameraElimination = new CameraEliminationTracker();
 let eliminationWarnings: readonly CameraEliminationWarning[] = [];
 let vehicleInputs: BrowserVehicleInput[] = [];
@@ -229,20 +241,20 @@ function applyRosterPresentation(): void {
   });
   if (multiplayer) {
     primaryDriveGuide.innerHTML = "<b>P1 · WASD</b> accelerate, reverse and steer";
-    primaryActionGuide.innerHTML = "<b>Space</b> handbrake · <b>Left Shift</b> brake · <b>R</b> recover";
+    primaryActionGuide.innerHTML = "<b>Space</b> handbrake · <b>Left Shift</b> brake · <b>R</b> recover · <b>E</b> item";
     secondaryDriveGuide.hidden = false;
     secondaryActionGuide.hidden = false;
   } else {
     primaryDriveGuide.innerHTML = "<b>WASD / arrows</b> accelerate, reverse and steer";
-    primaryActionGuide.innerHTML = "<b>Space</b> handbrake · <b>Shift</b> brake · <b>R</b> recover";
+    primaryActionGuide.innerHTML = "<b>Space</b> handbrake · <b>Shift</b> brake · <b>R</b> recover · <b>E /</b> item";
     secondaryDriveGuide.hidden = true;
     secondaryActionGuide.hidden = true;
   }
-  gamepadGuide.innerHTML = `<b>Gamepads 1–${count}</b> left stick · triggers · A/B/Y${count > 2 ? " · P3/P4 gamepad only" : ""}`;
+  gamepadGuide.innerHTML = `<b>Gamepads 1–${count}</b> left stick · triggers · A/B/X/Y${count > 2 ? " · P3/P4 gamepad only" : ""}`;
   resetButton.textContent = multiplayer ? "Reset vehicles" : "Reset vehicle";
   runtimeShortcuts.textContent = multiplayer
-    ? `P1 WASD · P2 arrows · ${count} gamepads · C colliders`
-    : "C toggles colliders · R recovers";
+    ? `P1 WASD + E · P2 arrows + / · ${count} gamepads · C colliders`
+    : "E or / uses item · C colliders · R recovers";
 }
 
 function configureLocalRoster(): void {
@@ -268,6 +280,7 @@ function applyState(next: RuntimeState): void {
   vehicleSelects.forEach((select) => {
     select.disabled = next === "loading" || next === "race";
   });
+  applyCombatHud();
 }
 
 function formatRaceTime(seconds: number): string {
@@ -334,6 +347,60 @@ function createTrackRaceSession(): RaceSession | undefined {
     : undefined;
 }
 
+function combatPickupDefinitions(): readonly CombatPickupDefinition[] {
+  const weapons = ["machine-gun", "rocket", "mine"] as const;
+  if (trackDefinition) {
+    const checkpointIndices = [0.18, 0.48, 0.78].map((ratio) => (
+      Math.min(trackDefinition!.checkpoints.length - 1, Math.floor(trackDefinition!.checkpoints.length * ratio))
+    ));
+    return weapons.map((weapon, index) => {
+      const checkpoint = trackDefinition!.checkpoints[checkpointIndices[index] ?? 0]!;
+      return {
+        id: `pickup-${weapon}`,
+        weapon,
+        position: [checkpoint.center[0], checkpoint.center[1] + 0.8, checkpoint.center[2]],
+      };
+    });
+  }
+  return [
+    { id: "pickup-machine-gun", weapon: "machine-gun", position: [-4, 0.7, -3] },
+    { id: "pickup-rocket", weapon: "rocket", position: [-4, 0.7, 8] },
+    { id: "pickup-mine", weapon: "mine", position: [-4, 0.7, 19] },
+  ];
+}
+
+function createCombatSession(): CombatSession {
+  return new CombatSession({
+    players: activePlayerSlots().map((slot) => ({ id: slot.id, displayName: slot.label })),
+    pickups: combatPickupDefinitions(),
+  });
+}
+
+function applyCombatHud(): void {
+  const snapshot = combatSession?.snapshot;
+  combatHud.hidden = !snapshot || state.state !== "race";
+  combatPlayerRows.forEach((row, index) => {
+    const player = snapshot?.players[index];
+    row.hidden = !player;
+    if (!player) {
+      return;
+    }
+    const health = player.destroyed ? "DESTROYED" : `${Math.ceil(player.health)} HP`;
+    const item = player.inventory
+      ? `${player.inventory.weapon.replace("machine-gun", "MG")} ×${player.inventory.ammo}`
+      : "EMPTY";
+    row.dataset["destroyed"] = String(player.destroyed);
+    row.replaceChildren();
+    const label = document.createElement("b");
+    label.textContent = player.displayName;
+    const healthValue = document.createElement("span");
+    healthValue.textContent = health;
+    const itemValue = document.createElement("em");
+    itemValue.textContent = item;
+    row.append(label, healthValue, itemValue);
+  });
+}
+
 function handleRaceEvents(raceEvents: readonly RaceEvent[]): string | undefined {
   let finishReason: string | undefined;
   for (const event of raceEvents) {
@@ -378,6 +445,46 @@ function handleRaceEvents(raceEvents: readonly RaceEvent[]): string | undefined 
   return finishReason;
 }
 
+function handleCombatEvents(combatEvents: readonly CombatEvent[]): string | undefined {
+  let finishReason: string | undefined;
+  for (const event of combatEvents) {
+    switch (event.type) {
+      case "pickup-collected":
+        runtimeStatus.textContent = `${event.playerId} picked up ${event.weapon} ×${event.ammo}`;
+        events.emit({ type: "audio:cue", cue: "pickup", gain: 0.07 });
+        break;
+      case "pickup-respawned":
+        runtimeStatus.textContent = `${event.pickupId} respawned`;
+        break;
+      case "weapon-fired":
+        events.emit({ type: "audio:cue", cue: "weapon-fire", gain: 0.07 });
+        break;
+      case "player-damaged":
+        physics?.applyVehicleImpulse(event.playerId, event.knockbackImpulse);
+        runtimeStatus.textContent = `${event.playerId} ${event.healthRemaining} HP`;
+        events.emit({ type: "audio:cue", cue: "impact", gain: 0.1 });
+        events.emit({ type: "renderer:flash", color: 0xff493d, durationSeconds: 0.12 });
+        break;
+      case "player-destroyed": {
+        events.emit({ type: "audio:cue", cue: "vehicle-destroyed", gain: 0.16 });
+        const raceEvents = raceSession?.eliminatePlayer(event.playerId, "destroyed") ?? [];
+        if (!raceSession) {
+          physics?.deactivateVehicle(event.playerId);
+        }
+        const eventFinishReason = handleRaceEvents(raceEvents);
+        if (eventFinishReason) {
+          finishReason = eventFinishReason;
+        }
+        break;
+      }
+      case "projectile-expired":
+        break;
+    }
+  }
+  applyCombatHud();
+  return finishReason;
+}
+
 events.subscribe((event) => {
   if (event.type === "runtime:state-changed") {
     applyState(event.to);
@@ -396,6 +503,7 @@ async function startRace(): Promise<void> {
   physics.resetDemo();
   resetCameraElimination();
   raceSession = createTrackRaceSession();
+  combatSession = createCombatSession();
   clock.restart(performance.now() / 1000);
   totalDroppedSeconds = 0;
   state.transition("race", raceSession ? "Race countdown started" : "Fixed-step simulation running");
@@ -411,6 +519,7 @@ startButton.addEventListener("click", () => {
 finishButton.addEventListener("click", () => {
   if (state.state === "race") {
     raceSession = undefined;
+    combatSession = undefined;
     resetCameraElimination();
     state.transition("results", "Simulation completed without clock drift");
     applyRaceBanner();
@@ -420,6 +529,7 @@ finishButton.addEventListener("click", () => {
 menuButton.addEventListener("click", () => {
   if (state.state === "race" || state.state === "results") {
     raceSession = undefined;
+    combatSession = undefined;
     resetCameraElimination();
     state.transition("menu", "Runtime ready");
     applyRaceBanner();
@@ -430,11 +540,14 @@ resetButton.addEventListener("click", () => {
   physics?.resetDemo();
   resetCameraElimination();
   raceSession = state.state === "race" ? createTrackRaceSession() : undefined;
+  combatSession = state.state === "race" ? createCombatSession() : undefined;
   applyRaceBanner();
+  applyCombatHud();
 });
 debugCamera.addEventListener("change", () => renderer.setDebugCamera(debugCamera.checked));
 playerCountSelect.addEventListener("change", () => {
   raceSession = undefined;
+  combatSession = undefined;
   resetCameraElimination();
   rebuildVehicleInputs();
   applyRosterPresentation();
@@ -587,7 +700,9 @@ assetInput.addEventListener("change", () => {
   }
   void (async () => {
     raceSession = undefined;
+    combatSession = undefined;
     applyRaceBanner();
+    applyCombatHud();
     state.transition("loading", `Parsing ${files.length} local asset${files.length === 1 ? "" : "s"}…`);
     try {
       const summaries: string[] = [];
@@ -676,6 +791,28 @@ function currentRacePositions(): Readonly<Record<string, readonly [number, numbe
   return positions;
 }
 
+function currentCombatPlayerFrames(): CombatPlayerFrames {
+  const frames: Record<string, { position: readonly [number, number, number]; headingRadians: number }> = {};
+  if (!physics) {
+    return frames;
+  }
+  const activeIds = new Set(physics.activeVehicleIds);
+  for (const slot of activePlayerSlots()) {
+    if (!activeIds.has(slot.id)) {
+      continue;
+    }
+    const history = physics.getVehicleTransformHistory(slot.id);
+    const telemetry = physics.getVehicleTelemetry(slot.id);
+    if (history && telemetry) {
+      frames[slot.id] = {
+        position: history.current.position,
+        headingRadians: telemetry.headingRadians,
+      };
+    }
+  }
+  return frames;
+}
+
 function updateCameraEliminations(
   stepSeconds: number,
   positions: Readonly<Record<string, readonly [number, number, number]>>,
@@ -762,7 +899,21 @@ function renderFrame(timestampMilliseconds: number): void {
       if (eliminationFinishReason) {
         raceFinishReason = eliminationFinishReason;
       }
-      physics?.stepVehicles(stepSeconds, sampleVehicleInputs(gamepads));
+      const sampledInputs = sampleVehicleInputs(gamepads);
+      if (combatSession && (!raceSession || raceSession.phase === "racing")) {
+        const useRequests = Object.fromEntries(Object.entries(sampledInputs).map(([id, input]) => (
+          [id, Boolean(input.useItem)]
+        )));
+        const combatFinishReason = handleCombatEvents(combatSession.advance(
+          stepSeconds,
+          currentCombatPlayerFrames(),
+          useRequests,
+        ));
+        if (combatFinishReason) {
+          raceFinishReason = combatFinishReason;
+        }
+      }
+      physics?.stepVehicles(stepSeconds, sampledInputs);
       physicsMilliseconds += performance.now() - startedAt;
     });
   } else {
@@ -784,6 +935,7 @@ function renderFrame(timestampMilliseconds: number): void {
     history: physics.transformHistory,
     objects: physics.sceneObjects,
     primaryVehicleActive: physics.activeVehicleIds.includes(PRIMARY_VEHICLE_ID),
+    ...(combatSession ? { combat: combatSession.snapshot } : {}),
     interpolationAlpha: frame.interpolationAlpha,
     frameDeltaSeconds: renderDeltaSeconds,
     ...(debugColliders.checked ? { debugLines: physics.debugLines() } : {}),
@@ -826,6 +978,7 @@ function renderFrame(timestampMilliseconds: number): void {
         ? `${lapProgress.totalCheckpoints} / ${lapProgress.totalCheckpoints} ✓`
         : `${lapProgress.passedCheckpoints} / ${lapProgress.totalCheckpoints} → ${lapProgress.nextCheckpointId}`
       : "—";
+    applyCombatHud();
     lastOverlayUpdate = timestampMilliseconds;
   }
   animationFrame = requestAnimationFrame(renderFrame);

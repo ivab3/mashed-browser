@@ -6,6 +6,8 @@ export interface VehicleInputFrame {
   brake: number;
   handbrake: number;
   recover: boolean;
+  /** One-shot item activation; optional for backward-compatible recorded input tapes. */
+  useItem?: boolean;
 }
 
 export const NEUTRAL_VEHICLE_INPUT: Readonly<VehicleInputFrame> = Object.freeze({
@@ -14,6 +16,7 @@ export const NEUTRAL_VEHICLE_INPUT: Readonly<VehicleInputFrame> = Object.freeze(
   brake: 0,
   handbrake: 0,
   recover: false,
+  useItem: false,
 });
 
 function clamp(value: number, minimum: number, maximum: number): number {
@@ -36,6 +39,7 @@ export function sanitizeVehicleInput(input: VehicleInputFrame): VehicleInputFram
     brake: clamp(Number.isFinite(input.brake) ? input.brake : 0, 0, 1),
     handbrake: clamp(Number.isFinite(input.handbrake) ? input.handbrake : 0, 0, 1),
     recover: input.recover,
+    useItem: Boolean(input.useItem),
   };
 }
 
@@ -61,6 +65,7 @@ export interface VehicleKeyboardBindings {
   brake: readonly string[];
   handbrake: readonly string[];
   recover: readonly string[];
+  useItem: readonly string[];
 }
 
 export const PLAYER_ONE_KEYBOARD_BINDINGS: VehicleKeyboardBindings = Object.freeze({
@@ -71,6 +76,7 @@ export const PLAYER_ONE_KEYBOARD_BINDINGS: VehicleKeyboardBindings = Object.free
   brake: ["ShiftLeft"],
   handbrake: ["Space"],
   recover: ["KeyR"],
+  useItem: ["KeyE"],
 });
 
 export const PLAYER_TWO_KEYBOARD_BINDINGS: VehicleKeyboardBindings = Object.freeze({
@@ -81,6 +87,7 @@ export const PLAYER_TWO_KEYBOARD_BINDINGS: VehicleKeyboardBindings = Object.free
   brake: ["ShiftRight"],
   handbrake: ["Enter"],
   recover: ["Backslash"],
+  useItem: ["Slash"],
 });
 
 export const GAMEPAD_ONLY_KEYBOARD_BINDINGS: VehicleKeyboardBindings = Object.freeze({
@@ -91,6 +98,7 @@ export const GAMEPAD_ONLY_KEYBOARD_BINDINGS: VehicleKeyboardBindings = Object.fr
   brake: [],
   handbrake: [],
   recover: [],
+  useItem: [],
 });
 
 export const SINGLE_PLAYER_KEYBOARD_BINDINGS: VehicleKeyboardBindings = Object.freeze({
@@ -101,6 +109,7 @@ export const SINGLE_PLAYER_KEYBOARD_BINDINGS: VehicleKeyboardBindings = Object.f
   brake: ["ShiftLeft", "ShiftRight"],
   handbrake: ["Space"],
   recover: ["KeyR"],
+  useItem: ["KeyE", "Slash"],
 });
 
 /** Keyboard and first-gamepad adapter. It owns no simulation state. */
@@ -113,6 +122,8 @@ export class BrowserVehicleInput {
   readonly #onKeyDown: (event: KeyboardEvent) => void;
   readonly #onKeyUp: (event: KeyboardEvent) => void;
   #recoveryLatched = false;
+  #useItemLatched = false;
+  #gamepadUseWasPressed = false;
 
   constructor(target: Window = window, options: BrowserVehicleInputOptions = {}) {
     this.#target = target;
@@ -122,6 +133,9 @@ export class BrowserVehicleInput {
     this.#onKeyDown = (event) => {
       if (this.#keyboard.recover.includes(event.code) && !event.repeat) {
         this.#recoveryLatched = true;
+      }
+      if (this.#keyboard.useItem.includes(event.code) && !event.repeat) {
+        this.#useItemLatched = true;
       }
       if (this.#isHandledKey(event.code)) {
         event.preventDefault();
@@ -144,7 +158,11 @@ export class BrowserVehicleInput {
     const triggerDrive = gamepadButton(gamepad, 7) - gamepadButton(gamepad, 6);
     const stickSteer = applyDeadzone(gamepad?.axes[0] ?? 0, this.#deadzone);
     const recover = this.#recoveryLatched || Boolean(gamepad?.buttons[3]?.pressed);
+    const gamepadUsePressed = Boolean(gamepad?.buttons[2]?.pressed);
+    const useItem = this.#useItemLatched || (gamepadUsePressed && !this.#gamepadUseWasPressed);
+    this.#gamepadUseWasPressed = gamepadUsePressed;
     this.#recoveryLatched = false;
+    this.#useItemLatched = false;
     return sanitizeVehicleInput({
       drive: Math.abs(keyboardDrive) > Math.abs(triggerDrive) ? keyboardDrive : triggerDrive,
       steer: Math.abs(keyboardSteer) > Math.abs(stickSteer) ? keyboardSteer : stickSteer,
@@ -157,6 +175,7 @@ export class BrowserVehicleInput {
         gamepadButton(gamepad, 1),
       ),
       recover,
+      useItem,
     });
   }
 
@@ -175,6 +194,7 @@ export class BrowserVehicleInput {
       ...this.#keyboard.brake,
       ...this.#keyboard.handbrake,
       ...this.#keyboard.recover,
+      ...this.#keyboard.useItem,
     ].includes(code);
   }
 }

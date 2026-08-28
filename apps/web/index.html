@@ -38,6 +38,13 @@
           <div id="metric-player-four-row" class="wide" hidden><span>P4</span><strong id="metric-player-four">0 km/h · 0/4 · airborne</strong></div>
         </aside>
 
+        <aside id="combat-hud" class="combat-hud" aria-label="Combat status" hidden>
+          <div id="combat-player-one"><b>P1</b><span>100 HP</span><em>EMPTY</em></div>
+          <div id="combat-player-two" hidden><b>P2</b><span>100 HP</span><em>EMPTY</em></div>
+          <div id="combat-player-three" hidden><b>P3</b><span>100 HP</span><em>EMPTY</em></div>
+          <div id="combat-player-four" hidden><b>P4</b><span>100 HP</span><em>EMPTY</em></div>
+        </aside>
+
         <div id="race-banner" class="race-banner" role="status" aria-live="polite" hidden>
           <span id="race-banner-label">Get ready</span>
           <strong id="race-banner-value">3</strong>
@@ -54,7 +61,7 @@
           <p class="kicker">Race vertical slice</p>
           <h2>Start it.<br />Finish it.</h2>
           <p class="intro">
-            Fixed-step match rules drive the countdown, checkpoints, shared-camera knockouts, and standings.
+            Fixed-step rules drive the countdown, camera knockouts, pickups, projectiles, damage, and standings.
           </p>
         </div>
 
@@ -96,10 +103,10 @@
         <section class="control-guide" aria-label="Driving controls">
           <div class="section-label">Drive</div>
           <p id="primary-drive-guide"><b>WASD / arrows</b> accelerate, reverse and steer</p>
-          <p id="primary-action-guide"><b>Space</b> handbrake · <b>Shift</b> brake · <b>R</b> recover</p>
+          <p id="primary-action-guide"><b>Space</b> handbrake · <b>Shift</b> brake · <b>R</b> recover · <b>E</b> item</p>
           <p id="secondary-drive-guide" hidden><b>P2 arrows</b> accelerate, reverse and steer</p>
-          <p id="secondary-action-guide" hidden><b>Enter</b> handbrake · <b>Right Shift</b> brake · <b>\</b> recover</p>
-          <p id="gamepad-guide"><b>Gamepad</b> left stick · triggers · A/B/Y</p>
+          <p id="secondary-action-guide" hidden><b>Enter</b> handbrake · <b>Right Shift</b> brake · <b>\</b> recover · <b>/</b> item</p>
+          <p id="gamepad-guide"><b>Gamepad</b> left stick · triggers · A/B/X/Y</p>
         </section>
 
         <section class="toggles">

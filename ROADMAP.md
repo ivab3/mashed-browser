@@ -303,7 +303,11 @@ DFF/TXD-пар и отдельный original render instance на каждый 
 все машины пока разделяют принятый Crusader physics profile. Третий срез добавил deterministic
 shared-camera elimination: route-aware выбор лидера, 1,5-секундный grace period, физическую
 деактивацию выбывших машин, last-car-standing winner, полную таблицу результатов и rematch без
-перезагрузки страницы. Оружие, полный HUD/audio и M1 hardening остаются следующими срезами.
+перезагрузки страницы. Четвёртый срез добавил deterministic combat session: pickup/respawn,
+machine gun, splash rockets и proximity mines, ammo/cooldown/projectile lifetime, swept hits,
+damage, Rapier knockback и уничтожение через общий race-elimination flow. Runtime показывает
+цветные pickup/projectile meshes и health/weapon HUD; E, / и gamepad X активируют предмет.
+Production HUD/effects, original audio, world impacts projectiles и M1 hardening остаются следующими срезами.
 
 Milestone M1: публично показываемый proof of concept.
 
