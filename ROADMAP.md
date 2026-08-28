@@ -312,8 +312,13 @@ simulation catch-up, per-player engine voices, UI cues и baseline particles д�
 урона и разрушений. Шестой срез добавил validated reader исходных PC RWS dictionaries, Worker
 transfer 422 PCM sample, привязку `PERMDICT` engine/weapon/collision/UI cues с synthesized fallback,
 а также Rapier world raycasts для projectiles, wall-truncated player hits, rocket splash в точке
-world impact и projectile destruction/impulse для props. Следующим срезом остаётся M1 hardening;
-voice streams, authored pickup placement, trails и decals не блокируют proof of concept.
+world impact и projectile destruction/impulse для props. M1.1 hardening добавил единый записанный
+race/combat/camera сценарий: полные snapshots и упорядоченный event log совпадают при презентации
+30/60/120 Гц, а terminal fixed-step больше не пропускает дополнительную симуляцию внутри 30 Гц кадра.
+Следующие срезы M1 — 30-минутный автоматический soak и browser evidence для четырёх игроков в 1080p
+и offline game-data. Voice streams, authored pickup placement, trails и decals не блокируют proof of
+concept. Воспроизводимые evidence-команды описаны в
+[`reference/M1_HARDENING.md`](./reference/M1_HARDENING.md).
 
 Milestone M1: публично показываемый proof of concept.
 

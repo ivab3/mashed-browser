@@ -12,6 +12,7 @@
     "assets:probe": "node --import tsx packages/assets/src/probe.ts",
     "asset-viewer": "pnpm --filter @mashed/asset-viewer dev",
     "lap:validate": "pnpm --filter @mashed/physics lap:validate",
+    "match:replay": "node --import tsx packages/replay/src/match-replay-cli.ts",
     "web": "pnpm --filter @mashed/web dev",
     "vehicle:tune": "pnpm --filter @mashed/physics tune",
     "build": "pnpm -r --if-present build",

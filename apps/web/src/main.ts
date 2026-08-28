@@ -1078,6 +1078,9 @@ function renderFrame(timestampMilliseconds: number): void {
   let frame: FixedStepFrame;
   if (state.state === "race") {
     frame = clock.advance(timestampMilliseconds / 1000, (stepSeconds) => {
+      if (raceFinishReason || raceSession?.phase === "finished") {
+        return;
+      }
       const startedAt = performance.now();
       const gamepads = navigator.getGamepads();
       const positions = currentRacePositions();

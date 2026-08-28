@@ -2,8 +2,9 @@
 
 Status: Stage 5 started on 2026-08-28. Deterministic race rules, the production local roster,
 shared-camera elimination, the first playable combat loop, and the presentation foundation are
-implemented. Original PCM audio and projectile world impacts complete the content/impact follow-up;
-M1 hardening and optional post-slice polish remain open.
+implemented. Original PCM audio and projectile world impacts complete the content/impact follow-up.
+The combined 30/60/120 Hz match replay matrix is green; the M1 soak and browser acceptance evidence
+remain open before optional post-slice polish.
 
 ## Slice 5.1 — race rules foundation
 
@@ -145,9 +146,12 @@ tape and collision answers remains independent of render cadence and of Rapier/W
 
 ## Planned slices
 
-1. **M1 hardening:** browser replay matrix, 30-minute soak, four-player 1080p performance scene,
-   and verification that prepared game data causes no network request after initial loading.
-2. **Optional polish after M1 evidence:** authored pickup placement, fire trails, damage decals, and
+1. **M1.1 replay matrix — complete:** the same recorded race/combat/camera scenario produces an
+   identical complete snapshot and ordered event log at 30, 60, and 120 Hz presentation rates.
+2. **M1.2 soak:** automated 30-minute complete-match soak with finite/bounded-state and reset checks.
+3. **M1.3 browser acceptance:** four-player 1080p performance evidence and verification that prepared
+   game data causes no network request after initial loading.
+4. **Optional polish after M1 evidence:** authored pickup placement, fire trails, damage decals, and
    localized voice-stream playback.
 
 ## Verification
@@ -166,4 +170,8 @@ after resume, prop metrics, and console cleanliness. Run the committed checks wi
 pnpm test
 pnpm typecheck
 pnpm build
+pnpm match:replay
 ```
+
+The accepted matrix and remaining hardening gates are recorded in
+[`M1_HARDENING.md`](./M1_HARDENING.md).

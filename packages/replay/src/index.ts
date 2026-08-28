@@ -49,3 +49,6 @@ export class ReplayCursor<TInput> {
     return frame;
   }
 }
+
+export * from "./match-replay.js";
+export * from "./stage-five-scenario.js";

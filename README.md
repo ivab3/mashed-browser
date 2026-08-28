@@ -22,6 +22,8 @@ health/ammo HUD. The fifth slice adds a deterministic pause/resume state, focus-
 per-player engine voices, pause/resume cues, and baseline pickup/weapon/damage/destruction particles.
 The sixth slice parses original PC RWS dictionaries in the loading Worker, binds named engine/combat/UI
 samples with synthesized fallback, and resolves projectile impacts against track/scenery and props.
+M1 hardening now includes a combined race/combat/camera replay whose complete outcome is identical at
+30, 60, and 120 Hz presentation rates.
 [ADR-0001](./reference/ADR-0001-runtime-asset-loading.md) selects direct runtime
 parsing in a loading Worker instead of mandatory pre-conversion.
 
@@ -50,6 +52,7 @@ pnpm typecheck
 pnpm test
 pnpm build
 pnpm vehicle:tune
+pnpm match:replay
 ```
 
 Project direction, gates, and scope live in [`ROADMAP.md`](./ROADMAP.md). Reference-build
