@@ -66,7 +66,7 @@ or return directly to menu. Invalid transitions throw synchronously rather than 
 initialized runtime.
 
 `RuntimeEventBus` carries discriminated, structured-clone-compatible records for state changes,
-focus, overruns, physics contacts, audio cues, and renderer flashes. This keeps Worker migration and
+focus, overruns, physics contacts, named/fallback audio cues, and renderer flashes/bursts. This keeps Worker migration and
 replay/event recording possible without exposing adapter objects to core.
 
 ## Replay and random contract
@@ -82,13 +82,16 @@ scene exist.
 
 ## Loading Worker boundary
 
-The Worker accepts an `ArrayBuffer` plus an explicit `dff`, `txd`, or `bsp` kind. It calls the same
+The Worker accepts an `ArrayBuffer` plus an explicit `dff`, `txd`, `bsp`, or PCM-dictionary `rws`
+kind. It calls the same
 `@mashed/assets` readers as the CLI/viewer, recursively finds parsed typed-array backing buffers,
 deduplicates them, and transfers ownership to the main thread. Responses report parsing time and
 transferred byte count. Loaded DTOs currently stay in an in-memory map; renderer/physics consumers
 will bind the selected race working set during Stage 4/5.
 
 Original files are selected through the browser and are not copied to source or production output.
+Named RWS samples are transferred as PCM16 arrays and registered with the audio adapter; synthesized
+cues remain available when the user has not loaded a matching dictionary.
 
 ## Debug runtime
 

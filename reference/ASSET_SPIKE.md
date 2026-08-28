@@ -124,6 +124,19 @@ Viewer теперь явно применяет geometry flags `LIGHT`, `MODULAT
 texture wrapping/filtering, исходные mip chains, alpha mask/blend и CCW front-face. Новый reader без ошибок прошёл все
 43 найденных `GRAPHICS`/`COLLIDE`/`COLLISIONS` BSP и 56 DFF из каталогов Warzone и Wildfire.
 
+### PC sound dictionaries
+
+В извлечённом PC audio-корпусе находятся 59 RWS: 29 wave dictionaries с root chunk `0x809` и 30
+локализованных voice streams с root chunk `0x80d`. Runtime-срез читает dictionaries; voice streams
+не нужны для battle/race loop и пока только распознаются extractor manifest.
+
+Все 29 dictionaries проходят новый browser-compatible reader: 422 именованных sample, codec GUID
+`D01BD217` (PCM), mono PCM16LE, 22050 Hz. Для каждого sample проверяются вложенные chunks
+`0x802/0x803/0x804`, размер header, codec, sample rate и точное совпадение declared/data byte length.
+`PERMDICT.RWS` содержит 45 общих sample, включая `eng1`–`eng4`, `machineg`, `rocket`, `drop mine`,
+`explosion1`, collision, menu и race-start cues. Reader возвращает отдельные `Int16Array`, которые
+loading Worker переносит в основной поток без включения исходного RWS в production bundle.
+
 ## Asset viewer
 
 `apps/asset-viewer` принимает локальные DFF, TXD, graphical BSP и collision BSP через file inputs и
@@ -142,15 +155,16 @@ state, без обязательной предварительной конве
 занимает 3 225 988 байт и после прогрева разбирается локально за median 72.76 ms / p95 74.80 ms;
 основная стоимость приходится на распаковку палитровых TXD в RGBA.
 
-На этапе 3 синхронные readers будут вызываться в loading Worker, а transferable typed arrays
-передаваться renderer/physics. glTF/KTX2/custom conversion остаётся опциональной оптимизацией,
+Синхронные readers вызываются в loading Worker, а transferable typed arrays передаются
+renderer/physics/audio. glTF/KTX2/Opus/custom conversion остаётся опциональной оптимизацией,
 если browser profiling покажет проблему времени загрузки или GPU memory. Полное решение, границы
 слоёв и условия пересмотра: [ADR-0001](./ADR-0001-runtime-asset-loading.md).
 
 ## Открытые вопросы
 
 - проверить остальные MatFX/blend combinations, когда они встретятся за пределами выбранного среза;
-- измерить browser Worker parsing и GPU upload на целевых машинах в Stage 3.
+- измерить browser Worker parsing, audio-buffer creation и GPU upload на целевых машинах в M1 hardening;
+- при появлении voice content добавить отдельный `0x80d` stream reader, не смешивая его с dictionary parser.
 
 ## Команды
 

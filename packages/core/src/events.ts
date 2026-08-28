@@ -44,6 +44,7 @@ export type RuntimeEvent =
       type: "audio:cue";
       cue: AudioCue;
       gain: number;
+      sampleName?: string;
     }
   | {
       type: "renderer:flash";

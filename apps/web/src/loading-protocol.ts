@@ -1,11 +1,12 @@
-import type { BspWorld, DffModel, PiTextureDictionary } from "@mashed/assets";
+import type { BspWorld, DffModel, PiTextureDictionary, RwsSoundDictionary } from "@mashed/assets";
 
-export type AssetKind = "dff" | "txd" | "bsp";
+export type AssetKind = "dff" | "txd" | "bsp" | "rws";
 
 export type LoadedAsset =
   | { kind: "dff"; data: DffModel }
   | { kind: "txd"; data: PiTextureDictionary }
-  | { kind: "bsp"; data: BspWorld };
+  | { kind: "bsp"; data: BspWorld }
+  | { kind: "rws"; data: RwsSoundDictionary };
 
 export interface LoadAssetRequest {
   id: number;

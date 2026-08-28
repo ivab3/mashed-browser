@@ -20,6 +20,8 @@ a page reload. The fourth slice adds deterministic pickups and respawns, machine
 projectiles, damage, Rapier knockback, destruction, synthesized combat cues, and a four-player
 health/ammo HUD. The fifth slice adds a deterministic pause/resume state, focus-loss auto-pause,
 per-player engine voices, pause/resume cues, and baseline pickup/weapon/damage/destruction particles.
+The sixth slice parses original PC RWS dictionaries in the loading Worker, binds named engine/combat/UI
+samples with synthesized fallback, and resolves projectile impacts against track/scenery and props.
 [ADR-0001](./reference/ADR-0001-runtime-asset-loading.md) selects direct runtime
 parsing in a loading Worker instead of mandatory pre-conversion.
 
@@ -93,7 +95,7 @@ pnpm web
 The shell demonstrates the `boot → loading → menu → race ⇄ paused → results` flow, a 60 Hz fixed simulation
 clock with interpolated presentation transforms, a live telemetry overlay, an orbit debug camera,
 Rapier collider lines, and the first fixed-step race-rules slice. A loaded track route adds a
-three-second countdown, ordered one-lap finish, and final-time banner. Local DFF/TXD/BSP files can
+three-second countdown, ordered one-lap finish, and final-time banner. Local DFF/TXD/BSP/RWS files can
 be parsed through the loading Worker; original
 bytes remain local and parsed typed arrays are transferred back without cloning. See
 [`reference/RUNTIME_FOUNDATION.md`](./reference/RUNTIME_FOUNDATION.md) for runtime contracts and
@@ -109,10 +111,13 @@ remains as a compatibility shortcut that defaults to two players and removes the
 Three color-coded combat pickups are placed along the route (or the handling-lab center lane): yellow
 machine gun, red rocket, and purple mine. Use an item with `E` for P1, `/` for P2, or gamepad X;
 damage destruction feeds the same elimination and results flow as camera distance.
+Projectiles stop on track/scenery, rockets splash from the world hit, and explosive prop hits use the
+same destruction/reset flow. Load the extracted `PERMDICT.RWS` alongside the track bundle to replace
+fallback tones with the original engine, weapon, collision, explosion, race, and menu samples.
 Pause with the HUD button or `Escape`; losing page focus pauses automatically. Physics, race, combat,
 and elimination steps remain frozen while paused, and resume continues from the same simulation step
-without catching up hidden time. Per-player synthesized engine voices track speed and throttle until
-extracted original audio is bound in the next content slice.
+without catching up hidden time. Per-player engine pitch tracks speed and throttle with or without the
+original bank.
 
 With extracted Warzone assets in the standard ignored `game-data/` location, `pnpm lap:validate`
 runs the deterministic 136-checkpoint full-lap acceptance scenario. An alternative track directory

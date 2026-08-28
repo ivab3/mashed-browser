@@ -78,6 +78,8 @@ function assetSummary(asset: LoadedAsset): string {
       return `${asset.data.textures.length} textures`;
     case "bsp":
       return `${asset.data.worldSectors.length} sectors · ${asset.data.header.triangleCount} triangles`;
+    case "rws":
+      return `${asset.data.sounds.length} original sounds`;
   }
 }
 
@@ -424,7 +426,7 @@ function handleRaceEvents(raceEvents: readonly RaceEvent[]): string | undefined 
         break;
       case "race-started":
         runtimeStatus.textContent = "Go!";
-        events.emit({ type: "audio:cue", cue: "race-start", gain: 0.08 });
+        events.emit({ type: "audio:cue", cue: "race-start", gain: 0.08, sampleName: "go" });
         break;
       case "checkpoint-passed":
         runtimeStatus.textContent = `Checkpoint ${event.checkpointId} passed`;
@@ -465,7 +467,7 @@ function handleCombatEvents(combatEvents: readonly CombatEvent[]): string | unde
     switch (event.type) {
       case "pickup-collected":
         runtimeStatus.textContent = `${event.playerId} picked up ${event.weapon} ×${event.ammo}`;
-        events.emit({ type: "audio:cue", cue: "pickup", gain: 0.07 });
+        events.emit({ type: "audio:cue", cue: "pickup", gain: 0.07, sampleName: "flash" });
         {
           const pickup = combatSession?.snapshot.pickups.find((candidate) => candidate.id === event.pickupId);
           if (pickup) {
@@ -483,7 +485,14 @@ function handleCombatEvents(combatEvents: readonly CombatEvent[]): string | unde
         runtimeStatus.textContent = `${event.pickupId} respawned`;
         break;
       case "weapon-fired":
-        events.emit({ type: "audio:cue", cue: "weapon-fire", gain: 0.07 });
+        events.emit({
+          type: "audio:cue",
+          cue: "weapon-fire",
+          gain: 0.07,
+          sampleName: event.weapon === "machine-gun"
+            ? "machineg"
+            : event.weapon === "rocket" ? "rocket" : "drop mine",
+        });
         {
           const projectile = combatSession?.snapshot.projectiles.find((candidate) => (
             candidate.id === event.projectileId
@@ -504,7 +513,12 @@ function handleCombatEvents(combatEvents: readonly CombatEvent[]): string | unde
       case "player-damaged":
         physics?.applyVehicleImpulse(event.playerId, event.knockbackImpulse);
         runtimeStatus.textContent = `${event.playerId} ${event.healthRemaining} HP`;
-        events.emit({ type: "audio:cue", cue: "impact", gain: 0.1 });
+        events.emit({
+          type: "audio:cue",
+          cue: "impact",
+          gain: 0.1,
+          sampleName: event.weapon === "machine-gun" ? "bullethitscar" : "explosion1",
+        });
         events.emit({ type: "renderer:flash", color: 0xff493d, durationSeconds: 0.12 });
         {
           const position = physics?.getVehicleTransformHistory(event.playerId)?.current.position;
@@ -520,7 +534,12 @@ function handleCombatEvents(combatEvents: readonly CombatEvent[]): string | unde
         }
         break;
       case "player-destroyed": {
-        events.emit({ type: "audio:cue", cue: "vehicle-destroyed", gain: 0.16 });
+        events.emit({
+          type: "audio:cue",
+          cue: "vehicle-destroyed",
+          gain: 0.16,
+          sampleName: "explosion1",
+        });
         const position = physics?.getVehicleTransformHistory(event.playerId)?.current.position;
         if (position) {
           events.emit({
@@ -539,6 +558,34 @@ function handleCombatEvents(combatEvents: readonly CombatEvent[]): string | unde
         if (eventFinishReason) {
           finishReason = eventFinishReason;
         }
+        break;
+      }
+      case "projectile-world-impact": {
+        const explosive = event.weapon !== "machine-gun";
+        const impulseMagnitude = explosive ? 12_000 : 2_400;
+        if (event.objectId) {
+          physics?.impactSceneObject(event.objectId, [
+            -event.normal[0] * impulseMagnitude,
+            Math.max(900, -event.normal[1] * impulseMagnitude),
+            -event.normal[2] * impulseMagnitude,
+          ], explosive);
+        }
+        runtimeStatus.textContent = event.objectId
+          ? `${event.weapon} hit ${event.objectId}`
+          : `${event.weapon} hit the course`;
+        events.emit({
+          type: "audio:cue",
+          cue: "impact",
+          gain: explosive ? 0.15 : 0.07,
+          sampleName: explosive ? "explosion1" : "impact with barrier",
+        });
+        events.emit({
+          type: "renderer:burst",
+          position: event.position,
+          color: COMBAT_EFFECT_COLORS[event.weapon],
+          count: explosive ? 30 : 8,
+          durationSeconds: explosive ? 0.8 : 0.3,
+        });
         break;
       }
       case "projectile-expired":
@@ -840,6 +887,9 @@ assetInput.addEventListener("change", () => {
         } else if (result.asset.kind === "dff") {
           loadedDffs.set(file.name.toLocaleLowerCase("en-US"), result.asset.data);
           role = parseVehicleDffName(file.name) ? "vehicle skin candidate" : "course model candidate";
+        } else if (result.asset.kind === "rws") {
+          const accepted = audio.addSampleBank(result.asset.data.sounds);
+          role = `${accepted} PCM samples accepted · ${audio.originalSampleCount} total ready`;
         }
         summaries.push(
           `${file.name}: ${assetSummary(result.asset)}, ${result.parseMilliseconds.toFixed(1)} ms, ${formatBytes(result.transferredBytes)} transferred${role ? ` · ${role}` : ""}`,
@@ -1050,6 +1100,7 @@ function renderFrame(timestampMilliseconds: number): void {
           stepSeconds,
           currentCombatPlayerFrames(),
           useRequests,
+          (segment) => physics?.castProjectileSegment(segment.start, segment.end),
         ));
         if (combatFinishReason) {
           raceFinishReason = combatFinishReason;

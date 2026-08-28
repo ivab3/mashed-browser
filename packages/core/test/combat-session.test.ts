@@ -103,6 +103,50 @@ describe("CombatSession", () => {
     expect(run()).toEqual(run());
   });
 
+  it("stops a swept projectile at deterministic world geometry", () => {
+    const combat = new CombatSession({
+      players,
+      pickups: [{ id: "gun", weapon: "machine-gun", position: [0, 0, 0] }],
+    });
+    const nearBarrierFrames = frames(0, 2.95);
+    combat.advance(1 / 60, nearBarrierFrames);
+    const events = combat.advance(1 / 60, nearBarrierFrames, { p1: true }, () => ({
+      fraction: 0.25,
+      normal: [0, 0, -1],
+      objectId: "wall-a",
+    }));
+    expect(events.map((event) => event.type)).toEqual(["weapon-fired", "projectile-world-impact"]);
+    expect(events[1]).toMatchObject({
+      projectileId: 1,
+      ownerId: "p1",
+      weapon: "machine-gun",
+      position: [0, 0.45, 2],
+      normal: [0, 0, -1],
+      objectId: "wall-a",
+    });
+    expect(combat.snapshot.projectiles).toEqual([]);
+    expect(combat.snapshot.players[1]?.health).toBe(100);
+  });
+
+  it("applies rocket splash at a world impact without hitting a player behind the wall", () => {
+    const combat = new CombatSession({
+      players,
+      pickups: [{ id: "rocket", weapon: "rocket", position: [0, 0, 0] }],
+    });
+    const nearbyFrames = frames(0, 5.5);
+    combat.advance(1 / 60, nearbyFrames);
+    const events = combat.advance(1 / 60, nearbyFrames, { p1: true }, () => ({
+      fraction: 0.5,
+      normal: [0, 0, -1],
+    }));
+    expect(events.map((event) => event.type)).toEqual([
+      "weapon-fired",
+      "projectile-world-impact",
+      "player-damaged",
+    ]);
+    expect(events[2]).toMatchObject({ playerId: "p2", weapon: "rocket", healthRemaining: 62 });
+  });
+
   it("rejects invalid roster, pickup, and frame data", () => {
     expect(() => new CombatSession({ players: [], pickups: [] })).toThrow(/between 1 and 4/);
     expect(() => new CombatSession({

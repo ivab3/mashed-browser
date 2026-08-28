@@ -1,6 +1,11 @@
 /// <reference lib="webworker" />
 
-import { parseBspWorld, parseDff, parsePiTextureDictionary } from "@mashed/assets";
+import {
+  parseBspWorld,
+  parseDff,
+  parsePiTextureDictionary,
+  parseRwsSoundDictionary,
+} from "@mashed/assets";
 
 import type {
   LoadAssetRequest,
@@ -25,6 +30,9 @@ worker.onmessage = (message: MessageEvent<LoadAssetRequest>): void => {
         break;
       case "bsp":
         asset = { kind: "bsp", data: parseBspWorld(request.buffer) };
+        break;
+      case "rws":
+        asset = { kind: "rws", data: parseRwsSoundDictionary(request.buffer) };
         break;
     }
     const transfer = transferablesIn(asset);

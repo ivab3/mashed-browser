@@ -97,6 +97,12 @@ export interface VehicleRosterEntry {
   spawn: VehicleSpawn;
 }
 
+export interface ProjectileWorldHit {
+  fraction: number;
+  normal: readonly [number, number, number];
+  objectId?: string;
+}
+
 export interface PhysicsRuntimeOptions {
   collisionObjects?: boolean;
   vehicles?: readonly VehicleRosterEntry[];
@@ -712,6 +718,74 @@ export class PhysicsRuntime {
     const vehicle = this.#collisionVehicles.find((candidate) => candidate.id === id);
     if (vehicle?.object.active) {
       vehicle.body.applyImpulse({ x: impulse[0], y: impulse[1], z: impulse[2] }, true);
+    }
+  }
+
+  castProjectileSegment(
+    start: readonly [number, number, number],
+    end: readonly [number, number, number],
+  ): ProjectileWorldHit | undefined {
+    if (
+      start.some((component) => !Number.isFinite(component))
+      || end.some((component) => !Number.isFinite(component))
+    ) {
+      throw new Error("Projectile segment must contain finite coordinates");
+    }
+    const dx = end[0] - start[0];
+    const dy = end[1] - start[1];
+    const dz = end[2] - start[2];
+    const length = Math.hypot(dx, dy, dz);
+    if (length <= Number.EPSILON) {
+      return undefined;
+    }
+    const vehicleBodyHandles = new Set<number>([
+      this.#body.handle,
+      ...this.#collisionVehicles.map((vehicle) => vehicle.body.handle),
+    ]);
+    const hit = this.#world.castRayAndGetNormal(
+      new this.#RAPIER.Ray(
+        { x: start[0], y: start[1], z: start[2] },
+        { x: dx / length, y: dy / length, z: dz / length },
+      ),
+      length,
+      true,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      (collider) => {
+        const parent = collider.parent();
+        return !parent || !vehicleBodyHandles.has(parent.handle);
+      },
+    );
+    if (!hit) {
+      return undefined;
+    }
+    const object = this.#objectByCollider.get(hit.collider.handle);
+    return {
+      fraction: Math.max(0, Math.min(1, hit.timeOfImpact / length)),
+      normal: [hit.normal.x, hit.normal.y, hit.normal.z],
+      ...(object ? { objectId: object.id } : {}),
+    };
+  }
+
+  impactSceneObject(
+    id: string,
+    impulse: readonly [number, number, number],
+    destroy: boolean,
+  ): void {
+    if (impulse.some((component) => !Number.isFinite(component))) {
+      throw new Error("Scene-object impulse must contain finite components");
+    }
+    const object = this.#arenaObjects.find((candidate) => (
+      candidate.id === id && candidate.kind !== "vehicle"
+    ));
+    if (!object?.active) {
+      return;
+    }
+    object.body.applyImpulse({ x: impulse[0], y: impulse[1], z: impulse[2] }, true);
+    if (destroy && object.destructible) {
+      this.#destroyObject(object, Math.hypot(...impulse));
     }
   }
 

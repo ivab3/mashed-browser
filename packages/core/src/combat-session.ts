@@ -43,6 +43,22 @@ export interface CombatPlayerFrame {
 export type CombatPlayerFrames = Readonly<Record<string, CombatPlayerFrame | undefined>>;
 export type CombatUseRequests = Readonly<Record<string, boolean | undefined>>;
 
+export interface CombatProjectileSegment {
+  projectileId: number;
+  weapon: CombatWeaponType;
+  ownerId: string;
+  start: TrackVector3;
+  end: TrackVector3;
+}
+
+export interface CombatWorldHit {
+  fraction: number;
+  normal: TrackVector3;
+  objectId?: string;
+}
+
+export type CombatWorldCollisionQuery = (segment: CombatProjectileSegment) => CombatWorldHit | undefined;
+
 export interface CombatInventorySnapshot {
   weapon: CombatWeaponType;
   ammo: number;
@@ -93,6 +109,15 @@ export type CombatEvent =
       knockbackImpulse: TrackVector3;
     }
   | { type: "player-destroyed"; playerId: string; sourcePlayerId: string; weapon: CombatWeaponType }
+  | {
+      type: "projectile-world-impact";
+      projectileId: number;
+      ownerId: string;
+      weapon: CombatWeaponType;
+      position: TrackVector3;
+      normal: TrackVector3;
+      objectId?: string;
+    }
   | { type: "projectile-expired"; projectileId: number };
 
 export const COMBAT_WEAPON_CONFIGS: Readonly<Record<CombatWeaponType, Readonly<CombatWeaponConfig>>> = Object.freeze({
@@ -162,28 +187,33 @@ function squaredDistance(left: TrackVector3, right: TrackVector3): number {
   return x * x + y * y + z * z;
 }
 
-function pointToSegmentSquaredDistance(
-  point: TrackVector3,
+function segmentSphereHitFraction(
+  center: TrackVector3,
   start: TrackVector3,
   finish: TrackVector3,
-): number {
+  radius: number,
+): number | undefined {
   const dx = finish[0] - start[0];
   const dy = finish[1] - start[1];
   const dz = finish[2] - start[2];
   const lengthSquared = dx * dx + dy * dy + dz * dz;
   if (lengthSquared <= Number.EPSILON) {
-    return squaredDistance(point, start);
+    return squaredDistance(center, start) <= radius * radius ? 0 : undefined;
   }
-  const progress = Math.max(0, Math.min(1, (
-    (point[0] - start[0]) * dx
-    + (point[1] - start[1]) * dy
-    + (point[2] - start[2]) * dz
-  ) / lengthSquared));
-  return squaredDistance(point, [
-    start[0] + dx * progress,
-    start[1] + dy * progress,
-    start[2] + dz * progress,
-  ]);
+  const mx = start[0] - center[0];
+  const my = start[1] - center[1];
+  const mz = start[2] - center[2];
+  const inside = mx * mx + my * my + mz * mz - radius * radius;
+  if (inside <= 0) {
+    return 0;
+  }
+  const projected = mx * dx + my * dy + mz * dz;
+  const discriminant = projected * projected - lengthSquared * inside;
+  if (discriminant < 0) {
+    return undefined;
+  }
+  const fraction = (-projected - Math.sqrt(discriminant)) / lengthSquared;
+  return fraction >= 0 && fraction <= 1 ? fraction : undefined;
 }
 
 function validateVector(vector: TrackVector3, name: string): void {
@@ -299,6 +329,7 @@ export class CombatSession {
     stepSeconds: number,
     playerFrames: CombatPlayerFrames,
     useRequests: CombatUseRequests = {},
+    worldCollisionQuery?: CombatWorldCollisionQuery,
   ): readonly CombatEvent[] {
     if (!Number.isFinite(stepSeconds) || stepSeconds <= 0) {
       throw new Error("Combat stepSeconds must be a finite positive number");
@@ -322,7 +353,7 @@ export class CombatSession {
     }
     this.#advancePickups(stepSeconds, playerFrames, events);
     this.#fireWeapons(playerFrames, useRequests, events);
-    this.#advanceProjectiles(stepSeconds, playerFrames, events);
+    this.#advanceProjectiles(stepSeconds, playerFrames, events, worldCollisionQuery);
     return events;
   }
 
@@ -429,6 +460,7 @@ export class CombatSession {
     stepSeconds: number,
     playerFrames: CombatPlayerFrames,
     events: CombatEvent[],
+    worldCollisionQuery: CombatWorldCollisionQuery | undefined,
   ): void {
     const removed = new Set<number>();
     for (const projectile of this.#projectiles) {
@@ -448,39 +480,91 @@ export class CombatSession {
       if (projectile.ageSeconds < config.armingSeconds) {
         continue;
       }
-      const directTarget = this.#players.find((player) => {
+      const worldHit = worldCollisionQuery && squaredDistance(
+        projectile.previousPosition,
+        projectile.position,
+      ) > Number.EPSILON
+        ? worldCollisionQuery({
+            projectileId: projectile.id,
+            weapon: projectile.weapon,
+            ownerId: projectile.ownerId,
+            start: [...projectile.previousPosition],
+            end: [...projectile.position],
+          })
+        : undefined;
+      if (worldHit) {
+        if (!Number.isFinite(worldHit.fraction) || worldHit.fraction < 0 || worldHit.fraction > 1) {
+          throw new Error(`Combat world hit for projectile ${projectile.id} must have a fraction from 0 to 1`);
+        }
+        validateVector(worldHit.normal, `Combat world hit ${projectile.id} normal`);
+      }
+      const directHit = this.#players.flatMap((player) => {
         const frame = playerFrames[player.definition.id];
-        return !player.destroyed
-          && frame !== undefined
-          && (player.definition.id !== projectile.ownerId
-            || projectile.ageSeconds >= config.ownerImmunitySeconds)
-          && pointToSegmentSquaredDistance(
-            frame.position,
-            projectile.previousPosition,
-            projectile.position,
-          ) <= config.projectileHitRadiusMeters * config.projectileHitRadiusMeters;
-      });
-      if (!directTarget) {
+        if (
+          player.destroyed
+          || !frame
+          || (player.definition.id === projectile.ownerId
+            && projectile.ageSeconds < config.ownerImmunitySeconds)
+        ) {
+          return [];
+        }
+        const fraction = segmentSphereHitFraction(
+          frame.position,
+          projectile.previousPosition,
+          projectile.position,
+          config.projectileHitRadiusMeters,
+        );
+        return fraction === undefined ? [] : [{ player, fraction }];
+      }).sort((left, right) => left.fraction - right.fraction)[0];
+      const directTarget = directHit && (!worldHit || directHit.fraction <= worldHit.fraction)
+        ? directHit.player
+        : undefined;
+      const impactFraction = directTarget ? directHit!.fraction : worldHit?.fraction;
+      const collisionEnd: TrackVector3 = impactFraction !== undefined
+        ? [
+            projectile.previousPosition[0]
+              + (projectile.position[0] - projectile.previousPosition[0]) * impactFraction,
+            projectile.previousPosition[1]
+              + (projectile.position[1] - projectile.previousPosition[1]) * impactFraction,
+            projectile.previousPosition[2]
+              + (projectile.position[2] - projectile.previousPosition[2]) * impactFraction,
+          ]
+        : projectile.position;
+      if (!directTarget && !worldHit) {
         continue;
       }
       removed.add(projectile.id);
-      const affected = config.explosionRadiusMeters > 0
+      if (worldHit && !directTarget) {
+        projectile.position = collisionEnd;
+        events.push({
+          type: "projectile-world-impact",
+          projectileId: projectile.id,
+          ownerId: projectile.ownerId,
+          weapon: projectile.weapon,
+          position: [...collisionEnd],
+          normal: [...worldHit.normal],
+          ...(worldHit.objectId ? { objectId: worldHit.objectId } : {}),
+        });
+      }
+      const affected = directTarget && config.explosionRadiusMeters === 0
+        ? [directTarget]
+        : config.explosionRadiusMeters > 0
         ? this.#players.filter((player) => {
             const frame = playerFrames[player.definition.id];
             return !player.destroyed
               && frame !== undefined
               && (player.definition.id !== projectile.ownerId
                 || projectile.ageSeconds >= config.ownerImmunitySeconds)
-              && squaredDistance(frame.position, projectile.position)
+              && squaredDistance(frame.position, collisionEnd)
               <= config.explosionRadiusMeters * config.explosionRadiusMeters;
           })
-        : [directTarget];
+        : [];
       for (const target of affected) {
         const frame = playerFrames[target.definition.id]!;
         const damage = Math.min(target.health, config.damage);
         target.health -= damage;
         const knockbackImpulse = normalizedKnockback(
-          projectile.position,
+          collisionEnd,
           frame.position,
           projectile.velocity,
           config.knockbackImpulse,

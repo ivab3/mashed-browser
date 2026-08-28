@@ -309,8 +309,11 @@ damage, Rapier knockback и уничтожение через общий race-el
 цветные pickup/projectile meshes и health/weapon HUD; E, / и gamepad X активируют предмет.
 Пятый срез добавил явное состояние pause/resume, автоматическую паузу при потере фокуса без
 simulation catch-up, per-player engine voices, UI cues и baseline particles для pickup, выстрелов,
-урона и разрушений. Original audio, world impacts projectiles, финальный effects polish и M1
-hardening остаются следующими срезами.
+урона и разрушений. Шестой срез добавил validated reader исходных PC RWS dictionaries, Worker
+transfer 422 PCM sample, привязку `PERMDICT` engine/weapon/collision/UI cues с synthesized fallback,
+а также Rapier world raycasts для projectiles, wall-truncated player hits, rocket splash в точке
+world impact и projectile destruction/impulse для props. Следующим срезом остаётся M1 hardening;
+voice streams, authored pickup placement, trails и decals не блокируют proof of concept.
 
 Milestone M1: публично показываемый proof of concept.
 

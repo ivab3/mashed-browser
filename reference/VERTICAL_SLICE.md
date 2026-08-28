@@ -2,7 +2,8 @@
 
 Status: Stage 5 started on 2026-08-28. Deterministic race rules, the production local roster,
 shared-camera elimination, the first playable combat loop, and the presentation foundation are
-implemented; original-audio binding, world impacts, final polish, and hardening remain open.
+implemented. Original PCM audio and projectile world impacts complete the content/impact follow-up;
+M1 hardening and optional post-slice polish remain open.
 
 ## Slice 5.1 — race rules foundation
 
@@ -116,12 +117,38 @@ The complete-match shell now has an explicit, deterministic presentation layer:
 The engine and UI tones in this slice are an offline-safe fallback. Binding extracted original
 engine, collision, weapon, and interface samples is the next content slice.
 
+## Slice 5.6 — original PCM audio and projectile world impacts
+
+The runtime now consumes the user-owned PC sound dictionaries and closes the projectile/world gap:
+
+- `@mashed/assets` validates the nested RenderWare Audio `WAVEDICT → WAVE → header/data` hierarchy,
+  accepts the confirmed PC PCM codec GUID, and returns named mono PCM16 samples as transferable data;
+- the reader was exercised against all 29 extracted `0x809` dictionaries: 422/422 samples decode at
+  22050 Hz. The 30 localized `0x80d` voice streams are intentionally left to a later voice-content
+  pass because the vertical slice does not depend on them;
+- `.RWS` joins DFF/TXD/BSP in the loading Worker and local file picker. Loading `PERMDICT.RWS`
+  registers 45 original samples without copying original bytes into the repository or build;
+- per-player `eng1`–`eng4` loops replace synthesized engine voices when present, with playback rate
+  driven by speed/throttle. Named original samples cover machine gun, rocket, mine, explosion,
+  collision, break, pickup, race-start, pause/resume, and menu cues; synthesis remains the safe
+  fallback when no matching bank is loaded;
+- moving projectiles submit their fixed-step segment to an injected world query. Rapier raycasts
+  track/scenery while excluding vehicle bodies, then reports only a hit fraction, normal, and optional
+  prop ID back to the pure combat rules;
+- a wall truncates the player-hit segment, rockets splash from the actual world impact, and plain
+  `projectile-world-impact` events drive original audio and deterministic particles;
+- identified dynamic props receive projectile impulse, while rocket impacts disable destructible
+  props through the existing object-destruction event/reset flow.
+
+The world query is an explicit deterministic input to `CombatSession`; replaying the same player
+tape and collision answers remains independent of render cadence and of Rapier/Web Audio types.
+
 ## Planned slices
 
-1. **Original content and impacts:** bind local engine/collision/weapon/UI audio, add projectile
-   collisions with track/scenery, and finish the battle-loop effects pass.
-2. **M1 hardening:** browser replay matrix, 30-minute soak, four-player 1080p performance scene,
+1. **M1 hardening:** browser replay matrix, 30-minute soak, four-player 1080p performance scene,
    and verification that prepared game data causes no network request after initial loading.
+2. **Optional polish after M1 evidence:** authored pickup placement, fire trails, damage decals, and
+   localized voice-stream playback.
 
 ## Verification
 
@@ -129,7 +156,8 @@ The suites cover countdown gating, ordered multi-lap finish, last-player-standin
 camera warnings/elimination/re-entry, independent multiplayer progress, roster/grid validation,
 vehicle deactivation/rematch reset, four independent physics slots, asset catalog order,
 keyboard/gamepad ownership and item-edge input, three weapon/projectile profiles, swept damage,
-knockback/destruction, pickup respawn, and repeated combat-tape equality. Browser smoke covers live 1→4→1
+knockback/destruction, pickup respawn, world-hit truncation/splash, Rapier world/prop raycasts,
+PCM dictionary structure/codec/data lengths, and repeated combat-tape equality. Browser smoke covers live 1→4→1
 roster changes, four grounded bodies, repeated `menu → race → results → race`, hidden-row behavior,
 combat HUD/pickup draw calls, a constant simulation step throughout pause, continuous step numbering
 after resume, prop metrics, and console cleanliness. Run the committed checks with:

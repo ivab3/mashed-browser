@@ -21,6 +21,12 @@ export const RW_CHUNK_IDS = {
   piTextureDictionary: 0x23,
   userData: 0x11f,
   materialEffects: 0x120,
+  wave: 0x802,
+  waveHeader: 0x803,
+  waveData: 0x804,
+  waveDictionary: 0x809,
+  waveDictionaryHeader: 0x80a,
+  waveDictionaryData: 0x80c,
 } as const;
 
 const CHUNK_NAMES = new Map<number, string>(

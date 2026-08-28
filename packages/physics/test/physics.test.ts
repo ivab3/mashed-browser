@@ -366,6 +366,46 @@ describe("PhysicsRuntime", () => {
     }
   });
 
+  it("casts projectile segments against world geometry while excluding vehicle bodies", async () => {
+    const physics = await createPhysicsRuntime(new RuntimeEventBus());
+    try {
+      physics.step(1 / 60);
+      const propHit = physics.castProjectileSegment([-4, 0.55, 5], [-4, 0.55, 9]);
+      expect(propHit?.objectId).toBe("crate-a");
+      expect(propHit?.normal[0]).toBeCloseTo(0, 4);
+      expect(propHit?.normal[1]).toBeCloseTo(0, 4);
+      expect(propHit?.normal[2]).toBeCloseTo(-1, 4);
+      expect(propHit?.fraction).toBeGreaterThan(0);
+      expect(propHit?.fraction).toBeLessThan(1);
+
+      const wallHit = physics.castProjectileSegment([0, 1, 30], [0, 1, 36]);
+      expect(wallHit?.objectId).toBeUndefined();
+      expect(wallHit?.fraction).toBeGreaterThan(0);
+      expect(wallHit?.fraction).toBeLessThan(1);
+      expect(physics.castProjectileSegment([0, 0, 0], [0, 0, 0])).toBeUndefined();
+    } finally {
+      physics.dispose();
+    }
+  });
+
+  it("applies projectile impulses and destruction to identified scene props", async () => {
+    const events = new RuntimeEventBus();
+    const received: RuntimeEvent[] = [];
+    events.subscribe((event) => received.push(event));
+    const physics = await createPhysicsRuntime(events);
+    try {
+      physics.impactSceneObject("crate-a", [0, 2_000, 8_000], true);
+      expect(physics.sceneObjects.find((object) => object.id === "crate-a")?.active).toBe(false);
+      expect(received).toContainEqual(expect.objectContaining({
+        type: "physics:object-destroyed",
+        id: "crate-a",
+      }));
+      expect(() => physics.impactSceneObject("crate-b", [Number.NaN, 0, 0], false)).toThrow(/finite/);
+    } finally {
+      physics.dispose();
+    }
+  });
+
   it("maps positive player steering to Rapier's mirrored wheel-steering direction", async () => {
     const physics = await createPhysicsRuntime(
       new RuntimeEventBus(),

@@ -18,7 +18,7 @@ interface PendingRequest {
 
 function assetKind(fileName: string): AssetKind {
   const extension = fileName.split(".").pop()?.toLocaleLowerCase("en-US");
-  if (extension === "dff" || extension === "txd" || extension === "bsp") {
+  if (extension === "dff" || extension === "txd" || extension === "bsp" || extension === "rws") {
     return extension;
   }
   throw new Error(`Unsupported asset extension in ${fileName}`);
