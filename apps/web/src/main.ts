@@ -95,8 +95,16 @@ function assetSummary(asset: LoadedAsset): string {
 }
 
 const STEP_SECONDS = 1 / 60;
-const COMBAT_EFFECT_COLORS = Object.freeze({
+const COMBAT_EFFECT_COLORS: Readonly<Record<CombatWeaponType, number>> = Object.freeze({
   "machine-gun": 0xffcf4a,
+  "guided-missile": 0xff654f,
+  mortar: 0xff9f43,
+  "rear-flame": 0xff6a22,
+  oil: 0x242a32,
+  "proximity-mine": 0x8d6be8,
+  "drum-bomb": 0xc44735,
+  shotgun: 0x77d9ff,
+  flash: 0xffffff,
   rocket: 0xff654f,
   mine: 0x8d6be8,
 });
@@ -452,10 +460,23 @@ function combatWeaponForPowerup(type: OriginalPowerupType): CombatWeaponType | u
     case "machine-gun":
       return "machine-gun";
     case "guided-missile":
-      return "rocket";
+      return "guided-missile";
+    case "mortar":
+      return "mortar";
+    case "rear-flame":
+      return "rear-flame";
+    case "oil":
+      return "oil";
+    case "detonator":
+    case "drum":
+      return "drum-bomb";
     case "mine":
     case "proximity-mine":
-      return "mine";
+      return "proximity-mine";
+    case "shotgun":
+      return "shotgun";
+    case "flash":
+      return "flash";
     default:
       return undefined;
   }
@@ -483,7 +504,7 @@ function combatPickupDefinitions(): readonly CombatPickupDefinition[] {
   });
   const weapons: readonly CombatWeaponType[] = configuredWeapons && configuredWeapons.length > 0
     ? configuredWeapons
-    : ["machine-gun", "rocket", "mine"];
+    : ["machine-gun", "guided-missile", "proximity-mine"];
   if (trackDefinition) {
     const checkpointIndices = weapons.map((_, index) => (
       (index + 1) / (weapons.length + 1)
@@ -501,8 +522,8 @@ function combatPickupDefinitions(): readonly CombatPickupDefinition[] {
   }
   return [
     { id: "pickup-machine-gun", weapon: "machine-gun", position: [-4, 0.7, -3] },
-    { id: "pickup-rocket", weapon: "rocket", position: [-4, 0.7, 8] },
-    { id: "pickup-mine", weapon: "mine", position: [-4, 0.7, 19] },
+    { id: "pickup-guided-missile", weapon: "guided-missile", position: [-4, 0.7, 8] },
+    { id: "pickup-proximity-mine", weapon: "proximity-mine", position: [-4, 0.7, 19] },
   ];
 }
 
@@ -522,7 +543,12 @@ function applyCombatHud(): void {
     if (!player) {
       return;
     }
-    const health = player.destroyed ? "DESTROYED" : `${Math.ceil(player.health)} HP`;
+    const effectLabel = player.effects.map((effect) => (
+      `${effect.type === "oiled" ? "OIL" : "FLASH"} ${effect.secondsRemaining.toFixed(1)}s`
+    )).join(" · ");
+    const health = player.destroyed
+      ? "DESTROYED"
+      : `${Math.ceil(player.health)} HP${effectLabel ? ` · ${effectLabel}` : ""}`;
     const item = player.inventory
       ? `${player.inventory.weapon.replace("machine-gun", "MG")} ×${player.inventory.ammo}`
       : "EMPTY";
@@ -582,6 +608,41 @@ function handleRaceEvents(raceEvents: readonly RaceEvent[]): string | undefined 
   return finishReason;
 }
 
+function combatSampleName(weapon: CombatWeaponType): string {
+  switch (weapon) {
+    case "machine-gun":
+      return "machineg";
+    case "guided-missile":
+    case "rocket":
+      return "rocket";
+    case "mortar":
+      return "mortarexhaust";
+    case "rear-flame":
+      return "flame thrower";
+    case "oil":
+      return "oilslick";
+    case "shotgun":
+      return "shotgun";
+    case "flash":
+      return "flash";
+    case "drum-bomb":
+    case "proximity-mine":
+    case "mine":
+      return "drop mine";
+  }
+}
+
+function explosiveCombatWeapon(weapon: CombatWeaponType): boolean {
+  return [
+    "guided-missile",
+    "mortar",
+    "proximity-mine",
+    "drum-bomb",
+    "rocket",
+    "mine",
+  ].includes(weapon);
+}
+
 function handleCombatEvents(combatEvents: readonly CombatEvent[]): string | undefined {
   let finishReason: string | undefined;
   for (const event of combatEvents) {
@@ -610,9 +671,7 @@ function handleCombatEvents(combatEvents: readonly CombatEvent[]): string | unde
           type: "audio:cue",
           cue: "weapon-fire",
           gain: 0.07,
-          sampleName: event.weapon === "machine-gun"
-            ? "machineg"
-            : event.weapon === "rocket" ? "rocket" : "drop mine",
+          sampleName: combatSampleName(event.weapon),
         });
         {
           const projectile = combatSession?.snapshot.projectiles.find((candidate) => (
@@ -631,6 +690,32 @@ function handleCombatEvents(combatEvents: readonly CombatEvent[]): string | unde
           }
         }
         break;
+      case "weapon-boosted":
+        physics?.applyVehicleImpulse(event.playerId, event.impulse);
+        break;
+      case "player-affected": {
+        runtimeStatus.textContent = `${event.playerId} ${event.effect} for ${event.durationSeconds.toFixed(1)}s`;
+        events.emit({
+          type: "audio:cue",
+          cue: "impact",
+          gain: event.effect === "flashed" ? 0.11 : 0.07,
+          sampleName: event.effect === "flashed" ? "flash" : "oilslick",
+        });
+        const position = physics?.getVehicleTransformHistory(event.playerId)?.current.position;
+        if (position) {
+          events.emit({
+            type: "renderer:burst",
+            position,
+            color: COMBAT_EFFECT_COLORS[event.weapon],
+            count: event.effect === "flashed" ? 22 : 10,
+            durationSeconds: event.effect === "flashed" ? 0.55 : 0.4,
+          });
+        }
+        if (event.effect === "flashed") {
+          events.emit({ type: "renderer:flash", color: 0xffffff, durationSeconds: 0.16 });
+        }
+        break;
+      }
       case "player-damaged":
         physics?.applyVehicleImpulse(event.playerId, event.knockbackImpulse);
         runtimeStatus.textContent = `${event.playerId} ${event.healthRemaining} HP`;
@@ -638,7 +723,9 @@ function handleCombatEvents(combatEvents: readonly CombatEvent[]): string | unde
           type: "audio:cue",
           cue: "impact",
           gain: 0.1,
-          sampleName: event.weapon === "machine-gun" ? "bullethitscar" : "explosion1",
+          sampleName: event.weapon === "machine-gun" || event.weapon === "shotgun" || event.weapon === "rear-flame"
+            ? "bullethitscar"
+            : "explosion1",
         });
         events.emit({ type: "renderer:flash", color: 0xff493d, durationSeconds: 0.12 });
         {
@@ -682,7 +769,7 @@ function handleCombatEvents(combatEvents: readonly CombatEvent[]): string | unde
         break;
       }
       case "projectile-world-impact": {
-        const explosive = event.weapon !== "machine-gun";
+        const explosive = explosiveCombatWeapon(event.weapon);
         const impulseMagnitude = explosive ? 12_000 : 2_400;
         if (event.objectId) {
           physics?.impactSceneObject(event.objectId, [
@@ -1163,13 +1250,22 @@ function updateCameraEliminations(
 function sampleVehicleInputs(gamepads: readonly (Gamepad | null)[]): VehicleInputById {
   const sampled: Record<string, VehicleInputFrame> = {};
   const racePlayers = new Map(raceSession?.snapshot.players.map((player) => [player.id, player.status]));
+  const combatPlayers = new Map(combatSession?.snapshot.players.map((player) => [player.id, player]));
   activePlayerSlots().forEach((slot, index) => {
     const canDrive = !raceSession || (
       raceSession.phase === "racing" && racePlayers.get(slot.id) === "racing"
     );
-    sampled[slot.id] = canDrive
+    const input = canDrive
       ? vehicleInputs[index]?.sample(gamepads) ?? NEUTRAL_VEHICLE_INPUT
       : NEUTRAL_VEHICLE_INPUT;
+    const effects = combatPlayers.get(slot.id)?.effects ?? [];
+    const oiled = effects.some((effect) => effect.type === "oiled");
+    const flashed = effects.some((effect) => effect.type === "flashed");
+    sampled[slot.id] = effects.length === 0 ? input : {
+      ...input,
+      drive: flashed ? input.drive * 0.7 : input.drive,
+      steer: input.steer * (oiled ? 0.28 : 1) * (flashed ? -1 : 1),
+    };
   });
   return sampled;
 }

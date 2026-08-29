@@ -1,7 +1,23 @@
 import type { TrackVector3 } from "./lap-session.js";
 import { LOCAL_PLAYER_SLOTS } from "./local-roster.js";
 
-export type CombatWeaponType = "machine-gun" | "rocket" | "mine";
+export type CombatWeaponType =
+  | "machine-gun"
+  | "guided-missile"
+  | "mortar"
+  | "rear-flame"
+  | "oil"
+  | "proximity-mine"
+  | "drum-bomb"
+  | "shotgun"
+  | "flash"
+  /** Stage 5 replay compatibility alias for guided-missile. */
+  | "rocket"
+  /** Stage 5 replay compatibility alias for proximity-mine. */
+  | "mine";
+
+export type CombatStatusEffectType = "oiled" | "flashed";
+export type CombatWeaponDelivery = "forward" | "rear" | "rear-hazard" | "radial";
 
 export interface CombatWeaponConfig {
   ammo: number;
@@ -14,6 +30,13 @@ export interface CombatWeaponConfig {
   knockbackImpulse: number;
   ownerImmunitySeconds: number;
   armingSeconds: number;
+  delivery: CombatWeaponDelivery;
+  initialVerticalSpeedMetersPerSecond: number;
+  gravityMetersPerSecondSquared: number;
+  homingRadiansPerSecond: number;
+  selfBoostImpulse: number;
+  statusEffect?: CombatStatusEffectType;
+  statusDurationSeconds: number;
 }
 
 export interface CombatPickupDefinition {
@@ -72,6 +95,13 @@ export interface CombatPlayerSnapshot {
   maximumHealth: number;
   destroyed: boolean;
   inventory: CombatInventorySnapshot | null;
+  effects: readonly CombatStatusEffectSnapshot[];
+}
+
+export interface CombatStatusEffectSnapshot {
+  type: CombatStatusEffectType;
+  sourcePlayerId: string;
+  secondsRemaining: number;
 }
 
 export interface CombatPickupSnapshot extends CombatPickupDefinition {
@@ -111,6 +141,20 @@ export type CombatEvent =
     }
   | { type: "player-destroyed"; playerId: string; sourcePlayerId: string; weapon: CombatWeaponType }
   | {
+      type: "player-affected";
+      playerId: string;
+      sourcePlayerId: string;
+      weapon: CombatWeaponType;
+      effect: CombatStatusEffectType;
+      durationSeconds: number;
+    }
+  | {
+      type: "weapon-boosted";
+      playerId: string;
+      weapon: CombatWeaponType;
+      impulse: TrackVector3;
+    }
+  | {
       type: "projectile-world-impact";
       projectileId: number;
       ownerId: string;
@@ -133,6 +177,158 @@ export const COMBAT_WEAPON_CONFIGS: Readonly<Record<CombatWeaponType, Readonly<C
     knockbackImpulse: 2_400,
     ownerImmunitySeconds: 0.12,
     armingSeconds: 0,
+    delivery: "forward",
+    initialVerticalSpeedMetersPerSecond: 0,
+    gravityMetersPerSecondSquared: 0,
+    homingRadiansPerSecond: 0,
+    selfBoostImpulse: 0,
+    statusDurationSeconds: 0,
+  }),
+  "guided-missile": Object.freeze({
+    ammo: 3,
+    cooldownSeconds: 0.65,
+    damage: 38,
+    projectileSpeedMetersPerSecond: 24,
+    projectileLifetimeSeconds: 3,
+    projectileHitRadiusMeters: 1.25,
+    explosionRadiusMeters: 4,
+    knockbackImpulse: 11_000,
+    ownerImmunitySeconds: 0.3,
+    armingSeconds: 0,
+    delivery: "forward",
+    initialVerticalSpeedMetersPerSecond: 0,
+    gravityMetersPerSecondSquared: 0,
+    homingRadiansPerSecond: 2.4,
+    selfBoostImpulse: 0,
+    statusDurationSeconds: 0,
+  }),
+  mortar: Object.freeze({
+    ammo: 3,
+    cooldownSeconds: 0.7,
+    damage: 46,
+    projectileSpeedMetersPerSecond: 18,
+    projectileLifetimeSeconds: 4,
+    projectileHitRadiusMeters: 1.2,
+    explosionRadiusMeters: 3.7,
+    knockbackImpulse: 12_500,
+    ownerImmunitySeconds: 0.45,
+    armingSeconds: 0,
+    delivery: "forward",
+    initialVerticalSpeedMetersPerSecond: 8,
+    gravityMetersPerSecondSquared: 18,
+    homingRadiansPerSecond: 0,
+    selfBoostImpulse: 0,
+    statusDurationSeconds: 0,
+  }),
+  "rear-flame": Object.freeze({
+    ammo: 8,
+    cooldownSeconds: 0.16,
+    damage: 18,
+    projectileSpeedMetersPerSecond: 0,
+    projectileLifetimeSeconds: 2.2,
+    projectileHitRadiusMeters: 2.4,
+    explosionRadiusMeters: 0,
+    knockbackImpulse: 3_200,
+    ownerImmunitySeconds: 0.8,
+    armingSeconds: 0.08,
+    delivery: "rear-hazard",
+    initialVerticalSpeedMetersPerSecond: 0,
+    gravityMetersPerSecondSquared: 0,
+    homingRadiansPerSecond: 0,
+    selfBoostImpulse: 1_600,
+    statusDurationSeconds: 0,
+  }),
+  oil: Object.freeze({
+    ammo: 6,
+    cooldownSeconds: 0.22,
+    damage: 0,
+    projectileSpeedMetersPerSecond: 0,
+    projectileLifetimeSeconds: 12,
+    projectileHitRadiusMeters: 2.6,
+    explosionRadiusMeters: 0,
+    knockbackImpulse: 0,
+    ownerImmunitySeconds: 1,
+    armingSeconds: 0.25,
+    delivery: "rear-hazard",
+    initialVerticalSpeedMetersPerSecond: 0,
+    gravityMetersPerSecondSquared: 0,
+    homingRadiansPerSecond: 0,
+    selfBoostImpulse: 0,
+    statusEffect: "oiled",
+    statusDurationSeconds: 3.5,
+  }),
+  "proximity-mine": Object.freeze({
+    ammo: 2,
+    cooldownSeconds: 0.5,
+    damage: 52,
+    projectileSpeedMetersPerSecond: 0,
+    projectileLifetimeSeconds: 16,
+    projectileHitRadiusMeters: 2.2,
+    explosionRadiusMeters: 3.5,
+    knockbackImpulse: 14_000,
+    ownerImmunitySeconds: 1,
+    armingSeconds: 0.55,
+    delivery: "rear-hazard",
+    initialVerticalSpeedMetersPerSecond: 0,
+    gravityMetersPerSecondSquared: 0,
+    homingRadiansPerSecond: 0,
+    selfBoostImpulse: 0,
+    statusDurationSeconds: 0,
+  }),
+  "drum-bomb": Object.freeze({
+    ammo: 2,
+    cooldownSeconds: 0.55,
+    damage: 58,
+    projectileSpeedMetersPerSecond: 11,
+    projectileLifetimeSeconds: 5,
+    projectileHitRadiusMeters: 1.5,
+    explosionRadiusMeters: 3.8,
+    knockbackImpulse: 15_000,
+    ownerImmunitySeconds: 0.65,
+    armingSeconds: 0.2,
+    delivery: "rear",
+    initialVerticalSpeedMetersPerSecond: 1.5,
+    gravityMetersPerSecondSquared: 5,
+    homingRadiansPerSecond: 0,
+    selfBoostImpulse: 0,
+    statusDurationSeconds: 0,
+  }),
+  shotgun: Object.freeze({
+    ammo: 4,
+    cooldownSeconds: 0.45,
+    damage: 28,
+    projectileSpeedMetersPerSecond: 0,
+    projectileLifetimeSeconds: 0.05,
+    projectileHitRadiusMeters: 4.8,
+    explosionRadiusMeters: 4.8,
+    knockbackImpulse: 10_000,
+    ownerImmunitySeconds: 1,
+    armingSeconds: 0,
+    delivery: "radial",
+    initialVerticalSpeedMetersPerSecond: 0,
+    gravityMetersPerSecondSquared: 0,
+    homingRadiansPerSecond: 0,
+    selfBoostImpulse: 0,
+    statusDurationSeconds: 0,
+  }),
+  flash: Object.freeze({
+    ammo: 1,
+    cooldownSeconds: 0.5,
+    damage: 0,
+    projectileSpeedMetersPerSecond: 0,
+    projectileLifetimeSeconds: 0.05,
+    projectileHitRadiusMeters: 18,
+    explosionRadiusMeters: 18,
+    knockbackImpulse: 0,
+    ownerImmunitySeconds: 1,
+    armingSeconds: 0,
+    delivery: "radial",
+    initialVerticalSpeedMetersPerSecond: 0,
+    gravityMetersPerSecondSquared: 0,
+    homingRadiansPerSecond: 0,
+    selfBoostImpulse: 0,
+    statusEffect: "flashed",
+    statusDurationSeconds: 2.25,
   }),
   rocket: Object.freeze({
     ammo: 3,
@@ -145,6 +341,12 @@ export const COMBAT_WEAPON_CONFIGS: Readonly<Record<CombatWeaponType, Readonly<C
     knockbackImpulse: 11_000,
     ownerImmunitySeconds: 0.3,
     armingSeconds: 0,
+    delivery: "forward",
+    initialVerticalSpeedMetersPerSecond: 0,
+    gravityMetersPerSecondSquared: 0,
+    homingRadiansPerSecond: 0,
+    selfBoostImpulse: 0,
+    statusDurationSeconds: 0,
   }),
   mine: Object.freeze({
     ammo: 2,
@@ -157,6 +359,12 @@ export const COMBAT_WEAPON_CONFIGS: Readonly<Record<CombatWeaponType, Readonly<C
     knockbackImpulse: 14_000,
     ownerImmunitySeconds: 1,
     armingSeconds: 0.55,
+    delivery: "rear-hazard",
+    initialVerticalSpeedMetersPerSecond: 0,
+    gravityMetersPerSecondSquared: 0,
+    homingRadiansPerSecond: 0,
+    selfBoostImpulse: 0,
+    statusDurationSeconds: 0,
   }),
 });
 
@@ -167,6 +375,7 @@ interface CombatPlayerRuntime {
   destroyed: boolean;
   inventory: CombatInventorySnapshot | undefined;
   cooldownSecondsRemaining: number;
+  readonly effects: Map<CombatStatusEffectType, CombatStatusEffectSnapshot>;
 }
 
 interface CombatPickupRuntime {
@@ -245,6 +454,16 @@ function normalizedKnockback(
   return [x / length * magnitude, magnitude * 0.16, z / length * magnitude];
 }
 
+function shortestAngle(from: number, to: number): number {
+  let difference = (to - from) % (Math.PI * 2);
+  if (difference > Math.PI) {
+    difference -= Math.PI * 2;
+  } else if (difference < -Math.PI) {
+    difference += Math.PI * 2;
+  }
+  return difference;
+}
+
 /** Pure fixed-step pickup, projectile, damage, and destruction rules for one local match. */
 export class CombatSession {
   readonly #players: CombatPlayerRuntime[];
@@ -284,6 +503,7 @@ export class CombatSession {
         destroyed: false,
         inventory: undefined,
         cooldownSecondsRemaining: 0,
+        effects: new Map(),
       };
     });
     const pickupIds = new Set<string>();
@@ -312,6 +532,7 @@ export class CombatSession {
         maximumHealth: this.#maximumHealth,
         destroyed: player.destroyed,
         inventory: player.inventory ? { ...player.inventory } : null,
+        effects: [...player.effects.values()].map((effect) => ({ ...effect })),
       })),
       pickups: this.#pickups.map((pickup) => ({
         ...pickup.definition,
@@ -356,6 +577,12 @@ export class CombatSession {
     const events: CombatEvent[] = [];
     for (const player of this.#players) {
       player.cooldownSecondsRemaining = Math.max(0, player.cooldownSecondsRemaining - stepSeconds);
+      for (const [type, effect] of player.effects) {
+        effect.secondsRemaining = Math.max(0, effect.secondsRemaining - stepSeconds);
+        if (effect.secondsRemaining === 0) {
+          player.effects.delete(type);
+        }
+      }
     }
     this.#advancePickups(stepSeconds, playerFrames, events);
     this.#fireWeapons(playerFrames, useRequests, events);
@@ -420,19 +647,21 @@ export class CombatSession {
       }
       const config = COMBAT_WEAPON_CONFIGS[inventory.weapon];
       const forward: TrackVector3 = [Math.sin(frame.headingRadians), 0, Math.cos(frame.headingRadians)];
-      const mine = inventory.weapon === "mine";
-      const offset = mine ? -1.9 : 1.8;
+      const rearDelivery = config.delivery === "rear" || config.delivery === "rear-hazard";
+      const radialDelivery = config.delivery === "radial";
+      const direction = rearDelivery ? -1 : 1;
+      const offset = radialDelivery ? 0 : rearDelivery ? -1.9 : 1.8;
       const position: TrackVector3 = [
         frame.position[0] + forward[0] * offset,
-        frame.position[1] + (mine ? 0.1 : 0.45),
+        frame.position[1] + (config.delivery === "rear-hazard" ? 0.1 : 0.45),
         frame.position[2] + forward[2] * offset,
       ];
-      const velocity: TrackVector3 = mine
-        ? [0, 0, 0]
+      const velocity: TrackVector3 = config.projectileSpeedMetersPerSecond === 0
+        ? [0, config.initialVerticalSpeedMetersPerSecond, 0]
         : [
-            forward[0] * config.projectileSpeedMetersPerSecond,
-            0,
-            forward[2] * config.projectileSpeedMetersPerSecond,
+            forward[0] * config.projectileSpeedMetersPerSecond * direction,
+            config.initialVerticalSpeedMetersPerSecond,
+            forward[2] * config.projectileSpeedMetersPerSecond * direction,
           ];
       const projectileId = this.#nextProjectileId;
       this.#nextProjectileId += 1;
@@ -459,6 +688,18 @@ export class CombatSession {
         projectileId,
         ammoRemaining,
       });
+      if (config.selfBoostImpulse > 0) {
+        events.push({
+          type: "weapon-boosted",
+          playerId: player.definition.id,
+          weapon,
+          impulse: [
+            forward[0] * config.selfBoostImpulse,
+            config.selfBoostImpulse * 0.04,
+            forward[2] * config.selfBoostImpulse,
+          ],
+        });
+      }
     }
   }
 
@@ -473,6 +714,39 @@ export class CombatSession {
       const config = COMBAT_WEAPON_CONFIGS[projectile.weapon];
       projectile.ageSeconds += stepSeconds;
       projectile.previousPosition = projectile.position;
+      if (config.homingRadiansPerSecond > 0) {
+        const target = this.#players
+          .flatMap((player) => {
+            const frame = playerFrames[player.definition.id];
+            return player.destroyed || player.definition.id === projectile.ownerId || !frame
+              ? []
+              : [{ frame, distanceSquared: squaredDistance(frame.position, projectile.position) }];
+          })
+          .sort((left, right) => left.distanceSquared - right.distanceSquared)[0];
+        const horizontalSpeed = Math.hypot(projectile.velocity[0], projectile.velocity[2]);
+        if (target && horizontalSpeed > 1e-6) {
+          const currentAngle = Math.atan2(projectile.velocity[0], projectile.velocity[2]);
+          const targetAngle = Math.atan2(
+            target.frame.position[0] - projectile.position[0],
+            target.frame.position[2] - projectile.position[2],
+          );
+          const maximumTurn = config.homingRadiansPerSecond * stepSeconds;
+          const turn = Math.max(-maximumTurn, Math.min(maximumTurn, shortestAngle(currentAngle, targetAngle)));
+          const nextAngle = currentAngle + turn;
+          projectile.velocity = [
+            Math.sin(nextAngle) * horizontalSpeed,
+            projectile.velocity[1],
+            Math.cos(nextAngle) * horizontalSpeed,
+          ];
+        }
+      }
+      if (config.gravityMetersPerSecondSquared > 0) {
+        projectile.velocity = [
+          projectile.velocity[0],
+          projectile.velocity[1] - config.gravityMetersPerSecondSquared * stepSeconds,
+          projectile.velocity[2],
+        ];
+      }
       projectile.position = [
         projectile.position[0] + projectile.velocity[0] * stepSeconds,
         projectile.position[1] + projectile.velocity[1] * stepSeconds,
@@ -567,32 +841,51 @@ export class CombatSession {
         : [];
       for (const target of affected) {
         const frame = playerFrames[target.definition.id]!;
-        const damage = Math.min(target.health, config.damage);
-        target.health -= damage;
-        const knockbackImpulse = normalizedKnockback(
-          collisionEnd,
-          frame.position,
-          projectile.velocity,
-          config.knockbackImpulse,
-        );
-        events.push({
-          type: "player-damaged",
-          playerId: target.definition.id,
-          sourcePlayerId: projectile.ownerId,
-          weapon: projectile.weapon,
-          damage,
-          healthRemaining: target.health,
-          knockbackImpulse,
-        });
-        if (target.health === 0) {
-          target.destroyed = true;
-          target.inventory = undefined;
+        if (config.statusEffect) {
+          const effect: CombatStatusEffectSnapshot = {
+            type: config.statusEffect,
+            sourcePlayerId: projectile.ownerId,
+            secondsRemaining: config.statusDurationSeconds,
+          };
+          target.effects.set(config.statusEffect, effect);
           events.push({
-            type: "player-destroyed",
+            type: "player-affected",
             playerId: target.definition.id,
             sourcePlayerId: projectile.ownerId,
             weapon: projectile.weapon,
+            effect: config.statusEffect,
+            durationSeconds: config.statusDurationSeconds,
           });
+        }
+        if (config.damage > 0) {
+          const damage = Math.min(target.health, config.damage);
+          target.health -= damage;
+          const knockbackImpulse = normalizedKnockback(
+            collisionEnd,
+            frame.position,
+            projectile.velocity,
+            config.knockbackImpulse,
+          );
+          events.push({
+            type: "player-damaged",
+            playerId: target.definition.id,
+            sourcePlayerId: projectile.ownerId,
+            weapon: projectile.weapon,
+            damage,
+            healthRemaining: target.health,
+            knockbackImpulse,
+          });
+          if (target.health === 0) {
+            target.destroyed = true;
+            target.inventory = undefined;
+            target.effects.clear();
+            events.push({
+              type: "player-destroyed",
+              playerId: target.definition.id,
+              sourcePlayerId: projectile.ownerId,
+              weapon: projectile.weapon,
+            });
+          }
         }
       }
     }

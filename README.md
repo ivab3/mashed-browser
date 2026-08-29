@@ -6,7 +6,7 @@ from a user-owned disc image or installed copy and are always kept below ignored
 
 Milestones **M0: Asset feasibility** and **M1: public proof of concept** are complete. Stage 6 alpha
 work is underway with validated parsing of original per-course power-up loadouts, authored pickup
-positions, and respawn timings. Stage 1
+positions and respawn timings, plus distinct deterministic rules for all nine base weapon types. Stage 1
 provides a reproducible local extraction pipeline; Stage 2 provides RenderWare DFF/TXD readers, full
 graphical/collision BSP sector parsing, and a Three.js asset viewer. Stage 3 adds a deterministic
 fixed-step core, replay checks, Rapier/Three.js/Web Audio adapters, debug tooling, and the browser
@@ -117,11 +117,14 @@ centers the active group and pulls back as the cars separate; on a loaded route,
 outside the accepted pack receives a fixed-step warning and is then eliminated. Results list the
 complete final order, and `Race again` resets the same match runtime. `/buildings?collisionLab=vehicle-pair`
 remains as a compatibility shortcut that defaults to two players and removes the prop line.
-Three color-coded combat pickups are placed along the route (or the handling-lab center lane): yellow
-machine gun, red rocket, and purple mine. Use an item with `E` for P1, `/` for P2, or gamepad X;
-damage destruction feeds the same elimination and results flow as camera distance.
-Projectiles stop on track/scenery, rockets splash from the world hit, and explosive prop hits use the
-same destruction/reset flow. Load the extracted `PERMDICT.RWS` alongside the track bundle to replace
+Without source metadata, three color-coded combat pickups are placed along the route (or the
+handling-lab center lane). Loading `POWERUPS_ALL.LUA` selects the original course loadout; loading a
+track's `POWERUPS_GOLD.LUA` also restores authored positions and respawn durations. Machine gun,
+guided missile, mortar, rear flame, oil, proximity mine, drum bomb, shotgun, and flash have distinct
+rules. Use an item with `E` for P1, `/` for P2, or gamepad X; damage destruction feeds the same
+elimination/results flow as camera distance, while oil and flash show timed handling effects in the HUD.
+Moving projectiles stop on track/scenery, explosives splash from the world hit, and explosive prop
+hits use the same destruction/reset flow. Load the extracted `PERMDICT.RWS` alongside the track bundle to replace
 fallback tones with the original engine, weapon, collision, explosion, race, and menu samples.
 Pause with the HUD button or `Escape`; losing page focus pauses automatically. Physics, race, combat,
 and elimination steps remain frozen while paused, and resume continues from the same simulation step

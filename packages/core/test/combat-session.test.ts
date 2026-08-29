@@ -7,6 +7,17 @@ import {
 } from "../src/index.js";
 
 const players = [{ id: "p1", displayName: "P1" }, { id: "p2", displayName: "P2" }];
+const alphaWeapons = [
+  "machine-gun",
+  "guided-missile",
+  "mortar",
+  "rear-flame",
+  "oil",
+  "proximity-mine",
+  "drum-bomb",
+  "shotgun",
+  "flash",
+] as const;
 
 function frames(p1Z = 0, p2Z = 20): CombatPlayerFrames {
   return {
@@ -79,6 +90,102 @@ describe("CombatSession", () => {
     ]);
     expect(combat.snapshot.projectiles.find((projectile) => projectile.weapon === "mine")?.velocity)
       .toEqual([0, 0, 0]);
+  });
+
+  it("gives every alpha weapon a distinct deterministic delivery profile", () => {
+    for (const weapon of alphaWeapons) {
+      const combat = new CombatSession({
+        players: [{ id: "p1" }],
+        pickups: [{ id: weapon, weapon, position: [0, 0, 0] }],
+      });
+      combat.advance(0.01, { p1: { position: [0, 0, 0], headingRadians: 0 } });
+      const events = combat.advance(
+        0.01,
+        { p1: { position: [0, 0, 0], headingRadians: 0 } },
+        { p1: true },
+      );
+      expect(events).toContainEqual(expect.objectContaining({
+        type: "weapon-fired",
+        playerId: "p1",
+        weapon,
+      }));
+      expect(combat.snapshot.players[0]?.inventory?.ammo ?? 0)
+        .toBe(Math.max(0, COMBAT_WEAPON_CONFIGS[weapon].ammo - 1));
+      expect(combat.snapshot.projectiles[0]?.weapon).toBe(weapon);
+    }
+  });
+
+  it("steers a guided missile toward the nearest target and applies mortar gravity", () => {
+    const guided = new CombatSession({
+      players,
+      pickups: [{ id: "guided", weapon: "guided-missile", position: [0, 0, 0] }],
+    });
+    const targetToTheRight: CombatPlayerFrames = {
+      p1: { position: [0, 0, 0], headingRadians: 0 },
+      p2: { position: [10, 0, 10], headingRadians: 0 },
+    };
+    guided.advance(0.01, targetToTheRight);
+    guided.advance(0.1, targetToTheRight, { p1: true });
+    expect(guided.snapshot.projectiles[0]?.velocity[0]).toBeGreaterThan(0);
+
+    const mortar = new CombatSession({
+      players,
+      pickups: [{ id: "mortar", weapon: "mortar", position: [0, 0, 0] }],
+    });
+    mortar.advance(0.01, frames());
+    mortar.advance(0.1, frames(), { p1: true });
+    expect(mortar.snapshot.projectiles[0]?.velocity[1]).toBeCloseTo(6.2);
+  });
+
+  it("applies and expires oil and flash handling effects on fixed-step time", () => {
+    const oil = new CombatSession({
+      players,
+      pickups: [{ id: "oil", weapon: "oil", position: [0, 0, 0] }],
+    });
+    const oilFrames: CombatPlayerFrames = {
+      p1: { position: [0, 0, 0], headingRadians: 0 },
+      p2: { position: [0, 0, -1.9], headingRadians: 0 },
+    };
+    oil.advance(0.01, oilFrames);
+    const oilEvents = oil.advance(0.3, oilFrames, { p1: true });
+    expect(oilEvents).toContainEqual({
+      type: "player-affected",
+      playerId: "p2",
+      sourcePlayerId: "p1",
+      weapon: "oil",
+      effect: "oiled",
+      durationSeconds: 3.5,
+    });
+    expect(oil.snapshot.players[1]?.effects[0]).toMatchObject({ type: "oiled" });
+    oil.advance(3.5, frames(20, 30));
+    expect(oil.snapshot.players[1]?.effects).toEqual([]);
+
+    const flash = new CombatSession({
+      players,
+      pickups: [{ id: "flash", weapon: "flash", position: [0, 0, 0] }],
+    });
+    flash.advance(0.01, frames(0, 5));
+    const flashEvents = flash.advance(0.01, frames(0, 5), { p1: true });
+    expect(flashEvents).toContainEqual(expect.objectContaining({
+      type: "player-affected",
+      playerId: "p2",
+      effect: "flashed",
+    }));
+    expect(flash.snapshot.players[1]?.health).toBe(100);
+  });
+
+  it("emits a forward boost when the rear flame is fired", () => {
+    const combat = new CombatSession({
+      players,
+      pickups: [{ id: "flame", weapon: "rear-flame", position: [0, 0, 0] }],
+    });
+    combat.advance(0.01, frames());
+    expect(combat.advance(0.01, frames(), { p1: true })).toContainEqual({
+      type: "weapon-boosted",
+      playerId: "p1",
+      weapon: "rear-flame",
+      impulse: [0, 64, 1600],
+    });
   });
 
   it("emits damage, knockback, and destruction from a swept projectile hit", () => {

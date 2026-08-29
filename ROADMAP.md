@@ -351,11 +351,13 @@ Milestone M1: публично показываемый proof of concept.
 
 Milestone M2: feature-complete alpha.
 
-Статус 2026-08-29: **этап 6 начат**. Срез 6.1 вводит безопасный reader исходных
+Статус 2026-08-29: **этап 6 начат; срезы 6.1–6.2 завершены**. Срез 6.1 вводит безопасный reader исходных
 `POWERUPS_ALL.LUA`/`POWERUPS_GOLD.LUA`: нормализованы все встречающиеся type ID, глобальные loadout
-для 26 course ID и source-authored position/respawn metadata. Runtime использует исходные позиции и
-тайминги для уже реализованных gun/guided-missile/mine эквивалентов; остальные распознанные типы не
-подменяются временным поведением и переходят в срез полного арсенала 6.2.
+для 26 course ID и source-authored position/respawn metadata. Срез 6.2 подключает девять подтверждённых
+обучающими строками типов: machine gun, guided missile, mortar, rear flame, oil, proximity mine, drum
+bomb, shotgun и flash. У каждого есть отдельная deterministic delivery/effect модель; oil/flash
+добавляют timed status, guided missile — homing, mortar — gravity arc, а flame — self-boost. Исходные
+позиции и respawn теперь напрямую создают все поддержанные типы.
 
 ### Этап 7. Beta: доставка, производительность и совместимость — 3–6 недель
 

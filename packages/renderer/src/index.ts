@@ -127,9 +127,39 @@ const ADDITIONAL_VEHICLE_PROXY_COLORS: Readonly<Record<string, number>> = Object
 
 const COMBAT_COLORS: Readonly<Record<CombatWeaponType, number>> = Object.freeze({
   "machine-gun": 0xffcf4a,
+  "guided-missile": 0xff654f,
+  mortar: 0xff9f43,
+  "rear-flame": 0xff6a22,
+  oil: 0x242a32,
+  "proximity-mine": 0x8d6be8,
+  "drum-bomb": 0xc44735,
+  shotgun: 0x77d9ff,
+  flash: 0xffffff,
   rocket: 0xff654f,
   mine: 0x8d6be8,
 });
+
+function combatProjectileGeometry(weapon: CombatWeaponType): THREE.BufferGeometry {
+  switch (weapon) {
+    case "mine":
+    case "proximity-mine":
+    case "oil":
+      return new THREE.CylinderGeometry(0.48, 0.58, 0.22, 12);
+    case "rocket":
+    case "guided-missile":
+    case "mortar":
+    case "drum-bomb":
+      return new THREE.CapsuleGeometry(0.18, 0.65, 4, 8);
+    case "rear-flame":
+      return new THREE.SphereGeometry(0.58, 8, 6);
+    case "shotgun":
+      return new THREE.SphereGeometry(1.1, 8, 6);
+    case "flash":
+      return new THREE.SphereGeometry(1.7, 10, 8);
+    case "machine-gun":
+      return new THREE.SphereGeometry(0.13, 8, 6);
+  }
+}
 
 export class RuntimeRenderer {
   readonly #renderer: THREE.WebGLRenderer;
@@ -700,11 +730,7 @@ export class RuntimeRenderer {
       projectileIds.add(projectile.id);
       let mesh = this.#combatProjectiles.get(projectile.id);
       if (!mesh) {
-        const geometry = projectile.weapon === "mine"
-          ? new THREE.CylinderGeometry(0.48, 0.58, 0.22, 12)
-          : projectile.weapon === "rocket"
-            ? new THREE.CapsuleGeometry(0.18, 0.65, 4, 8)
-            : new THREE.SphereGeometry(0.13, 8, 6);
+        const geometry = combatProjectileGeometry(projectile.weapon);
         mesh = new THREE.Mesh(
           geometry,
           new THREE.MeshStandardMaterial({
