@@ -6,7 +6,8 @@ from a user-owned disc image or installed copy and are always kept below ignored
 
 Milestones **M0: Asset feasibility** and **M1: public proof of concept** are complete. Stage 6 alpha
 work is underway with validated parsing of original per-course power-up loadouts, authored pickup
-positions and respawn timings, plus distinct deterministic rules for all nine base weapon types. Stage 1
+positions and respawn timings, distinct deterministic rules for all nine base weapon types, and four
+multi-round local match modes with persistent scores and objectives. Stage 1
 provides a reproducible local extraction pipeline; Stage 2 provides RenderWare DFF/TXD readers, full
 graphical/collision BSP sector parsing, and a Three.js asset viewer. Stage 3 adds a deterministic
 fixed-step core, replay checks, Rapier/Three.js/Web Audio adapters, debug tooling, and the browser
@@ -123,6 +124,9 @@ track's `POWERUPS_GOLD.LUA` also restores authored positions and respawn duratio
 guided missile, mortar, rear flame, oil, proximity mine, drum bomb, shotgun, and flash have distinct
 rules. Use an item with `E` for P1, `/` for P2, or gamepad X; damage destruction feeds the same
 elimination/results flow as camera distance, while oil and flash show timed handling effects in the HUD.
+With 2–4 players, choose Standard Play, Team Play, Hold the Flag, or The Fugitive before starting.
+The mode HUD tracks the live objective and series score; `Next round` resets race/combat state while
+preserving points, and the fugitive role rotates between rounds.
 Moving projectiles stop on track/scenery, explosives splash from the world hit, and explosive prop
 hits use the same destruction/reset flow. Load the extracted `PERMDICT.RWS` alongside the track bundle to replace
 fallback tones with the original engine, weapon, collision, explosion, race, and menu samples.

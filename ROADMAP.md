@@ -351,15 +351,17 @@ Milestone M1: публично показываемый proof of concept.
 
 Milestone M2: feature-complete alpha.
 
-Статус 2026-08-29: **этап 6 начат; срезы 6.1–6.2 завершены**. Срез 6.1 вводит безопасный reader исходных
+Статус 2026-08-29: **этап 6 начат; срезы 6.1–6.3 завершены**. Срез 6.1 вводит безопасный reader исходных
 `POWERUPS_ALL.LUA`/`POWERUPS_GOLD.LUA`: нормализованы все встречающиеся type ID, глобальные loadout
 для 26 course ID и source-authored position/respawn metadata. Срез 6.2 подключает девять подтверждённых
 обучающими строками типов: machine gun, guided missile, mortar, rear flame, oil, proximity mine, drum
 bomb, shotgun и flash. У каждого есть отдельная deterministic delivery/effect модель; oil/flash
 добавляют timed status, guided missile — homing, mortar — gravity arc, а flame — self-boost. Исходные
-позиции и respawn теперь напрямую создают все поддержанные типы. Срез 6.3a добавляет чистую
-multi-round `MatchModeSession` для Standard Play, Team Play, Hold the Flag и The Fugitive; подключение
-mode selection/objective HUD и round reset к браузерному runtime остаётся второй половиной среза.
+позиции и respawn теперь напрямую создают все поддержанные типы. Срез 6.3 добавляет чистую
+multi-round `MatchModeSession` для Standard Play, Team Play, Hold the Flag и The Fugitive, связывает
+режимы с race/combat runtime, objective/score HUD и same-page round reset. Отдельные replay каждого
+режима дают одинаковый результат при presentation clocks 30/60/120 Hz; production-browser smoke
+проверил старт и завершение всех четырёх режимов с четырьмя локальными игроками без ошибок консоли.
 
 ### Этап 7. Beta: доставка, производительность и совместимость — 3–6 недель
 

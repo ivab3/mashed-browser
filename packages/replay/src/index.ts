@@ -51,5 +51,6 @@ export class ReplayCursor<TInput> {
 }
 
 export * from "./match-replay.js";
+export * from "./match-mode-replay.js";
 export * from "./stage-five-scenario.js";
 export * from "./stage-five-soak.js";

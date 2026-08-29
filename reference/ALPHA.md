@@ -47,7 +47,7 @@ audio cues cover every weapon with synthesis fallback.
 The complete workspace suite, production builds, 30/60/120 Hz M1 replay matrix, and accelerated
 30-minute soak remain green after the expansion.
 
-## Slice 6.3a — local mode rule substrate
+## Slice 6.3 — local match modes
 
 `@mashed/core` now owns a pure `MatchModeSession` above the existing per-round race/combat rules:
 
@@ -60,20 +60,26 @@ The complete workspace suite, production builds, 30/60/120 Hz M1 replay matrix, 
   and plain-data events/snapshots;
 - invalid rosters, team assignments, active-player frames, and round transitions fail explicitly.
 
-The substrate deliberately has no DOM, Rapier, camera, or rendering dependency. Runtime selection,
-flag proximity/presentation, and persistent score HUD are the next half of slice 6.3.
+The substrate deliberately has no DOM, Rapier, camera, or rendering dependency. The browser adapter
+connects it to the 2–4 player roster, race/combat eliminations, lap completion, a visible flag or
+fugitive objective, a persistent score HUD, and same-page round resets. The selected mode is locked
+during play; `Next round` preserves the series score and rotates the fugitive, while terminal results
+offer a fresh match. The four rule families each have a recorded fixed-step replay whose complete
+outcome is identical at 30, 60, and 120 Hz presentation rates.
+
+Production-browser smoke covered starting, resolving, and advancing Standard Play plus resolving Team
+Play, Hold the Flag, and The Fugitive with four local players. All transitions reached the expected
+race/results state without console errors.
 
 ## Planned slices
 
-1. **6.3b match-mode runtime:** connect Standard Play, Team Play, Hold the Flag, and The Fugitive to
-   roster selection, objective/score HUD, round resets, and replay coverage.
-2. **6.4 AI opponents:** decode or characterize the per-course `.AI`/`.LED` data, build route steering
+1. **6.4 AI opponents:** decode or characterize the per-course `.AI`/`.LED` data, build route steering
    on the existing ordered checkpoints, and add deterministic difficulty profiles and replay tapes.
-3. **6.5 tournament flow:** main-menu to event-series progression, championship results, local save
+2. **6.5 tournament flow:** main-menu to event-series progression, championship results, local save
    schema, and English UI strings.
-4. **6.6 content batches:** full vehicle roster and tracks in measured batches. Every admitted track
+3. **6.6 content batches:** full vehicle roster and tracks in measured batches. Every admitted track
    gets a load smoke, rules replay, and an explicit unsupported-resource record.
-5. **6.7 settings and alpha gate:** controls/audio/graphics/difficulty settings, persistence, complete
+4. **6.7 settings and alpha gate:** controls/audio/graphics/difficulty settings, persistence, complete
    menu-to-series acceptance, and the Milestone M2 compatibility report.
 
 This order may interleave a content batch after a new mode or weapon family so the abstractions are

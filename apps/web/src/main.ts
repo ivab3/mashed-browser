@@ -24,6 +24,7 @@ import {
   createLocalPlayerGrid,
   FixedStepClock,
   LOCAL_PLAYER_SLOTS,
+  MatchModeSession,
   RaceSession,
   RuntimeEventBus,
   RuntimeStateMachine,
@@ -34,6 +35,8 @@ import {
   type CombatPlayerFrames,
   type CombatWeaponType,
   type LocalPlayerGridSlot,
+  type MatchModeEvent,
+  type MatchModeType,
   type RaceEvent,
   type RuntimeState,
 } from "@mashed/core";
@@ -173,6 +176,12 @@ const secondaryActionGuide = element<HTMLElement>("secondary-action-guide");
 const gamepadGuide = element<HTMLElement>("gamepad-guide");
 const runtimeShortcuts = element<HTMLElement>("runtime-shortcuts");
 const playerCountSelect = element<HTMLSelectElement>("player-count");
+const matchModeRow = element<HTMLElement>("match-mode-row");
+const matchModeSelect = element<HTMLSelectElement>("match-mode");
+const modeHud = element<HTMLElement>("mode-hud");
+const modeHudTitle = element<HTMLElement>("mode-hud-title");
+const modeHudObjective = element<HTMLElement>("mode-hud-objective");
+const modeHudScores = element<HTMLOListElement>("mode-hud-scores");
 const vehicleSelectRows = [
   element<HTMLElement>("vehicle-select-row-one"),
   element<HTMLElement>("vehicle-select-row-two"),
@@ -222,6 +231,10 @@ let physics: PhysicsRuntime | undefined;
 let trackDefinition: DerivedTrackDefinition | undefined;
 let raceSession: RaceSession | undefined;
 let combatSession: CombatSession | undefined;
+let matchModeSession: MatchModeSession | undefined;
+let matchModeSignature: string | undefined;
+let flagPosition: readonly [number, number, number] = [-4, 0.8, 8];
+let fugitiveInterceptorId: string | undefined;
 const cameraElimination = new CameraEliminationTracker();
 let eliminationWarnings: readonly CameraEliminationWarning[] = [];
 let vehicleInputs: BrowserVehicleInput[] = [];
@@ -255,6 +268,49 @@ if (m1EvidenceMode) {
 function selectedPlayerCount(): number {
   const value = Number(playerCountSelect.value);
   return Number.isInteger(value) && value >= 1 && value <= LOCAL_PLAYER_SLOTS.length ? value : 1;
+}
+
+const MATCH_MODE_LABELS: Readonly<Record<MatchModeType, string>> = Object.freeze({
+  standard: "Standard Play",
+  team: "Team Play",
+  "hold-the-flag": "Hold the Flag",
+  fugitive: "The Fugitive",
+});
+
+function selectedMatchMode(): MatchModeType {
+  const value = matchModeSelect.value;
+  return value === "team" || value === "hold-the-flag" || value === "fugitive"
+    ? value
+    : "standard";
+}
+
+function currentMatchModeSignature(): string {
+  return `${selectedPlayerCount()}:${selectedMatchMode()}`;
+}
+
+function defaultFlagPosition(): readonly [number, number, number] {
+  const checkpoint = trackDefinition?.checkpoints[Math.floor((trackDefinition?.checkpoints.length ?? 1) / 2)];
+  return checkpoint
+    ? [checkpoint.center[0], checkpoint.center[1] + 0.9, checkpoint.center[2]]
+    : [-4, 0.8, 8];
+}
+
+function createMatchModeSession(): MatchModeSession | undefined {
+  if (selectedPlayerCount() < 2) {
+    return undefined;
+  }
+  const mode = selectedMatchMode();
+  return new MatchModeSession({
+    mode,
+    players: activePlayerSlots().map((slot, index) => ({
+      id: slot.id,
+      displayName: slot.label,
+      ...(mode === "team" ? { teamId: index % 2 === 0 ? "Orange" : "Blue" } : {}),
+    })),
+    pointsToWin: 8,
+    flagHoldSeconds: 12,
+    fugitiveSurvivalSeconds: 45,
+  });
 }
 
 function currentM1EvidenceReport(): M1EvidenceReport {
@@ -332,6 +388,7 @@ function rebuildVehicleInputs(): void {
 function applyRosterPresentation(): void {
   const count = selectedPlayerCount();
   const multiplayer = count > 1;
+  matchModeRow.hidden = !multiplayer;
   metricSpeedLabel.textContent = multiplayer ? "P1 speed" : "Speed";
   metricWheelsLabel.textContent = multiplayer ? "P1 wheels" : "Wheels";
   metricSurfaceLabel.textContent = multiplayer ? "P1 surface" : "Surface";
@@ -374,21 +431,24 @@ function applyState(next: RuntimeState): void {
   stateBadge.dataset["state"] = next;
   startButton.disabled = next !== "menu" && next !== "results";
   startButton.textContent = next === "results"
-    ? "Race again"
+    ? matchModeSession?.snapshot.phase === "round-complete" ? "Next round" : "New match"
     : trackDefinition ? "Start lap" : "Start simulation";
   pauseButton.disabled = !matchActive;
   pauseButton.textContent = next === "paused" ? "Resume" : "Pause";
   pauseButton.dataset["action"] = next === "paused" ? "resume" : "pause";
   finishButton.disabled = next !== "race";
+  finishButton.textContent = matchModeSession ? "Finish round" : "Finish race";
   menuButton.disabled = !matchActive && next !== "results";
   resetButton.disabled = next === "paused";
   assetInput.disabled = next === "loading" || matchActive;
   playerCountSelect.disabled = next === "loading" || matchActive;
+  matchModeSelect.disabled = next === "loading" || matchActive || selectedPlayerCount() < 2;
   vehicleSelects.forEach((select) => {
     select.disabled = next === "loading" || matchActive;
   });
   pauseOverlay.hidden = next !== "paused";
   applyCombatHud();
+  applyModeHud();
 }
 
 function formatRaceTime(seconds: number): string {
@@ -410,7 +470,76 @@ function resetCameraElimination(): void {
   applyEliminationWarning();
 }
 
+function applyModeHud(): void {
+  const snapshot = matchModeSession?.snapshot;
+  modeHud.hidden = !snapshot || state.state === "menu";
+  if (!snapshot) {
+    return;
+  }
+  modeHudTitle.textContent = `${MATCH_MODE_LABELS[snapshot.mode]} · round ${snapshot.round}`;
+  switch (snapshot.mode) {
+    case "standard":
+      modeHudObjective.textContent = `Last car standing · first to ${snapshot.pointsToWin}`;
+      break;
+    case "team":
+      modeHudObjective.textContent = `Eliminate the other team · first to ${snapshot.pointsToWin}`;
+      break;
+    case "hold-the-flag": {
+      const holder = snapshot.players.find((player) => player.id === snapshot.flagHolderId);
+      modeHudObjective.textContent = holder
+        ? `${holder.displayName} holds flag · ${snapshot.flagHoldSeconds.toFixed(1)} / ${snapshot.flagHoldTargetSeconds.toFixed(0)}s`
+        : "Capture the green flag";
+      break;
+    }
+    case "fugitive": {
+      const fugitive = snapshot.players.find((player) => player.id === snapshot.fugitiveId);
+      modeHudObjective.textContent = `${fugitive?.displayName ?? "—"} is the fugitive · ${snapshot.roundElapsedSeconds.toFixed(1)} / ${snapshot.fugitiveSurvivalTargetSeconds.toFixed(0)}s`;
+      break;
+    }
+  }
+  const scores = snapshot.mode === "team"
+    ? snapshot.teams.map((team) => ({ label: team.id, score: team.score }))
+    : snapshot.players.map((player) => ({ label: player.displayName, score: player.score }));
+  modeHudScores.replaceChildren(...scores.map(({ label, score }) => {
+    const item = document.createElement("li");
+    const name = document.createElement("span");
+    name.textContent = label;
+    const value = document.createElement("b");
+    value.textContent = `${score} / ${snapshot.pointsToWin}`;
+    item.append(name, value);
+    return item;
+  }));
+}
+
+function applyModeResultBanner(): boolean {
+  const snapshot = matchModeSession?.snapshot;
+  if (!snapshot || snapshot.phase === "playing" || state.state !== "results") {
+    return false;
+  }
+  const winnerNames = snapshot.roundWinnerIds.map((id) => (
+    snapshot.players.find((player) => player.id === id)?.displayName ?? id
+  ));
+  raceBanner.hidden = false;
+  raceBannerLabel.textContent = snapshot.phase === "finished" ? "Match winner" : `Round ${snapshot.round}`;
+  raceBannerValue.textContent = `${winnerNames.join(" + ")} ${snapshot.phase === "finished" ? "wins" : "scores"}`;
+  const results = snapshot.mode === "team"
+    ? snapshot.teams.map((team) => ({ id: team.id, label: team.id, score: team.score }))
+    : snapshot.players.map((player) => ({ id: player.id, label: player.displayName, score: player.score }));
+  raceResults.replaceChildren(...results
+    .sort((left, right) => right.score - left.score)
+    .map((result, index) => {
+      const item = document.createElement("li");
+      item.innerHTML = `<span>${index + 1}</span><b>${result.label}</b><em>${result.score} PT</em>`;
+      return item;
+    }));
+  raceResults.hidden = false;
+  return true;
+}
+
 function applyRaceBanner(): void {
+  if (applyModeResultBanner()) {
+    return;
+  }
   const snapshot = raceSession?.snapshot;
   if (!snapshot || state.state === "menu" || snapshot.phase === "racing") {
     raceBanner.hidden = true;
@@ -448,9 +577,9 @@ function createTrackRaceSession(): RaceSession | undefined {
     ? new RaceSession({
         course: trackDefinition,
         players: activePlayerSlots().map((slot) => ({ id: slot.id, displayName: slot.label })),
-        totalLaps: 1,
+        totalLaps: matchModeSession ? 999 : 1,
         countdownSeconds: 3,
-        finishWhenOnePlayerRemains: selectedPlayerCount() > 1,
+        finishWhenOnePlayerRemains: false,
       })
     : undefined;
 }
@@ -742,6 +871,9 @@ function handleCombatEvents(combatEvents: readonly CombatEvent[]): string | unde
         }
         break;
       case "player-destroyed": {
+        if (matchModeSession?.snapshot.fugitiveId === event.playerId) {
+          fugitiveInterceptorId = event.sourcePlayerId;
+        }
         events.emit({
           type: "audio:cue",
           cue: "vehicle-destroyed",
@@ -804,6 +936,79 @@ function handleCombatEvents(combatEvents: readonly CombatEvent[]): string | unde
   return finishReason;
 }
 
+function handleMatchModeEvents(modeEvents: readonly MatchModeEvent[]): string | undefined {
+  let resultReason: string | undefined;
+  for (const event of modeEvents) {
+    switch (event.type) {
+      case "flag-captured":
+        runtimeStatus.textContent = `${event.playerId} captured the flag`;
+        events.emit({ type: "audio:cue", cue: "pickup", gain: 0.08, sampleName: "flash" });
+        break;
+      case "flag-dropped":
+        runtimeStatus.textContent = `${event.playerId} dropped the flag`;
+        break;
+      case "fugitive-assigned":
+        runtimeStatus.textContent = `${event.playerId} is the fugitive`;
+        break;
+      case "score-awarded":
+        runtimeStatus.textContent = `${event.teamId ?? event.playerIds.join(" + ")} scores · ${event.score}`;
+        break;
+      case "round-completed":
+        resultReason = `${event.winnerIds.join(" + ")} wins round ${event.round}`;
+        break;
+      case "match-completed":
+        resultReason = `${event.winnerIds.join(" + ")} wins the match ${event.score}`;
+        break;
+    }
+  }
+  applyModeHud();
+  return resultReason;
+}
+
+function updateMatchMode(
+  stepSeconds: number,
+  positions: Readonly<Record<string, readonly [number, number, number]>>,
+  raceEvents: readonly RaceEvent[],
+): string | undefined {
+  const session = matchModeSession;
+  if (!session || session.snapshot.phase !== "playing") {
+    return undefined;
+  }
+  const snapshot = session.snapshot;
+  const activeIds = new Set(physics?.activeVehicleIds ?? []);
+  let flagCapturePlayerId: string | undefined;
+  if (snapshot.mode === "hold-the-flag") {
+    const holderPosition = snapshot.flagHolderId ? positions[snapshot.flagHolderId] : undefined;
+    if (holderPosition) {
+      flagPosition = [holderPosition[0], holderPosition[1] + 1, holderPosition[2]];
+    } else if (!snapshot.flagHolderId) {
+      flagCapturePlayerId = activePlayerSlots()
+        .flatMap((slot) => {
+          const position = positions[slot.id];
+          if (!position || !activeIds.has(slot.id)) {
+            return [];
+          }
+          const distanceSquared = (position[0] - flagPosition[0]) ** 2
+            + (position[1] - flagPosition[1]) ** 2
+            + (position[2] - flagPosition[2]) ** 2;
+          return distanceSquared <= 2.8 ** 2 ? [{ id: slot.id, distanceSquared }] : [];
+        })
+        .sort((left, right) => left.distanceSquared - right.distanceSquared)[0]?.id;
+    }
+  }
+  const completedLapPlayerIds = raceEvents.flatMap((event) => (
+    event.type === "lap-completed" ? [event.playerId] : []
+  ));
+  const modeEvents = session.advance(stepSeconds, {
+    activePlayerIds: activePlayerSlots().map((slot) => slot.id).filter((id) => activeIds.has(id)),
+    ...(flagCapturePlayerId ? { flagCapturePlayerId } : {}),
+    ...(completedLapPlayerIds.length > 0 ? { completedLapPlayerIds } : {}),
+    ...(fugitiveInterceptorId ? { fugitiveEliminatedByPlayerId: fugitiveInterceptorId } : {}),
+  });
+  fugitiveInterceptorId = undefined;
+  return handleMatchModeEvents(modeEvents);
+}
+
 events.subscribe((event) => {
   if (event.type === "runtime:state-changed") {
     applyState(event.to);
@@ -827,6 +1032,18 @@ async function startRace(): Promise<void> {
     return;
   }
   await audio.unlock();
+  const signature = currentMatchModeSignature();
+  if (
+    matchModeSession?.snapshot.phase === "round-complete"
+    && matchModeSignature === signature
+  ) {
+    handleMatchModeEvents(matchModeSession.startNextRound());
+  } else {
+    matchModeSession = createMatchModeSession();
+    matchModeSignature = matchModeSession ? signature : undefined;
+  }
+  flagPosition = defaultFlagPosition();
+  fugitiveInterceptorId = undefined;
   physics.resetDemo();
   resetCameraElimination();
   raceSession = createTrackRaceSession();
@@ -836,6 +1053,7 @@ async function startRace(): Promise<void> {
   totalDroppedSeconds = 0;
   state.transition("race", raceSession ? "Race countdown started" : "Fixed-step simulation running");
   applyRaceBanner();
+  applyModeHud();
   if (!raceSession) {
     events.emit({ type: "audio:cue", cue: "race-start", gain: 0.08 });
   }
@@ -872,8 +1090,44 @@ pauseButton.addEventListener("click", () => {
 });
 finishButton.addEventListener("click", () => {
   if (state.state === "race") {
+    const modeSnapshot = matchModeSession?.snapshot;
+    if (matchModeSession && modeSnapshot?.phase === "playing") {
+      const firstPlayerId = modeSnapshot.players[0]!.id;
+      let modeEvents: readonly MatchModeEvent[];
+      switch (modeSnapshot.mode) {
+        case "standard":
+          modeEvents = matchModeSession.advance(STEP_SECONDS, { activePlayerIds: [firstPlayerId] });
+          break;
+        case "team": {
+          const teamId = modeSnapshot.players[0]!.teamId;
+          modeEvents = matchModeSession.advance(STEP_SECONDS, {
+            activePlayerIds: modeSnapshot.players.filter((player) => player.teamId === teamId).map((player) => player.id),
+          });
+          break;
+        }
+        case "hold-the-flag":
+          modeEvents = matchModeSession.advance(modeSnapshot.flagHoldTargetSeconds, {
+            activePlayerIds: modeSnapshot.players.map((player) => player.id),
+            flagCapturePlayerId: firstPlayerId,
+          });
+          break;
+        case "fugitive":
+          modeEvents = matchModeSession.advance(STEP_SECONDS, {
+            activePlayerIds: modeSnapshot.players.map((player) => player.id),
+            completedLapPlayerIds: modeSnapshot.fugitiveId ? [modeSnapshot.fugitiveId] : [],
+          });
+          break;
+      }
+      const reason = handleMatchModeEvents(modeEvents) ?? "Round completed";
+      state.transition("results", reason);
+      applyRaceBanner();
+      events.emit({ type: "audio:cue", cue: "race-finish", gain: 0.08 });
+      return;
+    }
     raceSession = undefined;
     combatSession = undefined;
+    matchModeSession = undefined;
+    matchModeSignature = undefined;
     latestVehicleInputs = {};
     resetCameraElimination();
     state.transition("results", "Simulation completed without clock drift");
@@ -885,6 +1139,8 @@ menuButton.addEventListener("click", () => {
   if (state.state === "race" || state.state === "paused" || state.state === "results") {
     raceSession = undefined;
     combatSession = undefined;
+    matchModeSession = undefined;
+    matchModeSignature = undefined;
     latestVehicleInputs = {};
     resetCameraElimination();
     state.transition("menu", "Runtime ready");
@@ -905,6 +1161,8 @@ debugCamera.addEventListener("change", () => renderer.setDebugCamera(debugCamera
 playerCountSelect.addEventListener("change", () => {
   raceSession = undefined;
   combatSession = undefined;
+  matchModeSession = undefined;
+  matchModeSignature = undefined;
   latestVehicleInputs = {};
   resetCameraElimination();
   rebuildVehicleInputs();
@@ -912,6 +1170,13 @@ playerCountSelect.addEventListener("change", () => {
   configureLocalRoster();
   applyState(state.state);
   runtimeStatus.textContent = `${selectedPlayerCount()} local player${selectedPlayerCount() === 1 ? "" : "s"} ready`;
+});
+matchModeSelect.addEventListener("change", () => {
+  matchModeSession = undefined;
+  matchModeSignature = undefined;
+  applyState(state.state);
+  applyModeHud();
+  runtimeStatus.textContent = `${MATCH_MODE_LABELS[selectedMatchMode()]} selected`;
 });
 vehicleSelects.forEach((select) => {
   select.addEventListener("change", () => {
@@ -1065,6 +1330,8 @@ assetInput.addEventListener("change", () => {
     state.transition("loading", `Parsing ${files.length} local asset${files.length === 1 ? "" : "s"}…`);
     try {
       const summaries: string[] = [];
+      matchModeSession = undefined;
+      matchModeSignature = undefined;
       for (const file of files) {
         if (file.name.toLocaleLowerCase("en-US").endsWith(".lua")) {
           if (/lapdata/i.test(file.name)) {
@@ -1205,6 +1472,23 @@ function currentCombatPlayerFrames(): CombatPlayerFrames {
   return frames;
 }
 
+function currentModeObjective(): { kind: "flag" | "fugitive"; position: readonly [number, number, number] } | undefined {
+  const snapshot = matchModeSession?.snapshot;
+  if (!snapshot || snapshot.phase !== "playing") {
+    return undefined;
+  }
+  if (snapshot.mode === "hold-the-flag") {
+    return { kind: "flag", position: flagPosition };
+  }
+  if (snapshot.mode === "fugitive" && snapshot.fugitiveId) {
+    const position = physics?.getVehicleTransformHistory(snapshot.fugitiveId)?.current.position;
+    return position
+      ? { kind: "fugitive", position: [position[0], position[1] + 1.5, position[2]] }
+      : undefined;
+  }
+  return undefined;
+}
+
 function updateCameraEliminations(
   stepSeconds: number,
   positions: Readonly<Record<string, readonly [number, number, number]>>,
@@ -1341,6 +1625,12 @@ function renderFrame(timestampMilliseconds: number): void {
           raceFinishReason = combatFinishReason;
         }
       }
+      if (!raceFinishReason && (!raceSession || raceSession.phase === "racing")) {
+        const modeFinishReason = updateMatchMode(stepSeconds, positions, raceEvents);
+        if (modeFinishReason) {
+          raceFinishReason = modeFinishReason;
+        }
+      }
       physics?.stepVehicles(stepSeconds, sampledInputs);
       physicsMilliseconds += performance.now() - startedAt;
     });
@@ -1359,11 +1649,13 @@ function renderFrame(timestampMilliseconds: number): void {
     applyRaceBanner();
     events.emit({ type: "audio:cue", cue: "race-finish", gain: 0.08 });
   }
+  const modeObjective = currentModeObjective();
   renderer.render({
     history: physics.transformHistory,
     objects: physics.sceneObjects,
     primaryVehicleActive: physics.activeVehicleIds.includes(PRIMARY_VEHICLE_ID),
     ...(combatSession ? { combat: combatSession.snapshot } : {}),
+    ...(modeObjective ? { modeObjective } : {}),
     interpolationAlpha: frame.interpolationAlpha,
     frameDeltaSeconds: renderDeltaSeconds,
     ...(debugColliders.checked ? { debugLines: physics.debugLines() } : {}),
@@ -1436,6 +1728,7 @@ function renderFrame(timestampMilliseconds: number): void {
         : `${lapProgress.passedCheckpoints} / ${lapProgress.totalCheckpoints} → ${lapProgress.nextCheckpointId}`
       : "—";
     applyCombatHud();
+    applyModeHud();
     lastOverlayUpdate = timestampMilliseconds;
   }
   animationFrame = requestAnimationFrame(renderFrame);

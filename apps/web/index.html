@@ -45,6 +45,12 @@
           <div id="combat-player-four" hidden><b>P4</b><span>100 HP</span><em>EMPTY</em></div>
         </aside>
 
+        <aside id="mode-hud" class="mode-hud" aria-label="Match mode status" hidden>
+          <strong id="mode-hud-title">Standard Play</strong>
+          <span id="mode-hud-objective">Last car standing</span>
+          <ol id="mode-hud-scores"></ol>
+        </aside>
+
         <div id="race-banner" class="race-banner" role="status" aria-live="polite" hidden>
           <span id="race-banner-label">Get ready</span>
           <strong id="race-banner-value">3</strong>
@@ -97,6 +103,15 @@
               <option value="2">2 players</option>
               <option value="3">3 players</option>
               <option value="4">4 players</option>
+            </select>
+          </label>
+          <label id="match-mode-row" class="player-count-label" for="match-mode" hidden>
+            <span class="section-label">Match mode</span>
+            <select id="match-mode">
+              <option value="standard">Standard Play</option>
+              <option value="team">Team Play</option>
+              <option value="hold-the-flag">Hold the Flag</option>
+              <option value="fugitive">The Fugitive</option>
             </select>
           </label>
           <div id="vehicle-select-row-one" class="vehicle-select-row">

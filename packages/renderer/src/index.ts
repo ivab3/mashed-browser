@@ -56,6 +56,12 @@ export interface RenderFrame {
   combat?: CombatSnapshot;
   objects?: readonly PhysicsSceneObject[];
   debugLines?: PhysicsDebugLines;
+  modeObjective?: ModeObjectiveRender;
+}
+
+export interface ModeObjectiveRender {
+  kind: "flag" | "fugitive";
+  position: readonly [number, number, number];
 }
 
 export interface RendererMetrics {
@@ -172,6 +178,7 @@ export class RuntimeRenderer {
   readonly #sceneObjects = new Map<string, THREE.Object3D>();
   readonly #combatPickups = new Map<string, THREE.Object3D>();
   readonly #combatProjectiles = new Map<number, THREE.Object3D>();
+  readonly #modeObjective = new THREE.Group();
   readonly #burstEffects: BurstEffect[] = [];
   readonly #cameraTarget = new THREE.Vector3(-4, 0.8, -5);
   readonly #debugGeometry = new THREE.BufferGeometry();
@@ -212,6 +219,25 @@ export class RuntimeRenderer {
     key.castShadow = true;
     this.#scene.add(key);
     this.#scene.add(this.#demoRoot);
+
+    const objectiveMarker = new THREE.Mesh(
+      new THREE.OctahedronGeometry(0.72, 0),
+      new THREE.MeshStandardMaterial({
+        color: 0x5bd19a,
+        emissive: 0x5bd19a,
+        emissiveIntensity: 0.5,
+        roughness: 0.24,
+      }),
+    );
+    objectiveMarker.castShadow = true;
+    const objectiveRing = new THREE.Mesh(
+      new THREE.TorusGeometry(1.05, 0.07, 8, 24),
+      new THREE.MeshBasicMaterial({ color: 0xcdf8df, transparent: true, opacity: 0.72 }),
+    );
+    objectiveRing.rotation.x = Math.PI / 2;
+    this.#modeObjective.add(objectiveMarker, objectiveRing);
+    this.#modeObjective.visible = false;
+    this.#scene.add(this.#modeObjective);
 
     const surfaceColors = [0x9bc5e5, 0x293b40, 0xb99052, 0x574836];
     for (let index = 0; index < surfaceColors.length; index += 1) {
@@ -572,6 +598,15 @@ export class RuntimeRenderer {
     this.#vehicle.visible = primaryVehicleActive;
     this.#syncSceneObjects(frame.objects ?? [], frame.interpolationAlpha);
     this.#syncCombat(frame.combat, frame.interpolationAlpha);
+    this.#modeObjective.visible = frame.modeObjective !== undefined;
+    if (frame.modeObjective) {
+      this.#modeObjective.position.fromArray(frame.modeObjective.position);
+      this.#modeObjective.rotation.y += frame.frameDeltaSeconds * 1.4;
+      const material = (this.#modeObjective.children[0] as THREE.Mesh).material as THREE.MeshStandardMaterial;
+      const color = frame.modeObjective.kind === "fugitive" ? 0xffcf4a : 0x5bd19a;
+      material.color.setHex(color);
+      material.emissive.setHex(color);
+    }
 
     if (this.#debugCameraEnabled) {
       this.#controls.update();
@@ -886,6 +921,8 @@ export class RuntimeRenderer {
     }
     this.#combatPickups.clear();
     this.#combatProjectiles.clear();
+    this.#modeObjective.removeFromParent();
+    disposeRenderableRoot(this.#modeObjective);
     for (const effect of this.#burstEffects) {
       effect.points.geometry.dispose();
       effect.points.material.dispose();
