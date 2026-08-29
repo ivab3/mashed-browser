@@ -20,6 +20,7 @@ export interface CombatPickupDefinition {
   id: string;
   weapon: CombatWeaponType;
   position: TrackVector3;
+  respawnSeconds?: number;
 }
 
 export interface CombatPlayerDefinition {
@@ -292,6 +293,11 @@ export class CombatSession {
       }
       pickupIds.add(definition.id);
       validateVector(definition.position, `Combat pickup ${definition.id}`);
+      if (definition.respawnSeconds !== undefined && (
+        !Number.isFinite(definition.respawnSeconds) || definition.respawnSeconds < 0
+      )) {
+        throw new Error(`Combat pickup ${definition.id} respawn time must be non-negative`);
+      }
       return { definition, active: true, respawnSecondsRemaining: 0 };
     });
   }
@@ -387,7 +393,7 @@ export class CombatSession {
       const config = COMBAT_WEAPON_CONFIGS[pickup.definition.weapon];
       collector.inventory = { weapon: pickup.definition.weapon, ammo: config.ammo };
       pickup.active = false;
-      pickup.respawnSecondsRemaining = this.#pickupRespawnSeconds;
+      pickup.respawnSecondsRemaining = pickup.definition.respawnSeconds ?? this.#pickupRespawnSeconds;
       events.push({
         type: "pickup-collected",
         pickupId: pickup.definition.id,

@@ -35,6 +35,23 @@ describe("CombatSession", () => {
     expect(combat.snapshot.pickups[0]?.active).toBe(true);
   });
 
+  it("honors a source-authored respawn duration per pickup", () => {
+    const combat = new CombatSession({
+      players,
+      pickups: [{
+        id: "gun",
+        weapon: "machine-gun",
+        position: [0, 0, 0],
+        respawnSeconds: 0.25,
+      }],
+      pickupRespawnSeconds: 10,
+    });
+    combat.advance(0.1, frames());
+    expect(combat.snapshot.pickups[0]?.respawnSecondsRemaining).toBe(0.25);
+    combat.advance(0.25, frames(5));
+    expect(combat.snapshot.pickups[0]?.active).toBe(true);
+  });
+
   it("fires machine-gun, rocket, and mine projectiles with data-driven ammo", () => {
     const combat = new CombatSession({
       players: [...players, { id: "p3" }],
@@ -156,6 +173,10 @@ describe("CombatSession", () => {
         { id: "same", weapon: "mine", position: [1, 0, 0] },
       ],
     })).toThrow(/duplicated/);
+    expect(() => new CombatSession({
+      players,
+      pickups: [{ id: "bad", weapon: "rocket", position: [0, 0, 0], respawnSeconds: -1 }],
+    })).toThrow(/respawn time/);
     const combat = new CombatSession({ players, pickups: [] });
     expect(() => combat.advance(0, frames())).toThrow(/stepSeconds/);
     expect(() => combat.advance(0.1, { missing: { position: [0, 0, 0], headingRadians: 0 } }))

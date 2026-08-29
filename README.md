@@ -4,14 +4,16 @@ Clean-room browser reimplementation of _Mashed: Fully Loaded_. The repository co
 new code, schemas, documentation, and metadata. Original executable and game assets must come
 from a user-owned disc image or installed copy and are always kept below ignored `game-data/`.
 
-Milestones **M0: Asset feasibility** and **M1: public proof of concept** are complete. Stage 1
+Milestones **M0: Asset feasibility** and **M1: public proof of concept** are complete. Stage 6 alpha
+work is underway with validated parsing of original per-course power-up loadouts, authored pickup
+positions, and respawn timings. Stage 1
 provides a reproducible local extraction pipeline; Stage 2 provides RenderWare DFF/TXD readers, full
 graphical/collision BSP sector parsing, and a Three.js asset viewer. Stage 3 adds a deterministic
 fixed-step core, replay checks, Rapier/Three.js/Web Audio adapters, debug tooling, and the browser
 runtime shell. Stage 4 and Gate C are complete with a playable data-driven ray-cast vehicle,
 keyboard/gamepad controls, four grip surfaces, recovery, a shared multiplayer camera, collision BSP
 binding, dynamic/destructible props, a reproducible tuning harness, playable original track sessions,
-and runtime-bound original vehicle DFF/TXD models. Stage 5 is underway with a deterministic
+and runtime-bound original vehicle DFF/TXD models. Stage 5 is complete with a deterministic
 one-to-four-player race session, countdown, independent lap progress, finish/elimination results,
 a production 1–4 local roster, heading-aware start grid, independent input/physics streams, and an
 original vehicle render instance for every active slot. The third slice adds a route-aware
@@ -65,6 +67,8 @@ Vehicle implementation notes and Gate C acceptance evidence live in
 for vehicle feel lives in [`reference/VEHICLE_TUNING.md`](./reference/VEHICLE_TUNING.md).
 Stage 5 scope, completed slices, and next work live in
 [`reference/VERTICAL_SLICE.md`](./reference/VERTICAL_SLICE.md).
+Stage 6 alpha slices and their acceptance boundaries live in
+[`reference/ALPHA.md`](./reference/ALPHA.md).
 
 ## Inspect Stage 2 fixtures
 
@@ -91,7 +95,7 @@ pnpm asset-viewer
 Current findings and the remaining Stage 2 questions are tracked in
 [`reference/ASSET_SPIKE.md`](./reference/ASSET_SPIKE.md).
 
-## Run the Stage 5 runtime
+## Run the Stage 6 alpha runtime
 
 ```bash
 pnpm web

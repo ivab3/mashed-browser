@@ -2,6 +2,8 @@ import { AudioRuntime } from "@mashed/audio";
 import {
   deriveTrackDefinition,
   listVehicleAssetPairs,
+  parsePowerupPlacementsLua,
+  parseTrackPowerupLoadoutsLua,
   parseVehicleDffName,
   parseCourseLua,
   parseLapDataLua,
@@ -10,7 +12,10 @@ import {
   type DerivedTrackDefinition,
   type DffModel,
   type LapDataDefinition,
+  type OriginalPowerupPlacement,
+  type OriginalPowerupType,
   type PiTextureDictionary,
+  type TrackPowerupLoadout,
   type VehicleAssetPair,
 } from "@mashed/assets";
 import {
@@ -27,6 +32,7 @@ import {
   type CombatEvent,
   type CombatPickupDefinition,
   type CombatPlayerFrames,
+  type CombatWeaponType,
   type LocalPlayerGridSlot,
   type RaceEvent,
   type RuntimeState,
@@ -199,6 +205,8 @@ const trackParts: {
   graphics?: BspWorld;
   lapData?: LapDataDefinition;
   course?: CourseDefinition;
+  powerupPlacements?: readonly OriginalPowerupPlacement[];
+  powerupLoadouts?: readonly TrackPowerupLoadout[];
 } = {};
 const loadedDffs = new Map<string, DffModel>();
 const loadedTextureDictionaries = new Map<string, PiTextureDictionary>();
@@ -439,16 +447,53 @@ function createTrackRaceSession(): RaceSession | undefined {
     : undefined;
 }
 
+function combatWeaponForPowerup(type: OriginalPowerupType): CombatWeaponType | undefined {
+  switch (type) {
+    case "machine-gun":
+      return "machine-gun";
+    case "guided-missile":
+      return "rocket";
+    case "mine":
+    case "proximity-mine":
+      return "mine";
+    default:
+      return undefined;
+  }
+}
+
 function combatPickupDefinitions(): readonly CombatPickupDefinition[] {
-  const weapons = ["machine-gun", "rocket", "mine"] as const;
+  if (trackParts.powerupPlacements) {
+    return trackParts.powerupPlacements.flatMap((placement) => {
+      const weapon = combatWeaponForPowerup(placement.type);
+      return weapon ? [{
+        id: placement.id,
+        weapon,
+        position: [placement.position[0], placement.position[1] + 0.8, placement.position[2]],
+        respawnSeconds: placement.respawnSeconds,
+      }] : [];
+    });
+  }
+
+  const configuredTypes = trackParts.course && trackParts.powerupLoadouts
+    ? trackParts.powerupLoadouts.find((loadout) => loadout.courseId === trackParts.course?.id)?.powerups
+    : undefined;
+  const configuredWeapons = configuredTypes?.flatMap((type) => {
+    const weapon = combatWeaponForPowerup(type);
+    return weapon ? [weapon] : [];
+  });
+  const weapons: readonly CombatWeaponType[] = configuredWeapons && configuredWeapons.length > 0
+    ? configuredWeapons
+    : ["machine-gun", "rocket", "mine"];
   if (trackDefinition) {
-    const checkpointIndices = [0.18, 0.48, 0.78].map((ratio) => (
+    const checkpointIndices = weapons.map((_, index) => (
+      (index + 1) / (weapons.length + 1)
+    )).map((ratio) => (
       Math.min(trackDefinition!.checkpoints.length - 1, Math.floor(trackDefinition!.checkpoints.length * ratio))
     ));
     return weapons.map((weapon, index) => {
       const checkpoint = trackDefinition!.checkpoints[checkpointIndices[index] ?? 0]!;
       return {
-        id: `pickup-${weapon}`,
+        id: `pickup-${index + 1}-${weapon}`,
         weapon,
         position: [checkpoint.center[0], checkpoint.center[1] + 0.8, checkpoint.center[2]],
       };
@@ -947,8 +992,23 @@ assetInput.addEventListener("change", () => {
             summaries.push(
               `${file.name}: course ${trackParts.course.id} · ${trackParts.course.clumps.length} clumps · ${trackParts.course.objectTemplates.length} object templates, ${(performance.now() - startedAt).toFixed(1)} ms`,
             );
+          } else if (/powerups?_gold/i.test(file.name)) {
+            const startedAt = performance.now();
+            trackParts.powerupPlacements = parsePowerupPlacementsLua(await file.text());
+            const playable = trackParts.powerupPlacements.filter((placement) => (
+              combatWeaponForPowerup(placement.type) !== undefined
+            )).length;
+            summaries.push(
+              `${file.name}: ${trackParts.powerupPlacements.length} source placements · ${playable} currently playable, ${(performance.now() - startedAt).toFixed(1)} ms`,
+            );
+          } else if (/powerups?_all/i.test(file.name)) {
+            const startedAt = performance.now();
+            trackParts.powerupLoadouts = parseTrackPowerupLoadoutsLua(await file.text());
+            summaries.push(
+              `${file.name}: ${trackParts.powerupLoadouts.length} course loadouts, ${(performance.now() - startedAt).toFixed(1)} ms`,
+            );
           } else {
-            summaries.push(`${file.name}: ignored (supported metadata: COURSE.LUA and LAPDATA.LUA)`);
+            summaries.push(`${file.name}: ignored (supported metadata: COURSE, LAPDATA, POWERUPS_GOLD, POWERUPS_ALL)`);
           }
           continue;
         }
