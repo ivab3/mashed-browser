@@ -47,10 +47,26 @@ audio cues cover every weapon with synthesis fallback.
 The complete workspace suite, production builds, 30/60/120 Hz M1 replay matrix, and accelerated
 30-minute soak remain green after the expansion.
 
+## Slice 6.3a — local mode rule substrate
+
+`@mashed/core` now owns a pure `MatchModeSession` above the existing per-round race/combat rules:
+
+- Standard Play awards a point to the last active player;
+- Team Play validates exactly two teams and awards a team score when the opposing team is out;
+- Hold the Flag models capture, transfer, drop, continuous hold time, and the point threshold;
+- The Fugitive rotates the role between rounds and resolves either survival/lap completion or an
+  explicit interceptor;
+- every mode owns deterministic multi-round scores, point target, round-complete and terminal phases,
+  and plain-data events/snapshots;
+- invalid rosters, team assignments, active-player frames, and round transitions fail explicitly.
+
+The substrate deliberately has no DOM, Rapier, camera, or rendering dependency. Runtime selection,
+flag proximity/presentation, and persistent score HUD are the next half of slice 6.3.
+
 ## Planned slices
 
-1. **6.3 match modes:** factor mode policy above race/combat sessions and implement Standard Play,
-   Team Play, Hold the Flag, and The Fugitive before the special arcade challenges.
+1. **6.3b match-mode runtime:** connect Standard Play, Team Play, Hold the Flag, and The Fugitive to
+   roster selection, objective/score HUD, round resets, and replay coverage.
 2. **6.4 AI opponents:** decode or characterize the per-course `.AI`/`.LED` data, build route steering
    on the existing ordered checkpoints, and add deterministic difficulty profiles and replay tapes.
 3. **6.5 tournament flow:** main-menu to event-series progression, championship results, local save

@@ -357,7 +357,9 @@ Milestone M2: feature-complete alpha.
 обучающими строками типов: machine gun, guided missile, mortar, rear flame, oil, proximity mine, drum
 bomb, shotgun и flash. У каждого есть отдельная deterministic delivery/effect модель; oil/flash
 добавляют timed status, guided missile — homing, mortar — gravity arc, а flame — self-boost. Исходные
-позиции и respawn теперь напрямую создают все поддержанные типы.
+позиции и respawn теперь напрямую создают все поддержанные типы. Срез 6.3a добавляет чистую
+multi-round `MatchModeSession` для Standard Play, Team Play, Hold the Flag и The Fugitive; подключение
+mode selection/objective HUD и round reset к браузерному runtime остаётся второй половиной среза.
 
 ### Этап 7. Beta: доставка, производительность и совместимость — 3–6 недель
 
