@@ -4,7 +4,7 @@ Clean-room browser reimplementation of _Mashed: Fully Loaded_. The repository co
 new code, schemas, documentation, and metadata. Original executable and game assets must come
 from a user-owned disc image or installed copy and are always kept below ignored `game-data/`.
 
-Milestone **M0: Asset feasibility** and the Stage 3 runtime foundation are complete. Stage 1
+Milestones **M0: Asset feasibility** and **M1: public proof of concept** are complete. Stage 1
 provides a reproducible local extraction pipeline; Stage 2 provides RenderWare DFF/TXD readers, full
 graphical/collision BSP sector parsing, and a Three.js asset viewer. Stage 3 adds a deterministic
 fixed-step core, replay checks, Rapier/Three.js/Web Audio adapters, debug tooling, and the browser
@@ -22,8 +22,9 @@ health/ammo HUD. The fifth slice adds a deterministic pause/resume state, focus-
 per-player engine voices, pause/resume cues, and baseline pickup/weapon/damage/destruction particles.
 The sixth slice parses original PC RWS dictionaries in the loading Worker, binds named engine/combat/UI
 samples with synthesized fallback, and resolves projectile impacts against track/scenery and props.
-M1 hardening now includes a combined race/combat/camera replay whose complete outcome is identical at
-30, 60, and 120 Hz presentation rates, plus a bounded 30-minute automated rematch soak.
+M1 hardening includes a combined race/combat/camera replay whose complete outcome is identical at
+30, 60, and 120 Hz presentation rates, a bounded 30-minute automated rematch soak, and a four-player
+production-browser gate at a 2560×1440 WebGL buffer with no post-load asset requests.
 [ADR-0001](./reference/ADR-0001-runtime-asset-loading.md) selects direct runtime
 parsing in a loading Worker instead of mandatory pre-conversion.
 

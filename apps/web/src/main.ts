@@ -53,6 +53,11 @@ import { RuntimeRenderer } from "@mashed/renderer";
 
 import { AssetLoadingClient } from "./asset-loader.js";
 import type { LoadedAsset } from "./loading-protocol.js";
+import {
+  evaluateM1Evidence,
+  M1EvidenceCollector,
+  type M1EvidenceReport,
+} from "./m1-evidence.js";
 import "./style.css";
 
 function element<T extends HTMLElement>(id: string): T {
@@ -89,7 +94,12 @@ const COMBAT_EFFECT_COLORS = Object.freeze({
   rocket: 0xff654f,
   mine: 0x8d6be8,
 });
-const vehiclePairLab = new URLSearchParams(window.location.search).get("collisionLab") === "vehicle-pair";
+const searchParameters = new URLSearchParams(window.location.search);
+const vehiclePairLab = searchParameters.get("collisionLab") === "vehicle-pair";
+const m1EvidenceMode = searchParameters.get("m1Evidence") === "1";
+if (m1EvidenceMode) {
+  document.documentElement.dataset["m1Evidence"] = "true";
+}
 
 function selectedPhysicsOptions(): PhysicsRuntimeOptions {
   return vehiclePairLab ? { collisionObjects: false } : {};
@@ -131,6 +141,10 @@ const raceBannerValue = element<HTMLElement>("race-banner-value");
 const raceResults = element<HTMLOListElement>("race-results");
 const eliminationWarning = element<HTMLElement>("elimination-warning");
 const pauseOverlay = element<HTMLElement>("pause-overlay");
+const m1EvidencePanel = element<HTMLElement>("m1-evidence-panel");
+const m1EvidenceReset = element<HTMLButtonElement>("m1-evidence-reset");
+const m1EvidenceCapture = element<HTMLButtonElement>("m1-evidence-capture");
+const m1EvidenceOutput = element<HTMLElement>("m1-evidence-output");
 const combatHud = element<HTMLElement>("combat-hud");
 const combatPlayerRows = [
   element<HTMLElement>("combat-player-one"),
@@ -203,12 +217,74 @@ let smoothedFps = 60;
 let lastOverlayUpdate = 0;
 let physicsMilliseconds = 0;
 let totalDroppedSeconds = 0;
+const m1Evidence = new M1EvidenceCollector();
 
-playerCountSelect.value = vehiclePairLab ? "2" : "1";
+playerCountSelect.value = m1EvidenceMode ? "4" : vehiclePairLab ? "2" : "1";
+
+declare global {
+  interface Window {
+    __MASHED_M1_EVIDENCE__?: {
+      readonly version: 1;
+      readonly mode: true;
+      reset(): void;
+      report(): M1EvidenceReport;
+    };
+  }
+}
+
+if (m1EvidenceMode) {
+  m1EvidencePanel.hidden = false;
+}
 
 function selectedPlayerCount(): number {
   const value = Number(playerCountSelect.value);
   return Number.isInteger(value) && value >= 1 && value <= LOCAL_PLAYER_SLOTS.length ? value : 1;
+}
+
+function currentM1EvidenceReport(): M1EvidenceReport {
+  return m1Evidence.report({
+    state: state.state,
+    playerCount: selectedPlayerCount(),
+    loadedAssetCount: loadedAssets.size,
+    windowWidth: window.innerWidth,
+    windowHeight: window.innerHeight,
+    viewportWidth: viewport.clientWidth,
+    viewportHeight: viewport.clientHeight,
+    devicePixelRatio: window.devicePixelRatio,
+    networkRequestsAfterReset: performance
+      .getEntriesByType("resource")
+      .map((entry) => {
+        const resource = entry as PerformanceResourceTiming;
+        return {
+          name: resource.name,
+          initiatorType: resource.initiatorType,
+          transferSize: resource.transferSize,
+        };
+      }),
+  });
+}
+
+function resetM1Evidence(): void {
+  m1Evidence.reset();
+  performance.clearResourceTimings();
+  m1EvidenceOutput.textContent = "Sampling reset. Keep the four-player match running for 5+ seconds.";
+}
+
+if (m1EvidenceMode) {
+  window.__MASHED_M1_EVIDENCE__ = {
+    version: 1,
+    mode: true,
+    reset: resetM1Evidence,
+    report: currentM1EvidenceReport,
+  };
+  m1EvidenceReset.addEventListener("click", resetM1Evidence);
+  m1EvidenceCapture.addEventListener("click", () => {
+    const report = currentM1EvidenceReport();
+    m1EvidenceOutput.textContent = JSON.stringify({
+      acceptance: evaluateM1Evidence(report),
+      report,
+    }, null, 2);
+  });
 }
 
 function activePlayerSlots(): readonly (typeof LOCAL_PLAYER_SLOTS)[number][] {
@@ -1137,6 +1213,34 @@ function renderFrame(timestampMilliseconds: number): void {
     ...(debugColliders.checked ? { debugLines: physics.debugLines() } : {}),
   });
   updateEngineAudio();
+
+  if (m1EvidenceMode && state.state === "race") {
+    const physicsMetrics = physics.metrics;
+    const renderMetrics = renderer.metrics;
+    m1Evidence.record({
+      timestampMilliseconds,
+      frameMilliseconds: renderDeltaSeconds * 1000,
+      physicsMilliseconds,
+      fps: smoothedFps,
+      simulationStep: frame.simulationStep,
+      droppedSeconds: totalDroppedSeconds,
+      activeVehicles: physics.activeVehicleIds.length,
+      bodies: physicsMetrics.bodies,
+      colliders: physicsMetrics.colliders,
+      contacts: physicsMetrics.contacts,
+      drawCalls: renderMetrics.drawCalls,
+      triangles: renderMetrics.triangles,
+      geometries: renderMetrics.geometries,
+      textures: renderMetrics.textures,
+      sceneObjects: renderMetrics.sceneObjects,
+      combatPickups: renderMetrics.combatPickups,
+      combatProjectiles: renderMetrics.combatProjectiles,
+      burstEffects: renderMetrics.burstEffects,
+      particles: renderMetrics.particles,
+      drawingBufferWidth: renderMetrics.drawingBufferWidth,
+      drawingBufferHeight: renderMetrics.drawingBufferHeight,
+    });
+  }
 
   if (timestampMilliseconds - lastOverlayUpdate >= 200) {
     const physicsMetrics = physics.metrics;

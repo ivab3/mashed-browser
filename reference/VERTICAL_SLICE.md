@@ -1,10 +1,9 @@
 # Stage 5 vertical slice
 
-Status: Stage 5 started on 2026-08-28. Deterministic race rules, the production local roster,
-shared-camera elimination, the first playable combat loop, and the presentation foundation are
-implemented. Original PCM audio and projectile world impacts complete the content/impact follow-up.
-The combined 30/60/120 Hz match replay matrix and accelerated 30-minute soak are green; M1 browser
-acceptance evidence remains open before optional post-slice polish.
+Status: Stage 5 and Milestone M1 completed on 2026-08-29. Deterministic race rules, the production
+local roster, shared-camera elimination, combat, presentation, original PCM audio, and projectile
+world impacts form the playable slice. The combined 30/60/120 Hz replay matrix, accelerated 30-minute
+soak, and four-player production-browser performance/offline gates are green.
 
 ## Slice 5.1 — race rules foundation
 
@@ -144,16 +143,17 @@ The runtime now consumes the user-owned PC sound dictionaries and closes the pro
 The world query is an explicit deterministic input to `CombatSession`; replaying the same player
 tape and collision answers remains independent of render cadence and of Rapier/Web Audio types.
 
-## Planned slices
+## Hardening slices
 
 1. **M1.1 replay matrix — complete:** the same recorded race/combat/camera scenario produces an
    identical complete snapshot and ordered event log at 30, 60, and 120 Hz presentation rates.
 2. **M1.2 soak — complete:** 1,029 complete rematches cover 1,800.75 simulated seconds with finite
    snapshots, deterministic resets, legal pause/resume transitions, and bounded projectile/effect state.
-3. **M1.3 browser acceptance:** four-player 1080p performance evidence and verification that prepared
-   game data causes no network request after initial loading.
-4. **Optional polish after M1 evidence:** authored pickup placement, fire trails, damage decals, and
-   localized voice-stream playback.
+3. **M1.3 browser acceptance — complete:** prepared Warzone/Crusader/RWS data sustains 60 fps in a
+   2560×1440 WebGL buffer with four active vehicles, zero dropped time, and zero post-load requests.
+
+Optional authored pickup placement, fire trails, damage decals, and localized voice-stream playback
+remain post-M1 polish rather than Stage 5 blockers.
 
 ## Verification
 

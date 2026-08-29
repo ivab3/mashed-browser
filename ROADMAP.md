@@ -268,7 +268,7 @@ ray-cast controller, а также независимый keyboard/gamepad input
 Расширенная browser replay matrix остаётся неблокирующей hardening-задачей этапа 5. Независимый
 original-vehicle render instance для P2 был завершён и обобщён до P1–P4 в срезе 5.2.
 
-### Этап 5. Вертикальный срез — 4–6 недель
+### Этап 5. Вертикальный срез — 4–6 недель ✅
 
 Прогресс и порядок рабочих срезов: [reference/VERTICAL_SLICE.md](./reference/VERTICAL_SLICE.md).
 
@@ -294,7 +294,7 @@ original-vehicle render instance для P2 был завершён и обобщ
 - На целевом компьютере поддерживается 60 fps при 1080p.
 - После первой загрузки матч запускается без сетевых запросов к игровым данным.
 
-Статус 2026-08-28: **этап 5 начат**. Первый срез добавил чистую fixed-step `RaceSession` для 1–4
+Статус 2026-08-29: **этап 5 завершён, Milestone M1 закрыт**. Первый срез добавил чистую fixed-step `RaceSession` для 1–4
 игроков: трёхсекундный countdown, независимые ordered checkpoints/круги, финиш, явное выбывание и
 детерминированную таблицу результатов. Однопользовательский Warzone runtime использует этот цикл и
 показывает countdown/final-time banner. Второй срез заменил специальную P2-ветку на production roster:
@@ -317,8 +317,10 @@ race/combat/camera сценарий: полные snapshots и упорядоч�
 30/60/120 Гц, а terminal fixed-step больше не пропускает дополнительную симуляцию внутри 30 Гц кадра.
 M1.2 прогнал 1029 полных rematch за 1800,75 с симуляции: 108045 fixed-step, чередование 30/60/120 Гц,
 52 pause/resume и finite/bounded-state проверки без reset divergence; retained heap после GC вырос
-примерно на 0,4 МБ. Последний срез M1 — browser evidence для четырёх игроков в 1080p и offline
-game-data. Voice streams, authored pickup placement, trails и decals не блокируют proof of concept.
+примерно на 0,4 МБ. M1.3 на production build с пользовательскими Warzone/Crusader/RWS данными и
+четырьмя машинами удержал median 60,01 fps (p95 frame 17,7 мс, physics 0,9 мс) в WebGL-буфере
+2560×1440, без dropped simulation time и без сетевых запросов после завершения загрузки. Voice
+streams, authored pickup placement, trails и decals не блокируют proof of concept.
 Воспроизводимые evidence-команды описаны в
 [`reference/M1_HARDENING.md`](./reference/M1_HARDENING.md).
 

@@ -1,0 +1,71 @@
+{
+  "version": 1,
+  "recordedAt": "2026-08-29",
+  "environment": {
+    "hardware": "MacBook Air (Apple M1, 8 GB, 7-core integrated GPU)",
+    "browserSurface": "Codex in-app Chromium",
+    "build": "Vite production preview"
+  },
+  "preparedInputs": [
+    "Warzone GRAPHICS.BSP, WARZONE.TXD, COLLIDE.BSP, AI1.BSP, LAPDATA.LUA, COURSE.LUA",
+    "Crusader CRUSADER0.DFF, CRUSADER.TXD",
+    "PERMDICT.RWS"
+  ],
+  "acceptance": {
+    "enoughSamples": true,
+    "fourPlayersActive": true,
+    "preparedAssetsLoaded": true,
+    "atLeast1080p": true,
+    "sixtyFps": true,
+    "noDroppedSimulationTime": true,
+    "offlineAfterInitialLoad": true,
+    "passed": true
+  },
+  "report": {
+    "version": 1,
+    "state": "race",
+    "playerCount": 4,
+    "loadedAssetCount": 7,
+    "windowWidth": 1280,
+    "windowHeight": 720,
+    "viewportWidth": 1280,
+    "viewportHeight": 720,
+    "devicePixelRatio": 2,
+    "networkRequestsAfterReset": [],
+    "sampleCount": 528,
+    "durationSeconds": 8.782800000000046,
+    "frameMilliseconds": {
+      "median": 16.699999999953434,
+      "p95": 17.699999999953434,
+      "maximum": 17.800000000046566
+    },
+    "physicsMilliseconds": {
+      "median": 0.6999999284744263,
+      "p95": 0.8999999761581421,
+      "maximum": 2.799999952316284
+    },
+    "fps": {
+      "median": 60.010492749704596,
+      "p05": 59.966854698506324,
+      "minimum": 59.928073067396674
+    },
+    "simulationSteps": 527,
+    "droppedSeconds": 0,
+    "maximumActiveVehicles": 4,
+    "maximumBodies": 15,
+    "maximumColliders": 22,
+    "maximumContacts": 1,
+    "maximumDrawCalls": 175,
+    "maximumTriangles": 26573,
+    "maximumGeometries": 75,
+    "maximumTextures": 47,
+    "maximumSceneObjects": 7,
+    "maximumCombatPickups": 3,
+    "maximumCombatProjectiles": 0,
+    "maximumBurstEffects": 0,
+    "maximumParticles": 0,
+    "drawingBufferWidth": 2560,
+    "drawingBufferHeight": 1440
+  },
+  "browserConsoleErrors": []
+}

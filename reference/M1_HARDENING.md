@@ -1,7 +1,7 @@
 # Milestone M1 hardening evidence
 
-Status: in progress. The combined match replay matrix and automated 30-minute soak are complete;
-target-browser performance and offline checks are the remaining M1 gate.
+Status: complete on 2026-08-29. The combined match replay matrix, automated 30-minute soak, and
+production-browser performance/offline checks are green.
 
 ## M1.1 — combined match replay matrix
 
@@ -61,7 +61,44 @@ Accepted bounds on 2026-08-28:
 The renderer budgets are derived from the production combat-event mapping and advanced on the same
 fixed-step event timeline. Browser/WebGL resource counts and frame-time evidence remain part of M1.3.
 
-## Remaining evidence
+## M1.3 — production browser performance and offline assets
 
-**M1.3 browser acceptance:** capture four-player 1080p frame/physics metrics and prove that a prepared
-local asset session performs no game-data network requests after initial loading.
+Build and serve the production app, then open `/?m1Evidence=1`:
+
+```bash
+pnpm --filter @mashed/web build
+pnpm --filter @mashed/web exec vite preview --host 127.0.0.1 --port 4173
+```
+
+Evidence mode makes the canvas full-window, selects four local players, and exposes a bounded sampler.
+Load the user-owned track/vehicle/audio bundle through the normal file chooser, start the match, allow
+the initial load and countdown to finish, choose **Reset sample**, then **Capture report** after at
+least five seconds. Reset also clears Resource Timing, so any later runtime/asset request is included
+in `networkRequestsAfterReset`. The gate refuses to pass an asset-free run.
+
+Accepted production run on an Apple M1 MacBook Air (8 GB memory, 7-core integrated GPU):
+
+| Measurement | Result |
+| --- | ---: |
+| Prepared inputs | Warzone route/collision/graphics/TXD, Crusader DFF/TXD, PERMDICT RWS |
+| Loaded source data | 7 binary assets + 2 LUA metadata files; 136 checkpoints |
+| CSS viewport / device scale | 1280×720 / 2× |
+| WebGL drawing buffer | 2560×1440 (above 1920×1080) |
+| Sample | 528 frames / 8.783 s |
+| FPS median / p05 / minimum | 60.01 / 59.97 / 59.93 |
+| Frame time median / p95 / maximum | 16.70 / 17.70 / 17.80 ms |
+| Physics time median / p95 / maximum | 0.70 / 0.90 / 2.80 ms |
+| Simulation | 527 steps; 0 dropped seconds |
+| Active vehicles | 4 |
+| Peak render load | 175 draws; 26,573 triangles; 75 geometries; 47 textures |
+| Physics world | 15 bodies; 22 colliders |
+| Requests after post-load reset | 0 |
+| Browser console errors | 0 |
+
+The machine-readable acceptance requires 300+ samples over 5+ seconds, four active vehicles, at least
+one prepared binary asset, a drawing buffer of at least 1920×1080, median FPS ≥59, p95 frame time
+≤20 ms, zero dropped simulation time, and zero resource requests after the post-load reset. All flags
+passed in the accepted run.
+
+The captured machine-readable report is committed as
+[`m1-browser-evidence-2026-08-29.json`](./m1-browser-evidence-2026-08-29.json).

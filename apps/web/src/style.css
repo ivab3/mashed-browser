@@ -17,6 +17,56 @@ main {
   min-height: 0;
 }
 
+html[data-m1-evidence="true"] main { grid-template-columns: minmax(0, 1fr); }
+
+html[data-m1-evidence="true"] .control-panel {
+  position: absolute;
+  z-index: 8;
+  right: 14px;
+  bottom: 14px;
+  width: 280px;
+  max-height: 380px;
+  padding: 18px;
+  border: 1px solid rgb(255 255 255 / 12%);
+  border-radius: 14px;
+  opacity: 0.82;
+}
+
+html[data-m1-evidence="true"] .control-panel > :not(.controls, footer) { display: none; }
+
+.m1-evidence-panel {
+  position: absolute;
+  z-index: 7;
+  right: 14px;
+  top: 14px;
+  width: min(540px, calc(100% - 28px));
+  max-height: calc(100% - 420px);
+  overflow: auto;
+  padding: 12px;
+  border: 1px solid rgb(255 138 76 / 34%);
+  border-radius: 12px;
+  background: rgb(8 16 23 / 86%);
+  backdrop-filter: blur(14px);
+}
+
+.m1-evidence-panel > div { display: flex; gap: 8px; align-items: center; }
+.m1-evidence-panel strong { margin-right: auto; color: #ffb182; font-size: 11px; }
+.m1-evidence-panel button, .m1-evidence-load {
+  padding: 6px 8px;
+  border: 1px solid rgb(255 255 255 / 18%);
+  border-radius: 5px;
+  color: #dbe6e6;
+  background: #17262f;
+  font-size: 10px;
+  cursor: pointer;
+}
+.m1-evidence-panel pre {
+  margin: 10px 0 0;
+  color: #b9c9cc;
+  font: 10px/1.35 ui-monospace, SFMono-Regular, Menlo, monospace;
+  white-space: pre-wrap;
+}
+
 .viewport {
   position: relative;
   min-width: 0;

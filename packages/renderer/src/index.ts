@@ -61,6 +61,15 @@ export interface RenderFrame {
 export interface RendererMetrics {
   drawCalls: number;
   triangles: number;
+  geometries: number;
+  textures: number;
+  sceneObjects: number;
+  combatPickups: number;
+  combatProjectiles: number;
+  burstEffects: number;
+  particles: number;
+  drawingBufferWidth: number;
+  drawingBufferHeight: number;
 }
 
 export interface TrackRenderSector {
@@ -265,6 +274,17 @@ export class RuntimeRenderer {
     return {
       drawCalls: this.#renderer.info.render.calls,
       triangles: this.#renderer.info.render.triangles,
+      geometries: this.#renderer.info.memory.geometries,
+      textures: this.#renderer.info.memory.textures,
+      sceneObjects: this.#sceneObjects.size,
+      combatPickups: this.#combatPickups.size,
+      combatProjectiles: this.#combatProjectiles.size,
+      burstEffects: this.#burstEffects.length,
+      particles: this.#burstEffects.reduce((total, effect) => (
+        total + effect.points.geometry.getAttribute("position").count
+      ), 0),
+      drawingBufferWidth: this.#renderer.domElement.width,
+      drawingBufferHeight: this.#renderer.domElement.height,
     };
   }
 
