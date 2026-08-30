@@ -1,0 +1,187 @@
+export type ContentResourceDisposition = "deferred" | "non-runtime" | "parsed-only";
+
+export interface ContentResourceBoundary {
+  suffix: string;
+  disposition: ContentResourceDisposition;
+  reason: string;
+}
+
+export interface AlphaTrackAdmission {
+  id: string;
+  displayName: string;
+  directoryName: string;
+  courseId: number;
+  powerupFileName?: string;
+  resourceBoundaries: readonly ContentResourceBoundary[];
+}
+
+export interface AlphaVehicleAdmission {
+  id: string;
+  displayName: string;
+  directoryName: string;
+  assetBaseName: string;
+  variants: readonly number[];
+  nameMapping: "exact-name" | "inferred-position";
+  resourceBoundaries: readonly {
+    fileNames: readonly string[];
+    disposition: ContentResourceDisposition;
+    reason: string;
+  }[];
+}
+
+export interface AlphaContentBatch {
+  id: string;
+  status: "admitted";
+  tracks: readonly AlphaTrackAdmission[];
+  vehicles: readonly AlphaVehicleAdmission[];
+}
+
+const CITY_RESOURCE_BOUNDARIES: readonly ContentResourceBoundary[] = Object.freeze([
+  {
+    suffix: ".aid",
+    disposition: "deferred",
+    reason: "Original AI behavior table is structurally unconfirmed and does not drive the route controller.",
+  },
+  {
+    suffix: ".anm",
+    disposition: "deferred",
+    reason: "Authored object and camera animation playback is not implemented.",
+  },
+  {
+    suffix: ".mts",
+    disposition: "deferred",
+    reason: "Authored material/physics template binding is not implemented.",
+  },
+  {
+    suffix: ".uva",
+    disposition: "deferred",
+    reason: "Authored UV animation playback is not implemented.",
+  },
+  {
+    suffix: "ktcscript.lua",
+    disposition: "deferred",
+    reason: "Kill-the-copter scripted event is outside the admitted local match rules.",
+  },
+  {
+    suffix: "powerups_gold.dff",
+    disposition: "deferred",
+    reason: "Pickup rules and placement are supported, but the original pickup DFF is not rendered.",
+  },
+  {
+    suffix: "occluder.dff",
+    disposition: "deferred",
+    reason: "The source course comments this model out and the runtime has no occluder pass.",
+  },
+  {
+    suffix: "fourlight.dff",
+    disposition: "deferred",
+    reason: "The model is not referenced by the admitted course definition.",
+  },
+  {
+    suffix: "swingtyre.dff",
+    disposition: "deferred",
+    reason: "The model is not referenced by the admitted course definition.",
+  },
+  {
+    suffix: "skydome.dff",
+    disposition: "parsed-only",
+    reason: "The DFF parses, but its local-template transform is not placed by the renderer.",
+  },
+  {
+    suffix: "tree.dff",
+    disposition: "parsed-only",
+    reason: "The DFF parses, but its local-template transform is not placed by the renderer.",
+  },
+  {
+    suffix: "rbarrel.dff",
+    disposition: "parsed-only",
+    reason: "The DFF parses, but its local-template transform is not placed by the renderer.",
+  },
+  {
+    suffix: "lights.dff",
+    disposition: "parsed-only",
+    reason: "The DFF parses, but original light behavior is not instantiated by the renderer.",
+  },
+  ...["lamposts.dff", "parkpost.dff", "gates.dff", "trafficlight.dff", "twolight.dff"].map((suffix) => ({
+    suffix,
+    disposition: "parsed-only" as const,
+    reason: "The RWP template DFF parses, but authored object instances and MTS physics are deferred.",
+  })),
+  {
+    suffix: ".mts.txt",
+    disposition: "non-runtime",
+    reason: "Extracted text sidecars are diagnostics and are not runtime inputs.",
+  },
+  {
+    suffix: "rwdebug.log",
+    disposition: "non-runtime",
+    reason: "Source debug output is not a runtime resource.",
+  },
+]);
+
+/** Source-free admission metadata for content that has passed its Stage 6 gates. */
+export const ALPHA_CONTENT_BATCHES: readonly AlphaContentBatch[] = Object.freeze([
+  {
+    id: "6.6a-city-wildfire",
+    status: "admitted",
+    tracks: [
+      {
+        id: "city-26",
+        displayName: "City",
+        directoryName: "City",
+        courseId: 26,
+        powerupFileName: "POWERUPS_GOLD.LUA",
+        resourceBoundaries: CITY_RESOURCE_BOUNDARIES,
+      },
+    ],
+    vehicles: [
+      {
+        id: "wildfire",
+        displayName: "Wildfire",
+        directoryName: "Wildfire",
+        assetBaseName: "WILDFIRE",
+        variants: [0, 1, 2, 3, 4, 5],
+        nameMapping: "exact-name",
+        resourceBoundaries: [
+          {
+            fileNames: ["WILDFIRELIGHTS.DFF"],
+            disposition: "deferred",
+            reason: "Original vehicle light attachment behavior is not implemented.",
+          },
+          {
+            fileNames: ["GHOST.DFF"],
+            disposition: "deferred",
+            reason: "Original ghost presentation is not implemented.",
+          },
+          {
+            fileNames: [
+              "DEBRIS0.DFF",
+              "DEBRIS1.DFF",
+              "DEBRIS2.DFF",
+              "DEBRIS3.DFF",
+              "DEBRIS4.DFF",
+              "DEBRIS5.DFF",
+            ],
+            disposition: "deferred",
+            reason: "Vehicle-specific debris meshes are not spawned on destruction.",
+          },
+        ],
+      },
+    ],
+  },
+]);
+
+export function alphaContentBatch(id: string): AlphaContentBatch | undefined {
+  return ALPHA_CONTENT_BATCHES.find((batch) => batch.id === id);
+}
+
+export function admittedTrackByCourseId(courseId: number): AlphaTrackAdmission | undefined {
+  return ALPHA_CONTENT_BATCHES.flatMap((batch) => batch.tracks)
+    .find((track) => track.courseId === courseId);
+}
+
+export function admittedVehicleByAssetName(assetName: string): AlphaVehicleAdmission | undefined {
+  const normalized = assetName.toLocaleUpperCase("en-US");
+  return ALPHA_CONTENT_BATCHES.flatMap((batch) => batch.vehicles)
+    .find((vehicle) => vehicle.assetBaseName.toLocaleUpperCase("en-US") === normalized);
+}

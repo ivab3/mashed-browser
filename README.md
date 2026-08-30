@@ -60,6 +60,7 @@ An installed directory containing exactly one `MFL.exe` can be used instead of a
 pnpm typecheck
 pnpm test
 pnpm build
+pnpm content:validate
 pnpm ai:lap
 pnpm vehicle:tune
 pnpm match:replay
@@ -80,6 +81,8 @@ AI format findings, route-driver contracts, and follow-up acceptance live in
 [`reference/AI_FOUNDATION.md`](./reference/AI_FOUNDATION.md).
 Championship rules, source boundaries, and the versioned series-save contract live in
 [`reference/CHAMPIONSHIP_FOUNDATION.md`](./reference/CHAMPIONSHIP_FOUNDATION.md).
+Content admission batches, repeatable local-source gates, and explicit deferred-resource records live
+in [`reference/CONTENT_BATCHES.md`](./reference/CONTENT_BATCHES.md).
 
 ## Inspect Stage 2 fixtures
 
@@ -121,6 +124,9 @@ bytes remain local and parsed typed arrays are transferred back without cloning.
 [`reference/RUNTIME_FOUNDATION.md`](./reference/RUNTIME_FOUNDATION.md) for runtime contracts and
 acceptance evidence. Loading a numbered vehicle DFF such as `CRUSADER0.DFF` together with its shared
 `CRUSADER.TXD` adds it to the local roster selectors.
+The first measured content admission adds City (course 26) and all six intact Wildfire skins.
+`pnpm content:validate` checks their local extracted files, runs City's 30/60/120 Hz route-rules
+matrix, and fails if a source file is neither exercised nor explicitly classified.
 Choose 1–4 local players in the runtime roster. P1 uses WASD and gamepad 1; P2 uses the arrow keys
 and gamepad 2; P3/P4 use gamepads 3/4. Every active slot has independent physics and telemetry, and
 can select any complete numbered DFF/shared-TXD pair loaded in the current session. The camera

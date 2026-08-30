@@ -1,5 +1,7 @@
 import { AudioRuntime } from "@mashed/audio";
 import {
+  admittedTrackByCourseId,
+  admittedVehicleByAssetName,
   deriveTrackDefinition,
   listVehicleAssetPairs,
   parseAiData,
@@ -364,7 +366,9 @@ function createMatchModeSession(): MatchModeSession | undefined {
 
 function alphaChampionshipDefinition(): ChampionshipDefinition {
   const courseId = trackParts.course?.id;
-  const courseLabel = courseId === undefined ? "Loaded Track" : `Course ${courseId}`;
+  const courseLabel = courseId === undefined
+    ? "Loaded Track"
+    : admittedTrackByCourseId(courseId)?.displayName ?? `Course ${courseId}`;
   const event = (id: string, name: string, mode: MatchModeType) => ({
     id,
     name: `${courseLabel} · ${name}`,
@@ -1567,6 +1571,10 @@ function vehiclePairKey(pair: VehicleAssetPair): string {
   return pair.fileName.toLocaleLowerCase("en-US");
 }
 
+function vehicleDisplayName(assetName: string): string {
+  return admittedVehicleByAssetName(assetName)?.displayName ?? assetName;
+}
+
 function refreshVehicleCatalog(): void {
   vehicleCatalog = listVehicleAssetPairs(loadedDffs.keys(), loadedTextureDictionaries.keys());
   const availableKeys = new Set(vehicleCatalog.map(vehiclePairKey));
@@ -1578,7 +1586,7 @@ function refreshVehicleCatalog(): void {
     const options = vehicleCatalog.map((pair) => {
       const option = document.createElement("option");
       option.value = vehiclePairKey(pair);
-      option.textContent = `${pair.vehicleName} · skin ${pair.variant}`;
+      option.textContent = `${vehicleDisplayName(pair.vehicleName)} · skin ${pair.variant}`;
       return option;
     });
     select.replaceChildren(proxy, ...options);
@@ -1607,7 +1615,7 @@ function bindVehicleModels(): string[] {
     }
     const rendered = renderer.setVehicleModelFor(slot.id, model, textures);
     bound.push(
-      `${slot.label} ${pair.vehicleName} skin ${pair.variant} · ${rendered.atomics} atomics · ${rendered.triangles.toLocaleString()} tris${rendered.missingTextureNames.length > 0 ? ` · ${rendered.missingTextureNames.length} missing maps` : ""}`,
+      `${slot.label} ${vehicleDisplayName(pair.vehicleName)} skin ${pair.variant} · ${rendered.atomics} atomics · ${rendered.triangles.toLocaleString()} tris${rendered.missingTextureNames.length > 0 ? ` · ${rendered.missingTextureNames.length} missing maps` : ""}`,
     );
   });
   return bound;
@@ -1635,6 +1643,10 @@ function bindTrackParts(): string[] {
     );
   }
   if (trackParts.course) {
+    const admittedTrack = admittedTrackByCourseId(trackParts.course.id);
+    if (admittedTrack) {
+      bound.push(`${admittedTrack.displayName} · admitted content batch`);
+    }
     const courseNames = new Map<string, string>();
     for (const asset of [
       ...trackParts.course.clumps.map((clump) => clump.fileName),

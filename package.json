@@ -18,6 +18,7 @@
     "web": "pnpm --filter @mashed/web dev",
     "vehicle:tune": "pnpm --filter @mashed/physics tune",
     "build": "pnpm -r --if-present build",
+    "content:validate": "pnpm --filter @mashed/physics content:validate",
     "typecheck": "pnpm -r typecheck",
     "test": "pnpm -r test"
   },

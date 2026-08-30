@@ -351,7 +351,7 @@ Milestone M1: публично показываемый proof of concept.
 
 Milestone M2: feature-complete alpha.
 
-Статус 2026-08-30: **этап 6 выполняется; срезы 6.1–6.5 завершены**. Срез 6.1 вводит безопасный reader исходных
+Статус 2026-08-30: **этап 6 выполняется; срезы 6.1–6.5 и первый content batch 6.6a завершены**. Срез 6.1 вводит безопасный reader исходных
 `POWERUPS_ALL.LUA`/`POWERUPS_GOLD.LUA`: нормализованы все встречающиеся type ID, глобальные loadout
 для 26 course ID и source-authored position/respawn metadata. Срез 6.2 подключает девять подтверждённых
 обучающими строками типов: machine gun, guided missile, mortar, rear flame, oil, proximity mine, drum
@@ -375,8 +375,12 @@ checkpoint Warzone за 56,02 с без reverse/recovery; двухпроцесс
 оригинального event order в извлечённом PIZ не найдено, поэтому текущий clean-room alpha cup не
 выдаётся за точное восстановление оригинальной сетки. Browser runtime связывает три события с live
 standings, event/final results, medal table, next-event/restart flow и отказоустойчивым local save.
-Полный UI-проход восстановил финальную таблицу после navigation. Следующий рабочий блок — 6.6:
-vehicle roster и трассы измеряемыми content batches со smoke/replay/unsupported-resource evidence.
+Полный UI-проход восстановил финальную таблицу после navigation. Первый пакет 6.6a допускает City
+(course 26) и Wildfire через source-free registry: 117-checkpoint replay совпадает на 30/60/120 Hz,
+обычный browser loader связывает world/collision/course/Wildfire, а validator отклоняет любой
+неклассифицированный source file. `.AID/.ANM/.MTS/.UVA`, scripted KTC, local-template placement,
+vehicle lights/ghost/debris перечислены явно как deferred или parsed-only. Следующий рабочий блок —
+расширение 6.6b+ теми же измеряемыми пакетами.
 
 ### Этап 7. Beta: доставка, производительность и совместимость — 3–6 недель
 
