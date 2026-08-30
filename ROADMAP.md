@@ -351,7 +351,7 @@ Milestone M1: публично показываемый proof of concept.
 
 Milestone M2: feature-complete alpha.
 
-Статус 2026-08-30: **этап 6 выполняется; срезы 6.1–6.5 и content batches 6.6a–d завершены**. Срез 6.1 вводит безопасный reader исходных
+Статус 2026-08-30: **этап 6 выполняется; срезы 6.1–6.5 и content batches 6.6a–e завершены**. Срез 6.1 вводит безопасный reader исходных
 `POWERUPS_ALL.LUA`/`POWERUPS_GOLD.LUA`: нормализованы все встречающиеся type ID, глобальные loadout
 для 26 course ID и source-authored position/respawn metadata. Срез 6.2 подключает девять подтверждённых
 обучающими строками типов: machine gun, guided missile, mortar, rear flame, oil, proximity mine, drum
@@ -392,7 +392,11 @@ collision triangles; Hard CPU достигает checkpoint 23 при 60 FPS б�
 все 15 source vehicle archives и 90 numbered skins: validator проверяет 4 182 atomics и 508 956
 triangles, а browser smoke связывает по очереди все 12 новых skin-0/TXD пар без ошибок. Все
 позиционно выведенные display names остаются metadata, и UI продолжает показывать source labels.
-Следующий рабочий блок — расширение трасс пакетами 6.6e+.
+Пакет 6.6e переводит существующий M1 Warzone baseline под тот же строгий admission contract: полный
+136-checkpoint replay совпадает на 30/60/120 Hz, validator учитывает 23 077 world и 5 661 source
+collision triangles, 85 textures и все 40 declared DFF, а обычный 51-file browser load завершился
+естественным Hard CPU финишем за 55,78 с при 60 FPS без dropped time или console warnings/errors.
+Следующий рабочий блок — расширение трасс пакетами 6.6f+ и затем alpha settings/gate 6.7.
 
 ### Этап 7. Beta: доставка, производительность и совместимость — 3–6 недель
 

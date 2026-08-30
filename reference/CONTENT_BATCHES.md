@@ -1,7 +1,8 @@
 # Stage 6 content batches
 
 Status: batches 6.6a (`City` course 26 + `Wildfire`), 6.6b (`Neustein` course 39 + `Crusader`),
-6.6c (`Arctic` course 0 + `Shorty`), and the roster-only batch 6.6d admitted on 2026-08-30.
+6.6c (`Arctic` course 0 + `Shorty`), the roster-only batch 6.6d, and the formalized Warzone
+baseline batch 6.6e admitted on 2026-08-30.
 Original files remain in the user's ignored `game-data/` tree; the repository contains only
 source-free admission metadata, validators, and measurements.
 
@@ -179,5 +180,38 @@ FPS with zero dropped time and no console warnings or errors.
 - `ADVANTAGE0SLT.DFF` and `ADVANTAGE0SM.DFF` are non-numbered alternate presentation meshes and are
   deferred rather than silently promoted to roster skins;
 - this is a roster-only admission, so no additional track replay is claimed by 6.6d.
+
+## Batch 6.6e — Warzone baseline
+
+Warzone was already the M1 development fixture and production AI-lap gate. This batch brings that
+existing baseline under the same source-free admission registry and fail-closed resource accounting
+as the later tracks. `Warzone` is the confirmed internal family label for course 33; it uses the
+shared `POWERUPS_ALL.LUA` course loadout.
+
+| Asset | Accepted evidence |
+|---|---|
+| Warzone route | 136 ordered checkpoints, 2 split checkpoints, one complete deterministic lap at 30/60/120 Hz |
+| Warzone world | 23,077 graphics triangles, 5,661 source collision triangles, 85 textures |
+| Warzone models | 40 declared DFFs parse, 42 atomics, 3,038 triangles |
+| Warzone rules | Shared course-33 loadout resolves machine gun, flash, proximity mine, mortar, and guided missile |
+
+The browser acceptance loaded 51 files through the normal chooser. Production adapters bound all 136
+checkpoints, 5,833 filtered drive/scenery collision triangles, 23,077 visible world triangles, 62
+materials, 85 textures, 23 placed course atomics, and the intact 13-atomic/3,557-triangle `WILDFIRE0`
+vehicle. Twenty of 34 world-authored DFF references rendered; the remaining 14 are explicit local
+templates rather than silently dropped inputs. A production Hard CPU completed the full physics lap
+at 60 FPS in 55.78 seconds with zero dropped simulation time and no console warnings or errors.
+
+## Explicit 6.6e boundaries
+
+- boat, helicopter, and unused `.ANM` playback plus `.MTS` material/physics template binding are
+  deferred;
+- course 33 uses the shared loadout table; `POWERUPS_GOLD.DFF` is not rendered and no authored
+  pickup-position Lua exists in this track directory;
+- `ADS.DFF` is commented out by the course definition;
+- 20 local-template DFF families parse, but their template transforms or light behavior are not
+  instantiated;
+- `.MTS.TXT` sidecars are source diagnostics, not runtime inputs;
+- the batch reuses the already admitted Wildfire vehicle and does not claim an additional vehicle.
 
 Future batches must extend the admission registry rather than weakening or bypassing these checks.

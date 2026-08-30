@@ -104,7 +104,7 @@ persists the strict versioned save by course and roster size. Browser acceptance
 series, restored its final table after navigation, and restarted it at zero points. Details live in
 [CHAMPIONSHIP_FOUNDATION.md](./CHAMPIONSHIP_FOUNDATION.md).
 
-## Slices 6.6a–d — measured content batches and complete vehicle roster
+## Slices 6.6a–e — measured content batches and complete vehicle roster
 
 The first admission beyond the Warzone proof baseline adds City (course 26) and Wildfire. A
 source-free batch registry records stable identities and every deferred/parsed-only resource family.
@@ -137,9 +137,17 @@ The browser loaded the 12 newly admitted skin-0/TXD pairs together and bound eve
 no warnings or errors. Only Wildfire's display-name mapping is direct, so all other selectors retain
 their source labels.
 
+The fifth admission closes the historical gap around the M1 Warzone fixture by registering course 33
+under the same fail-closed content contract. Its 136-checkpoint rules replay is identical at
+30/60/120 Hz; the validator accounts for 23,077 world triangles, 5,661 source collision triangles, 85
+textures, and all 40 declared DFF models. The ordinary 51-file browser load bound the complete route,
+world, filtered collision, placed models, shared five-weapon loadout, and Wildfire. A production Hard
+CPU then completed the natural physics lap in 55.78 seconds at 60 FPS with no dropped time or console
+warnings/errors.
+
 ## Planned slices
 
-1. **6.6e+ track batches:** extend the playable track catalog in measured batches. Every admitted track
+1. **6.6f+ track batches:** extend the playable track catalog in measured batches. Every admitted track
    keeps the load smoke, rules replay, and explicit unsupported-resource record.
 2. **6.7 settings and alpha gate:** controls/audio/graphics/difficulty settings, persistence, complete
    menu-to-series acceptance, and the Milestone M2 compatibility report.

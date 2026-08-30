@@ -44,6 +44,10 @@ describe("Stage 6 content admissions", () => {
       nameMapping: "inferred-position",
       variants: [0, 1, 2, 3, 4, 5],
     });
+    expect(admittedTrackByCourseId(33)).toMatchObject({
+      id: "warzone-33",
+      powerupLoadoutPath: "Common/POWERUPS/Powerups/POWERUPS_ALL.LUA",
+    });
   });
 
   it("records every deferred City source family explicitly", () => {

@@ -12,7 +12,7 @@ Human/Easy/Normal/Hard drivers, deterministic checkpoint steering, and structura
 `.AI`/`.LED` data. CPU item use respects each weapon's useful target arc/range, and the production Hard
 driver completes the 136-checkpoint Warzone gate without recovery. A clean-room three-event Alpha
 Championship adds aggregate points, final medals, next-event flow, and a strict versioned local save
-that resumes after navigation. Measured content batches admit City, Neustein, and Arctic behind
+that resumes after navigation. Measured content batches admit City, Neustein, Arctic, and Warzone behind
 deterministic full-route gates and cover the complete 15-vehicle, 90-skin roster with explicit
 source-free resource boundaries. Stage 1
 provides a reproducible local extraction pipeline; Stage 2 provides RenderWare DFF/TXD readers, full
@@ -126,8 +126,8 @@ bytes remain local and parsed typed arrays are transferred back without cloning.
 [`reference/RUNTIME_FOUNDATION.md`](./reference/RUNTIME_FOUNDATION.md) for runtime contracts and
 acceptance evidence. Loading a numbered vehicle DFF such as `CRUSADER0.DFF` together with its shared
 `CRUSADER.TXD` adds it to the local roster selectors.
-Measured track admissions currently cover City (course 26), Neustein (course 39), and Arctic (course
-0). The vehicle registry covers all 15 source archives and all 90 intact numbered skins.
+Measured track admissions currently cover City (course 26), Neustein (course 39), Arctic (course 0),
+and Warzone (course 33). The vehicle registry covers all 15 source archives and all 90 intact numbered skins.
 `pnpm content:validate` checks every admitted local bundle, runs each track's 30/60/120 Hz route-rules
 matrix, and fails if a source file is neither exercised nor explicitly classified. The browser uses
 each course's declared BSP filenames, including Arctic's nonstandard names. Inferred localized

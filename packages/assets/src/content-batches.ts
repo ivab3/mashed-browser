@@ -449,6 +449,73 @@ export const ALPHA_CONTENT_BATCHES: readonly AlphaContentBatch[] = Object.freeze
       inferredVehicle("bigboss", "Slugger", "BigBoss", "BIGBOSS", { arms: false }),
     ],
   },
+  {
+    id: "6.6e-warzone-baseline",
+    status: "admitted",
+    tracks: [
+      {
+        id: "warzone-33",
+        displayName: "Warzone",
+        directoryName: "Warzone",
+        courseId: 33,
+        powerupLoadoutPath: "Common/POWERUPS/Powerups/POWERUPS_ALL.LUA",
+        resourceBoundaries: [
+          {
+            suffix: ".anm",
+            disposition: "deferred",
+            reason: "Authored boat, helicopter, and unused animation playback is not implemented.",
+          },
+          {
+            suffix: ".mts",
+            disposition: "deferred",
+            reason: "Authored material/physics template binding is not implemented.",
+          },
+          {
+            suffix: "powerups_gold.dff",
+            disposition: "deferred",
+            reason: "The original pickup DFF is not rendered; course 33 uses the shared loadout table.",
+          },
+          {
+            suffix: "ads.dff",
+            disposition: "deferred",
+            reason: "The course definition comments out this model reference.",
+          },
+          ...[
+            "block.dff",
+            "chunk.dff",
+            "cross.dff",
+            "crosstree.dff",
+            "deck.dff",
+            "fade_5.dff",
+            "fade_6.dff",
+            "fence_2.dff",
+            "hordome.dff",
+            "hstone.dff",
+            "hut01.dff",
+            "intactroof.dff",
+            "lights.dff",
+            "oaktrunk.dff",
+            "post_a.dff",
+            "pylon_h.dff",
+            "pylon_l.dff",
+            "rbarrel.dff",
+            "skydome.dff",
+            "tower.dff",
+          ].map((suffix) => ({
+            suffix,
+            disposition: "parsed-only" as const,
+            reason: "The DFF parses, but its local-template transform or light behavior is not instantiated.",
+          })),
+          {
+            suffix: ".mts.txt",
+            disposition: "non-runtime",
+            reason: "Extracted text sidecars are diagnostics and are not runtime inputs.",
+          },
+        ],
+      },
+    ],
+    vehicles: [],
+  },
 ]);
 
 export function alphaContentBatch(id: string): AlphaContentBatch | undefined {
