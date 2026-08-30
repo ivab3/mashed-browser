@@ -351,7 +351,7 @@ Milestone M1: публично показываемый proof of concept.
 
 Milestone M2: feature-complete alpha.
 
-Статус 2026-08-30: **этап 6 выполняется; срезы 6.1–6.5 и content batches 6.6a–b завершены**. Срез 6.1 вводит безопасный reader исходных
+Статус 2026-08-30: **этап 6 выполняется; срезы 6.1–6.5 и content batches 6.6a–c завершены**. Срез 6.1 вводит безопасный reader исходных
 `POWERUPS_ALL.LUA`/`POWERUPS_GOLD.LUA`: нормализованы все встречающиеся type ID, глобальные loadout
 для 26 course ID и source-authored position/respawn metadata. Срез 6.2 подключает девять подтверждённых
 обучающими строками типов: machine gun, guided missile, mortar, rear flame, oil, proximity mine, drum
@@ -383,8 +383,13 @@ vehicle lights/ghost/debris перечислены явно как deferred ил
 Neustein (course 39) и Crusader: 72-checkpoint replay совпадает на 30/60/120 Hz, shared loadout
 разрешает пять исходных типов оружия, а browser smoke связывает 13 342 world и 4 102 filtered
 collision triangles; Hard CPU достигает checkpoint 23 при 60 FPS без dropped simulation time.
-Позиционное соответствие `Crusader` локализованному имени остаётся только inferred metadata.
-Следующий рабочий блок — расширение 6.6c+ теми же измеряемыми пакетами.
+Позиционное соответствие `Crusader` локализованному имени остаётся только inferred metadata. Третий
+пакет 6.6c допускает Arctic (course 0) и Shorty, одновременно добавляя строгую поддержку исходного
+`Lap_Line(-1)` sentinel и привязку нестандартных BSP-имён из `COURSE.LUA`. Arctic даёт полный
+94-checkpoint replay на 30/60/120 Hz, 18 authored pickups и browser-bound world/collision/vehicle при
+60 FPS без dropped time или console errors. Hard CPU доходит до checkpoint 8, где статическое
+препятствие оставляет obstacle-aware AI physics отдельной границей. Следующий рабочий блок —
+расширение 6.6d+ теми же измеряемыми пакетами.
 
 ### Этап 7. Beta: доставка, производительность и совместимость — 3–6 недель
 

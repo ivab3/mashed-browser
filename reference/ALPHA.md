@@ -104,7 +104,7 @@ persists the strict versioned save by course and roster size. Browser acceptance
 series, restored its final table after navigation, and restarted it at zero points. Details live in
 [CHAMPIONSHIP_FOUNDATION.md](./CHAMPIONSHIP_FOUNDATION.md).
 
-## Slices 6.6a–b — first measured content batches
+## Slices 6.6a–c — first measured content batches
 
 The first admission beyond the Warzone proof baseline adds City (course 26) and Wildfire. A
 source-free batch registry records stable identities and every deferred/parsed-only resource family.
@@ -121,9 +121,17 @@ dropped simulation time. The unconfirmed `Crusader` → `Bahnstormer` position m
 instead of being presented as fact. Measurements and exact boundaries live in
 [CONTENT_BATCHES.md](./CONTENT_BATCHES.md).
 
+The third admission adds Arctic (course 0) and Shorty while closing two cross-catalog assumptions:
+the lap reader now accepts the original terminal `Lap_Line(-1)` sentinel, and the browser binds
+nonstandard BSP filenames through `COURSE.LUA` declarations rather than filename guesses. Arctic's
+94-checkpoint rules replay is identical across 30/60/120 Hz, and its 18 authored pickup markers feed
+the production combat adapter. Browser loading binds the complete world/collision/Shorty bundle at
+60 FPS with no dropped time or console errors. The Hard route driver reaches checkpoint 8 before an
+authored obstacle exposes the next AI-physics follow-up; autonomous Arctic completion is not claimed.
+
 ## Planned slices
 
-1. **6.6c+ content batches:** extend the vehicle roster and tracks in measured batches. Every admitted
+1. **6.6d+ content batches:** extend the vehicle roster and tracks in measured batches. Every admitted
    track keeps the load smoke, rules replay, and explicit unsupported-resource record.
 2. **6.7 settings and alpha gate:** controls/audio/graphics/difficulty settings, persistence, complete
    menu-to-series acceptance, and the Milestone M2 compatibility report.

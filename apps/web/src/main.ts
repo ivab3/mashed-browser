@@ -79,6 +79,7 @@ import {
   M1EvidenceCollector,
   type M1EvidenceReport,
 } from "./m1-evidence.js";
+import { declaredTrackBsps, trackBspRole, type TrackBspRole } from "./track-resource-role.js";
 import "./style.css";
 
 function element<T extends HTMLElement>(id: string): T {
@@ -1538,20 +1539,25 @@ vehicleSelects.forEach((select) => {
 });
 
 function rememberBsp(fileName: string, world: BspWorld): string | undefined {
-  const normalized = fileName.toLocaleLowerCase("en-US");
-  if (/^ai\d*\.bsp$/.test(normalized)) {
-    trackParts.ai = world;
-    return "AI route";
+  const role = trackBspRole(fileName, trackParts.course);
+  return role ? assignTrackBsp(role, world) : undefined;
+}
+
+function assignTrackBsp(role: TrackBspRole, world: BspWorld): string {
+  trackParts[role] = world;
+  return role === "ai" ? "AI route" : role;
+}
+
+function resolveDeclaredTrackBsps(): void {
+  if (!trackParts.course) {
+    return;
   }
-  if (/collid/.test(normalized)) {
-    trackParts.collision = world;
-    return "collision";
+  for (const declared of declaredTrackBsps(trackParts.course)) {
+    const asset = loadedAssets.get(declared.fileName.toLocaleLowerCase("en-US"));
+    if (asset?.kind === "bsp") {
+      assignTrackBsp(declared.role, asset.data);
+    }
   }
-  if (/graphics|world/.test(normalized)) {
-    trackParts.graphics = world;
-    return "graphics";
-  }
-  return undefined;
 }
 
 function trackTextureDictionary(): PiTextureDictionary | undefined {
@@ -1623,6 +1629,7 @@ function bindVehicleModels(): string[] {
 }
 
 function bindTrackParts(): string[] {
+  resolveDeclaredTrackBsps();
   const bound: string[] = [];
   if (trackParts.ai && trackParts.lapData && physics) {
     trackDefinition = deriveTrackDefinition(trackParts.ai, trackParts.lapData);

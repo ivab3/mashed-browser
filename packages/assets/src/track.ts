@@ -47,9 +47,16 @@ function integerArguments(source: string, name: string): number[][] {
 
 /** Parses the declarative calls used by the original LAPDATA.LUA without executing Lua. */
 export function parseLapDataLua(source: string): LapDataDefinition {
-  const line = integerArguments(source, "Lap_Line").map((values) => values[0]!);
-  if (line.length < 2 || !/Lap_Line_End\s*\(\s*\)/i.test(source)) {
-    throw new Error("LAPDATA needs at least two Lap_Line calls followed by Lap_Line_End()");
+  const lineCalls = integerArguments(source, "Lap_Line").map((values) => values[0]!);
+  const sentinelEnd = lineCalls.at(-1) === -1;
+  const line = sentinelEnd ? lineCalls.slice(0, -1) : lineCalls;
+  const explicitEnd = /Lap_Line_End\s*\(\s*\)/i.test(source);
+  if (
+    line.length < 2
+    || (!explicitEnd && !sentinelEnd)
+    || line.some((checkpointId) => checkpointId < 0)
+  ) {
+    throw new Error("LAPDATA needs at least two non-negative Lap_Line calls and an end marker");
   }
   const safeStartRanges = integerArguments(source, "Safe_Start_Lines").map((values) => {
     if (values.length !== 2) {

@@ -35,6 +35,15 @@ describe("Stage 6 content admissions", () => {
       displayName: "Bahnstormer",
       nameMapping: "inferred-position",
     });
+    expect(admittedTrackByCourseId(0)).toMatchObject({
+      id: "arctic-0",
+      powerupFileName: "POWERUPS_GOLD.LUA",
+    });
+    expect(admittedVehicleByAssetName("shorty")).toMatchObject({
+      displayName: "Ruckus",
+      nameMapping: "inferred-position",
+      variants: [0, 1, 2, 3, 4, 5],
+    });
   });
 
   it("records every deferred City source family explicitly", () => {

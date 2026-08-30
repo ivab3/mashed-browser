@@ -54,6 +54,11 @@ describe("track metadata", () => {
     });
   });
 
+  it("accepts the original terminal Lap_Line(-1) sentinel without treating it as a checkpoint", () => {
+    expect(parseLapDataLua(LAP_DATA.replace("Lap_Line_End()", "Lap_Line(-1)")).line)
+      .toEqual([0, 2]);
+  });
+
   it("turns AI BSP material polygons into an ordered course and spawn", () => {
     const track = deriveTrackDefinition(aiWorld(), parseLapDataLua(LAP_DATA));
     expect(track.checkpoints.map((checkpoint) => checkpoint.id)).toEqual([0, 1, 2]);

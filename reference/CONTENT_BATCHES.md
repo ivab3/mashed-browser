@@ -1,8 +1,9 @@
 # Stage 6 content batches
 
-Status: batches 6.6a (`City` course 26 + `Wildfire`) and 6.6b (`Neustein` course 39 + `Crusader`)
-admitted on 2026-08-30. Original files remain in the user's ignored `game-data/` tree; the repository
-contains only source-free admission metadata, validators, and measurements.
+Status: batches 6.6a (`City` course 26 + `Wildfire`), 6.6b (`Neustein` course 39 + `Crusader`),
+and 6.6c (`Arctic` course 0 + `Shorty`) admitted on 2026-08-30. Original files remain in the user's
+ignored `game-data/` tree; the repository contains only source-free admission metadata, validators,
+and measurements.
 
 ## Admission contract
 
@@ -102,5 +103,44 @@ loading smoke; the full route-rules replay remains the deterministic completion 
 - Crusader arms, lights, ghost presentation, and six vehicle-specific debris meshes are deferred;
 - all six numbered Crusader skins are admitted, but the inferred localized-name mapping remains
   metadata only until direct source evidence is found.
+
+## Batch 6.6c — Arctic + Shorty
+
+Arctic intentionally exercises a second source dialect: its course declares `AI.BSP`, `GRAPH.BSP`,
+and `COLLISIONS.BSP`, and its lap line ends with the original `Lap_Line(-1)` sentinel rather than
+`Lap_Line_End()`. The production reader now accepts that exact terminal sentinel without exposing it
+as a checkpoint, and the browser resolves BSP roles from `COURSE.LUA` regardless of file-selection
+order. `Shorty` retains its archive label in the UI because its proposed `Ruckus` display mapping is
+position-derived rather than directly named by the asset.
+
+The repeatable local gate reports:
+
+| Asset | Accepted evidence |
+|---|---|
+| Arctic route | 94 ordered checkpoints, 2 split checkpoints, one complete deterministic lap at 30/60/120 Hz |
+| Arctic world | 15,858 graphics triangles, 3,037 source collision triangles, 20 textures |
+| Arctic models | 13 declared DFFs parse, 28 atomics, 1,511 triangles |
+| Arctic rules | 18 authored pickup markers; 6 currently resolve to playable non-blank pickups |
+| Shorty | 6 numbered skins, 5 textures, 276 atomics, 43,836 triangles across the six DFFs |
+
+The browser smoke loaded 22 files through the normal chooser. The production adapters bound 94
+checkpoints, 2,960 filtered drive/scenery collision triangles, 15,858 rendered world triangles, 20
+placed course atomics, and the intact 13-atomic/5,074-triangle `SHORTY0` vehicle. A Hard CPU reached
+checkpoint 8 at 60 FPS with zero dropped simulation time and no console errors. It then remained
+blocked by an authored static obstacle during the smoke; full autonomous physics completion on Arctic
+is therefore a follow-up, not evidence claimed by this loading/rules admission.
+
+## Explicit 6.6c boundaries
+
+- `.ANM` helicopter/KTC animation, the KTC script, `.MTS` material/physics templates, sea/sky `.UVA`
+  playback, and ten wave `.SPL` paths are deferred;
+- source pickup positions and rules are active, but `POWERUPS_GOLD.DFF` is not rendered;
+- crate, fishing boat, lights, mist, red barrel, both tyre types, sky, and wall DFFs parse but their
+  local-template transforms or light behavior are not instantiated;
+- four world-authored course DFFs render; the remaining original dynamic behavior and fade/UV logic
+  are not claimed;
+- Shorty arms, lights, ghost presentation, and six vehicle-specific debris meshes are deferred;
+- the current route driver is deterministic on Arctic but is not yet obstacle-aware enough for a
+  complete physics lap, so only the full rules replay and partial browser driving smoke are admitted.
 
 Future batches must extend the admission registry rather than weakening or bypassing these checks.

@@ -263,6 +263,105 @@ export const ALPHA_CONTENT_BATCHES: readonly AlphaContentBatch[] = Object.freeze
       },
     ],
   },
+  {
+    id: "6.6c-arctic-shorty",
+    status: "admitted",
+    tracks: [
+      {
+        id: "arctic-0",
+        displayName: "Arctic",
+        directoryName: "Arctic",
+        courseId: 0,
+        powerupFileName: "POWERUPS_GOLD.LUA",
+        resourceBoundaries: [
+          {
+            suffix: ".anm",
+            disposition: "deferred",
+            reason: "Authored helicopter and KTC animation playback is not implemented.",
+          },
+          {
+            suffix: "ktcscript.lua",
+            disposition: "deferred",
+            reason: "Kill-the-copter scripted event is outside the admitted local match rules.",
+          },
+          {
+            suffix: ".mts",
+            disposition: "deferred",
+            reason: "Authored material/physics template binding is not implemented.",
+          },
+          {
+            suffix: ".uva",
+            disposition: "deferred",
+            reason: "Authored sea and sky UV animation playback is not implemented.",
+          },
+          {
+            suffix: ".spl",
+            disposition: "deferred",
+            reason: "Authored wave spline animation is not implemented.",
+          },
+          {
+            suffix: "powerups_gold.dff",
+            disposition: "deferred",
+            reason: "Pickup rules and placement are supported, but the original pickup DFF is not rendered.",
+          },
+          ...[
+            "crate02.dff",
+            "fishingboat.dff",
+            "lights.dff",
+            "mist.dff",
+            "rbarrel.dff",
+            "redtyre.dff",
+            "sky.dff",
+            "wall3.dff",
+            "whitetyre.dff",
+          ].map((suffix) => ({
+            suffix,
+            disposition: "parsed-only" as const,
+            reason: "The DFF parses, but its local-template transform or light behavior is not instantiated.",
+          })),
+        ],
+      },
+    ],
+    vehicles: [
+      {
+        id: "shorty",
+        displayName: "Ruckus",
+        directoryName: "Shorty",
+        assetBaseName: "SHORTY",
+        variants: [0, 1, 2, 3, 4, 5],
+        nameMapping: "inferred-position",
+        resourceBoundaries: [
+          {
+            fileNames: ["SHORTYARMS.DFF"],
+            disposition: "deferred",
+            reason: "Original vehicle weapon-arm attachment behavior is not implemented.",
+          },
+          {
+            fileNames: ["SHORTYLIGHTS.DFF"],
+            disposition: "deferred",
+            reason: "Original vehicle light attachment behavior is not implemented.",
+          },
+          {
+            fileNames: ["GHOST.DFF"],
+            disposition: "deferred",
+            reason: "Original ghost presentation is not implemented.",
+          },
+          {
+            fileNames: [
+              "DEBRIS0.DFF",
+              "DEBRIS1.DFF",
+              "DEBRIS2.DFF",
+              "DEBRIS3.DFF",
+              "DEBRIS4.DFF",
+              "DEBRIS5.DFF",
+            ],
+            disposition: "deferred",
+            reason: "Vehicle-specific debris meshes are not spawned on destruction.",
+          },
+        ],
+      },
+    ],
+  },
 ]);
 
 export function alphaContentBatch(id: string): AlphaContentBatch | undefined {
