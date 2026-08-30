@@ -14,7 +14,8 @@ driver completes the 136-checkpoint Warzone gate without recovery. A clean-room 
 Championship adds aggregate points, final medals, next-event flow, and a strict versioned local save
 that resumes after navigation. Measured content batches admit City, Neustein, Arctic, and Warzone behind
 deterministic full-route gates and cover the complete 15-vehicle, 90-skin roster with explicit
-source-free resource boundaries. Stage 1
+source-free resource boundaries. Runtime-backed CPU, gamepad deadzone, audio, and graphics settings
+use a strictly validated versioned local save. Stage 1
 provides a reproducible local extraction pipeline; Stage 2 provides RenderWare DFF/TXD readers, full
 graphical/collision BSP sector parsing, and a Three.js asset viewer. Stage 3 adds a deterministic
 fixed-step core, replay checks, Rapier/Three.js/Web Audio adapters, debug tooling, and the browser
@@ -133,6 +134,10 @@ matrix, and fails if a source file is neither exercised nor explicitly classifie
 each course's declared BSP filenames, including Arctic's nonstandard names. Inferred localized
 vehicle-name mappings stay registry metadata; the runtime keeps source archive labels until direct
 evidence exists.
+The Settings panel applies CPU presets, gamepad deadzone, master volume/mute, and graphics quality to
+the live adapters. Values restore from a strict versioned local record; malformed or unavailable
+storage falls back to safe defaults without blocking boot. See
+[`reference/ALPHA_SETTINGS.md`](./reference/ALPHA_SETTINGS.md) for the schema and browser acceptance.
 Choose 1–4 local players in the runtime roster. P1 uses WASD and gamepad 1; P2 uses the arrow keys
 and gamepad 2; P3/P4 use gamepads 3/4. Every active slot has independent physics and telemetry, and
 can select any complete numbered DFF/shared-TXD pair loaded in the current session. The camera

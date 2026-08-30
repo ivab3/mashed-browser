@@ -391,6 +391,60 @@ button[data-action="resume"] { border-color: #ff8a4c; color: #ffb182; }
 
 .roster-config select:disabled { opacity: 0.45; }
 
+.settings-panel {
+  display: grid;
+  gap: 10px;
+  padding: 14px 16px;
+  border: 1px solid #25343b;
+  border-radius: 10px;
+  background: #0c171d;
+}
+
+.settings-heading,
+.settings-panel > label:not(.settings-check) {
+  display: grid;
+  grid-template-columns: 1fr minmax(118px, 1.25fr);
+  gap: 12px;
+  align-items: center;
+}
+
+.settings-heading { min-height: 28px; }
+.settings-heading button {
+  min-height: 28px;
+  padding: 4px 9px;
+  justify-self: end;
+  font-size: 10px;
+}
+
+.settings-panel label > span {
+  color: #82969b;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.settings-panel select {
+  width: 100%;
+  min-width: 0;
+  padding: 8px 9px;
+  border: 1px solid #33454e;
+  border-radius: 7px;
+  color: #dbe6e6;
+  background: #15242b;
+  font-size: 11px;
+}
+
+.settings-panel .settings-slider {
+  grid-template-columns: 1fr minmax(82px, 1fr) 34px;
+}
+
+.settings-slider input { width: 100%; accent-color: #ff8a4c; }
+.settings-slider output { color: #dbe6e6; font: 10px ui-monospace, SFMono-Regular, Menlo, monospace; text-align: right; }
+.settings-check { display: flex; gap: 9px; align-items: center; cursor: pointer; }
+.settings-check input { accent-color: #ff8a4c; }
+.settings-panel p { margin: 0; color: #6f8389; font: 9px/1.4 ui-monospace, SFMono-Regular, Menlo, monospace; }
+
 .toggles { display: grid; gap: 10px; padding: 16px; border: 1px solid #25343b; border-radius: 10px; background: #0c171d; }
 .toggles label { display: flex; gap: 9px; align-items: center; color: #aebdc0; font-size: 12px; cursor: pointer; }
 .toggles input { accent-color: #ff8a4c; }

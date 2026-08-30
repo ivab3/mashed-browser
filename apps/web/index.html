@@ -181,6 +181,44 @@
           </div>
         </section>
 
+        <section class="settings-panel" aria-label="Alpha settings">
+          <div class="settings-heading">
+            <span class="section-label">Settings</span>
+            <button id="settings-reset" type="button">Reset</button>
+          </div>
+          <label for="settings-difficulty">
+            <span>CPU preset</span>
+            <select id="settings-difficulty">
+              <option value="easy">Easy</option>
+              <option value="normal">Normal</option>
+              <option value="hard">Hard</option>
+            </select>
+          </label>
+          <label for="settings-graphics">
+            <span>Graphics</span>
+            <select id="settings-graphics">
+              <option value="performance">Performance</option>
+              <option value="balanced">Balanced</option>
+              <option value="quality">Quality</option>
+            </select>
+          </label>
+          <label class="settings-slider" for="settings-volume">
+            <span>Master volume</span>
+            <input id="settings-volume" type="range" min="0" max="100" step="1" />
+            <output id="settings-volume-value" for="settings-volume">70%</output>
+          </label>
+          <label class="settings-slider" for="settings-deadzone">
+            <span>Gamepad deadzone</span>
+            <input id="settings-deadzone" type="range" min="0" max="50" step="1" />
+            <output id="settings-deadzone-value" for="settings-deadzone">12%</output>
+          </label>
+          <label class="settings-check" for="settings-muted">
+            <input id="settings-muted" type="checkbox" />
+            <span>Mute audio</span>
+          </label>
+          <p id="settings-status" role="status">Saved locally</p>
+        </section>
+
         <section class="control-guide" aria-label="Driving controls">
           <div class="section-label">Drive</div>
           <p id="primary-drive-guide"><b>WASD / arrows</b> accelerate, reverse and steer</p>

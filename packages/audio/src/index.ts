@@ -50,7 +50,7 @@ interface EngineVoiceNodes {
   source: AudioScheduledSourceNode;
   pitch: AudioParam;
   gain: GainNode;
-  targetGain: number;
+  baseGain: number;
   originalSample: boolean;
 }
 
@@ -66,6 +66,7 @@ export class AudioRuntime {
   readonly #buffers = new Map<string, AudioBuffer>();
   #context: AudioContext | undefined;
   #paused = false;
+  #masterVolume = 1;
 
   constructor(events: RuntimeEventBus) {
     this.#unsubscribe = events.subscribe((event) => {
@@ -82,6 +83,25 @@ export class AudioRuntime {
 
   get originalSampleCount(): number {
     return this.#samples.size;
+  }
+
+  get masterVolume(): number {
+    return this.#masterVolume;
+  }
+
+  setMasterVolume(volume: number): void {
+    this.#masterVolume = Number.isFinite(volume) ? Math.min(1, Math.max(0, volume)) : 1;
+    const context = this.#context;
+    if (!context) {
+      return;
+    }
+    for (const voice of this.#engineVoices.values()) {
+      voice.gain.gain.setTargetAtTime(
+        this.#paused ? 0 : voice.baseGain * this.#masterVolume,
+        context.currentTime,
+        0.035,
+      );
+    }
   }
 
   addSampleBank(samples: readonly Pcm16AudioSample[]): number {
@@ -114,7 +134,11 @@ export class AudioRuntime {
       return;
     }
     for (const voice of this.#engineVoices.values()) {
-      voice.gain.gain.setTargetAtTime(paused ? 0 : voice.targetGain, context.currentTime, 0.035);
+      voice.gain.gain.setTargetAtTime(
+        paused ? 0 : voice.baseGain * this.#masterVolume,
+        context.currentTime,
+        0.035,
+      );
     }
   }
 
@@ -140,14 +164,18 @@ export class AudioRuntime {
       }
       const speed = Math.min(1, Math.max(0, voice.normalizedSpeed));
       const throttle = Math.min(1, Math.max(0, voice.throttle));
-      nodes.targetGain = nodes.originalSample
+      nodes.baseGain = nodes.originalSample
         ? 0.012 + throttle * 0.025 + speed * 0.008
         : 0.005 + throttle * 0.013 + speed * 0.004;
       const pitch = nodes.originalSample
         ? 0.72 + speed * 0.75 + throttle * 0.16
         : 62 + speed * 155 + throttle * 28;
       nodes.pitch.setTargetAtTime(pitch, context.currentTime, 0.045);
-      nodes.gain.gain.setTargetAtTime(this.#paused ? 0 : nodes.targetGain, context.currentTime, 0.055);
+      nodes.gain.gain.setTargetAtTime(
+        this.#paused ? 0 : nodes.baseGain * this.#masterVolume,
+        context.currentTime,
+        0.055,
+      );
     }
     for (const [id, nodes] of this.#engineVoices) {
       if (present.has(id)) {
@@ -177,13 +205,13 @@ export class AudioRuntime {
       source.loop = true;
       source.connect(gain).connect(context.destination);
       source.start();
-      return { source, pitch: source.playbackRate, gain, targetGain: 0, originalSample: true };
+      return { source, pitch: source.playbackRate, gain, baseGain: 0, originalSample: true };
     }
     const source = context.createOscillator();
     source.type = "sawtooth";
     source.connect(gain).connect(context.destination);
     source.start();
-    return { source, pitch: source.frequency, gain, targetGain: 0, originalSample: false };
+    return { source, pitch: source.frequency, gain, baseGain: 0, originalSample: false };
   }
 
   #stopVoice(nodes: EngineVoiceNodes, now: number): void {
@@ -227,7 +255,7 @@ export class AudioRuntime {
 
   #play(cue: AudioCue, gainValue: number, requestedName?: string): void {
     const context = this.#context;
-    if (!context || context.state !== "running") {
+    if (!context || context.state !== "running" || this.#masterVolume <= 0) {
       return;
     }
     const gain = context.createGain();
@@ -236,7 +264,10 @@ export class AudioRuntime {
     if (originalBuffer) {
       const source = context.createBufferSource();
       source.buffer = originalBuffer;
-      gain.gain.setValueAtTime(Math.max(0, Math.min(1, gainValue * 2.5)), now);
+      gain.gain.setValueAtTime(
+        Math.max(0, Math.min(1, gainValue * 2.5 * this.#masterVolume)),
+        now,
+      );
       source.connect(gain).connect(context.destination);
       source.start(now);
       return;
@@ -246,7 +277,10 @@ export class AudioRuntime {
       ? "square"
       : cue === "break" || cue === "vehicle-destroyed" ? "sawtooth" : "sine";
     oscillator.frequency.setValueAtTime(CUE_FREQUENCIES[cue], now);
-    gain.gain.setValueAtTime(Math.max(0, Math.min(0.3, gainValue)), now);
+    gain.gain.setValueAtTime(
+      Math.max(0, Math.min(0.3, gainValue * this.#masterVolume)),
+      now,
+    );
     gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.09);
     oscillator.connect(gain).connect(context.destination);
     oscillator.start(now);

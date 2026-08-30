@@ -72,6 +72,11 @@ import {
 import { RuntimeRenderer } from "@mashed/renderer";
 
 import { AssetLoadingClient } from "./asset-loader.js";
+import {
+  AlphaSettingsStorage,
+  DEFAULT_ALPHA_SETTINGS,
+  type AlphaSettingsV1,
+} from "./alpha-settings.js";
 import { ChampionshipSaveStorage } from "./championship-storage.js";
 import type { LoadedAsset } from "./loading-protocol.js";
 import {
@@ -224,6 +229,15 @@ const driverSelects = [
   element<HTMLSelectElement>("driver-select-three"),
   element<HTMLSelectElement>("driver-select-four"),
 ];
+const settingsDifficulty = element<HTMLSelectElement>("settings-difficulty");
+const settingsGraphics = element<HTMLSelectElement>("settings-graphics");
+const settingsVolume = element<HTMLInputElement>("settings-volume");
+const settingsVolumeValue = element<HTMLOutputElement>("settings-volume-value");
+const settingsDeadzone = element<HTMLInputElement>("settings-deadzone");
+const settingsDeadzoneValue = element<HTMLOutputElement>("settings-deadzone-value");
+const settingsMuted = element<HTMLInputElement>("settings-muted");
+const settingsReset = element<HTMLButtonElement>("settings-reset");
+const settingsStatus = element<HTMLElement>("settings-status");
 const additionalPlayerMetrics = [
   {
     row: element<HTMLElement>("metric-player-two-row"),
@@ -246,6 +260,11 @@ const audio = new AudioRuntime(events);
 const renderer = new RuntimeRenderer(viewport, events);
 const assetLoader = new AssetLoadingClient();
 const championshipStorage = new ChampionshipSaveStorage(() => window.localStorage);
+const settingsStorage = new AlphaSettingsStorage(() => window.localStorage);
+const settingsLoad = settingsStorage.load();
+let alphaSettings = settingsLoad.settings;
+audio.setMasterVolume(alphaSettings.muted ? 0 : alphaSettings.masterVolume);
+renderer.setGraphicsQuality(alphaSettings.graphicsQuality);
 const loadedAssets = new Map<string, LoadedAsset>();
 const trackParts: {
   ai?: BspWorld;
@@ -330,6 +349,48 @@ function selectedMatchMode(): MatchModeType {
 function selectedAiDifficulty(index: number): AiDifficulty | undefined {
   const value = driverSelects[index]?.value;
   return value === "easy" || value === "normal" || value === "hard" ? value : undefined;
+}
+
+function syncAlphaSettingsControls(): void {
+  settingsDifficulty.value = alphaSettings.difficulty;
+  settingsGraphics.value = alphaSettings.graphicsQuality;
+  settingsVolume.value = String(Math.round(alphaSettings.masterVolume * 100));
+  settingsVolumeValue.value = `${Math.round(alphaSettings.masterVolume * 100)}%`;
+  settingsDeadzone.value = String(Math.round(alphaSettings.gamepadDeadzone * 100));
+  settingsDeadzoneValue.value = `${Math.round(alphaSettings.gamepadDeadzone * 100)}%`;
+  settingsMuted.checked = alphaSettings.muted;
+  settingsVolume.disabled = alphaSettings.muted;
+}
+
+function persistAlphaSettings(status: string): void {
+  const result = settingsStorage.save(alphaSettings);
+  settingsStatus.textContent = result.ok ? `${status} · saved locally` : `${status} · save unavailable: ${result.error}`;
+}
+
+function applyAlphaSettings(
+  next: AlphaSettingsV1,
+  status: string,
+  options: { rebuildInputs?: boolean; syncCpuDrivers?: boolean } = {},
+): void {
+  alphaSettings = next;
+  if (options.syncCpuDrivers) {
+    driverSelects.forEach((select) => {
+      if (select.value !== "human") {
+        select.value = alphaSettings.difficulty;
+      }
+    });
+    aiDrivers.clear();
+    matchModeSession = undefined;
+    matchModeSignature = undefined;
+  }
+  audio.setMasterVolume(alphaSettings.muted ? 0 : alphaSettings.masterVolume);
+  renderer.setGraphicsQuality(alphaSettings.graphicsQuality);
+  syncAlphaSettingsControls();
+  if (options.rebuildInputs) {
+    rebuildVehicleInputs();
+  }
+  applyRosterPresentation();
+  persistAlphaSettings(status);
 }
 
 function currentMatchModeSignature(): string {
@@ -518,7 +579,11 @@ function rebuildVehicleInputs(): void {
         : index === 1
           ? PLAYER_TWO_KEYBOARD_BINDINGS
           : GAMEPAD_ONLY_KEYBOARD_BINDINGS;
-    return new BrowserVehicleInput(window, { gamepadIndex: slot.gamepadIndex, keyboard });
+    return new BrowserVehicleInput(window, {
+      gamepadIndex: slot.gamepadIndex,
+      keyboard,
+      deadzone: alphaSettings.gamepadDeadzone,
+    });
   });
 }
 
@@ -567,6 +632,10 @@ function configureLocalRoster(): void {
 
 rebuildVehicleInputs();
 applyRosterPresentation();
+syncAlphaSettingsControls();
+settingsStatus.textContent = settingsLoad.ok
+  ? settingsLoad.restored ? "Restored locally" : "Defaults active"
+  : `Defaults active · restore unavailable: ${settingsLoad.error}`;
 
 function applyState(next: RuntimeState): void {
   const matchActive = next === "race" || next === "paused";
@@ -603,6 +672,9 @@ function applyState(next: RuntimeState): void {
   driverSelects.forEach((select) => {
     select.disabled = next === "loading" || matchActive;
   });
+  settingsDifficulty.disabled = next === "loading" || matchActive;
+  settingsDeadzone.disabled = next === "loading" || matchActive;
+  settingsReset.disabled = next === "loading" || matchActive;
   pauseOverlay.hidden = next !== "paused";
   applyCombatHud();
   applyModeHud();
@@ -1467,6 +1539,59 @@ resetButton.addEventListener("click", () => {
   applyCombatHud();
 });
 debugCamera.addEventListener("change", () => renderer.setDebugCamera(debugCamera.checked));
+settingsDifficulty.addEventListener("change", () => {
+  const difficulty = settingsDifficulty.value;
+  if (difficulty !== "easy" && difficulty !== "normal" && difficulty !== "hard") {
+    return;
+  }
+  applyAlphaSettings(
+    { ...alphaSettings, difficulty },
+    `CPU preset ${difficulty}`,
+    { syncCpuDrivers: true },
+  );
+});
+settingsGraphics.addEventListener("change", () => {
+  const graphicsQuality = settingsGraphics.value;
+  if (
+    graphicsQuality !== "performance"
+    && graphicsQuality !== "balanced"
+    && graphicsQuality !== "quality"
+  ) {
+    return;
+  }
+  applyAlphaSettings({ ...alphaSettings, graphicsQuality }, `Graphics ${graphicsQuality}`);
+});
+settingsVolume.addEventListener("input", () => {
+  settingsVolumeValue.value = `${settingsVolume.value}%`;
+});
+settingsVolume.addEventListener("change", () => {
+  const masterVolume = Number(settingsVolume.value) / 100;
+  applyAlphaSettings({ ...alphaSettings, masterVolume }, `Master volume ${settingsVolume.value}%`);
+});
+settingsDeadzone.addEventListener("input", () => {
+  settingsDeadzoneValue.value = `${settingsDeadzone.value}%`;
+});
+settingsDeadzone.addEventListener("change", () => {
+  const gamepadDeadzone = Number(settingsDeadzone.value) / 100;
+  applyAlphaSettings(
+    { ...alphaSettings, gamepadDeadzone },
+    `Gamepad deadzone ${settingsDeadzone.value}%`,
+    { rebuildInputs: true },
+  );
+});
+settingsMuted.addEventListener("change", () => {
+  applyAlphaSettings(
+    { ...alphaSettings, muted: settingsMuted.checked },
+    settingsMuted.checked ? "Audio muted" : "Audio enabled",
+  );
+});
+settingsReset.addEventListener("click", () => {
+  applyAlphaSettings(
+    DEFAULT_ALPHA_SETTINGS,
+    "Settings reset",
+    { rebuildInputs: true, syncCpuDrivers: true },
+  );
+});
 playerCountSelect.addEventListener("change", () => {
   if (selectedGameFlow() === "championship" && selectedPlayerCount() < 2) {
     playerCountSelect.value = "2";

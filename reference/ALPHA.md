@@ -145,12 +145,25 @@ world, filtered collision, placed models, shared five-weapon loadout, and Wildfi
 CPU then completed the natural physics lap in 55.78 seconds at 60 FPS with no dropped time or console
 warnings/errors.
 
+## Slice 6.7a — persisted alpha settings
+
+The production menu now exposes runtime-backed CPU difficulty, gamepad deadzone, master volume/mute,
+and three graphics quality profiles. Gameplay-sensitive difficulty/deadzone controls lock during a
+match; audio and graphics remain live. A strict `version: 1` local record validates every enum,
+boolean, and numeric range on restore, falls back safely when storage is malformed or unavailable,
+and keeps championship progress in its separate definition-scoped save contract.
+
+Browser acceptance changed all four categories, synchronized an active CPU, restored the exact values
+after navigation, reset them to defaults, restored the reset after another navigation, and completed a
+two-player CPU round without console warnings or errors. Contract details and current boundaries live
+in [ALPHA_SETTINGS.md](./ALPHA_SETTINGS.md).
+
 ## Planned slices
 
 1. **6.6f+ track batches:** extend the playable track catalog in measured batches. Every admitted track
    keeps the load smoke, rules replay, and explicit unsupported-resource record.
-2. **6.7 settings and alpha gate:** controls/audio/graphics/difficulty settings, persistence, complete
-   menu-to-series acceptance, and the Milestone M2 compatibility report.
+2. **6.7b alpha gate:** keyboard rebinding, complete menu-to-series acceptance, and the Milestone M2
+   compatibility report.
 
 This order may interleave a content batch after a new mode or weapon family so the abstractions are
 validated on more than Warzone before they spread across the full catalog.

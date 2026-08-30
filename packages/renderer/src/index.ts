@@ -78,6 +78,8 @@ export interface RendererMetrics {
   drawingBufferHeight: number;
 }
 
+export type RendererGraphicsQuality = "performance" | "balanced" | "quality";
+
 export interface TrackRenderSector {
   positions: Float32Array;
   normals?: Float32Array;
@@ -576,6 +578,12 @@ export class RuntimeRenderer {
       this.#controls.target.copy(this.#cameraTarget);
       this.#controls.update();
     }
+  }
+
+  setGraphicsQuality(quality: RendererGraphicsQuality): void {
+    const pixelRatioCap = quality === "performance" ? 1 : quality === "balanced" ? 1.5 : 2;
+    this.#renderer.setPixelRatio(Math.min(window.devicePixelRatio, pixelRatioCap));
+    this.#renderer.shadowMap.enabled = quality !== "performance";
   }
 
   resize(width: number, height: number): void {

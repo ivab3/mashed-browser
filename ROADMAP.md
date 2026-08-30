@@ -351,7 +351,7 @@ Milestone M1: публично показываемый proof of concept.
 
 Milestone M2: feature-complete alpha.
 
-Статус 2026-08-30: **этап 6 выполняется; срезы 6.1–6.5 и content batches 6.6a–e завершены**. Срез 6.1 вводит безопасный reader исходных
+Статус 2026-08-30: **этап 6 выполняется; срезы 6.1–6.5, content batches 6.6a–e и settings slice 6.7a завершены**. Срез 6.1 вводит безопасный reader исходных
 `POWERUPS_ALL.LUA`/`POWERUPS_GOLD.LUA`: нормализованы все встречающиеся type ID, глобальные loadout
 для 26 course ID и source-authored position/respawn metadata. Срез 6.2 подключает девять подтверждённых
 обучающими строками типов: machine gun, guided missile, mortar, rear flame, oil, proximity mine, drum
@@ -396,7 +396,12 @@ triangles, а browser smoke связывает по очереди все 12 н�
 136-checkpoint replay совпадает на 30/60/120 Hz, validator учитывает 23 077 world и 5 661 source
 collision triangles, 85 textures и все 40 declared DFF, а обычный 51-file browser load завершился
 естественным Hard CPU финишем за 55,78 с при 60 FPS без dropped time или console warnings/errors.
-Следующий рабочий блок — расширение трасс пакетами 6.6f+ и затем alpha settings/gate 6.7.
+Срез 6.7a добавляет реальные настройки CPU difficulty, gamepad deadzone, master volume/mute и трёх
+graphics profiles. Строгий versioned local record проверяет enum, boolean и numeric ranges, безопасно
+переживает corrupted/unavailable storage и не смешивается с championship progress. Browser acceptance
+изменил все категории, восстановил их после navigation, проверил reset и завершил двухпользовательский
+CPU round без console warnings/errors. Keyboard rebinding и финальный M2 compatibility report остаются
+в 6.7b; расширение трасс продолжается пакетами 6.6f+.
 
 ### Этап 7. Beta: доставка, производительность и совместимость — 3–6 недель
 
