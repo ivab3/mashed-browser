@@ -13,7 +13,7 @@
   "dependencies": {
     "@mashed/core": "workspace:*",
     "@mashed/physics": "workspace:*",
-    "three": "^0.179.1"
+    "three": "^0.185.1"
   },
   "devDependencies": {
     "@types/three": "^0.179.0",
