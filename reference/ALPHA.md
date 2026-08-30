@@ -86,8 +86,8 @@ live in [AI_FOUNDATION.md](./AI_FOUNDATION.md).
 
 ## Planned slices
 
-1. **6.4b AI hardening:** add opponent-aware combat decisions, production recovery/pack behavior, a
-   complete autonomous Warzone lap gate, and a naturally resolved browser round.
+1. **6.4b AI hardening:** add opponent-aware combat decisions, production recovery/pack behavior, and
+   a naturally resolved browser round. The autonomous Warzone lap gate is already green at 57.6 s.
 2. **6.5 tournament flow:** main-menu to event-series progression, championship results, local save
    schema, and English UI strings.
 3. **6.6 content batches:** full vehicle roster and tracks in measured batches. Every admitted track

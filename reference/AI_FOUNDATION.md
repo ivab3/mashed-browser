@@ -1,6 +1,6 @@
 # Stage 6 AI foundation
 
-Status: route-opponent slice 6.4a complete on 2026-08-30. The accepted scope is deterministic
+Status: route-opponent slice 6.4a and autonomous-lap gate complete on 2026-08-30. The accepted scope is deterministic
 checkpoint following through ordinary vehicle inputs, explicit difficulty profiles, structural readers
 for the original `.AI`/`.LED` resources, and browser/runtime integration. Combat tactics and a complete
 autonomous-lap gate remain follow-up work.
@@ -63,10 +63,14 @@ inputs. A CPU selected without a loaded route remains neutral rather than silent
   `LE33.LED`. Normal and Hard CPU drivers remained in the same live Standard Play round; after 18
   seconds P1 had passed 29 of 136 checkpoints and both cars reported 33 km/h, four grounded wheels,
   asphalt contact, and no console errors.
+- `pnpm ai:lap` drives the production Hard controller through all 136 Warzone checkpoints using the
+  real collision route. The accepted baseline completes in 57.6 seconds (3,456 fixed steps), reaches
+  39.58 km/h, finishes with four grounded wheels, and uses neither reverse escape nor recovery. The
+  command fails if the lap is incomplete, exceeds 75 seconds, uses more than 180 reverse frames, or
+  requests recovery.
 
 ## Follow-up boundary
 
-Slice 6.4b should add opponent-aware weapon timing/aiming, recovery and pack behavior under combat,
-a full autonomous Warzone lap tape using the production controller, and a browser round that resolves
-without the debug finish control. Semantics from `.AI`/`.LED` should be promoted from neutral fields
+The remaining 6.4b work should add opponent-aware weapon timing, recovery and pack behavior under
+combat, and a browser round that resolves without the debug finish control. Semantics from `.AI`/`.LED` should be promoted from neutral fields
 only when an observable original-game behavior or stronger binary evidence confirms them.

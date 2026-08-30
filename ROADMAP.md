@@ -365,8 +365,9 @@ multi-round `MatchModeSession` для Standard Play, Team Play, Hold the Flag и
 Срез 6.4a добавляет чистый seeded `AiRouteDriver`, профили Easy/Normal/Hard, per-slot Human/CPU выбор
 и replay 30/60/120 Hz. CPU проходит тот же input/status/Rapier путь, что игрок. Структурные readers
 приняли все 28 `.AI` и 29 `.LED` файлов локального reference set; неподтверждённые поля остаются
-нейтральными и пока не участвуют в рулении. Следующий срез 6.4b закрывает combat tactics, полный
-автономный круг и естественное завершение browser-раунда.
+нейтральными и пока не участвуют в рулении. Следующий срез 6.4b закрывает combat tactics и
+естественное завершение browser-раунда. Первый gate 6.4b уже закрыт: `pnpm ai:lap`
+проводит production Hard controller через все 136 checkpoint Warzone за 57,6 с без reverse/recovery.
 
 ### Этап 7. Beta: доставка, производительность и совместимость — 3–6 недель
 

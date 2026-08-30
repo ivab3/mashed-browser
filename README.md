@@ -57,6 +57,7 @@ An installed directory containing exactly one `MFL.exe` can be used instead of a
 pnpm typecheck
 pnpm test
 pnpm build
+pnpm ai:lap
 pnpm vehicle:tune
 pnpm match:replay
 pnpm m1:soak

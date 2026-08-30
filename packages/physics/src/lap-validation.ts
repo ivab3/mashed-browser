@@ -1,6 +1,8 @@
 import {
+  AiRouteDriver,
   LapSession,
   RuntimeEventBus,
+  type AiDifficulty,
   type LapCheckpoint,
 } from "@mashed/core";
 import type { VehicleInputFrame } from "@mashed/input";
@@ -33,6 +35,8 @@ export interface RouteDriverState {
 export interface LapValidationOptions {
   stepSeconds?: number;
   maximumSteps?: number;
+  aiDifficulty?: AiDifficulty;
+  aiSeed?: number;
 }
 
 export interface LapValidationReport {
@@ -187,6 +191,9 @@ export async function runLapValidation(
     { collisionObjects: false },
   );
   const lap = new LapSession(course);
+  const aiDriver = options.aiDifficulty
+    ? new AiRouteDriver({ difficulty: options.aiDifficulty, seed: options.aiSeed ?? 0xa1_6_4 })
+    : undefined;
   const checkpointById = new Map(course.checkpoints.map((checkpoint, index) => (
     [checkpoint.id, { checkpoint, index }] as const
   )));
@@ -234,20 +241,30 @@ export async function runLapValidation(
         reverseUntilStep = steps + 90;
         lastCheckpointStep = steps;
       }
-      const routeInput = createRouteInput({
-        position: runtime.transformHistory.current.position,
-        headingRadians: telemetry.headingRadians,
-        speedMetersPerSecond: telemetry.speedMetersPerSecond,
-        precedingCheckpoint: preceding,
-        checkpoint: target.checkpoint,
-        followingCheckpoint: following,
-        minimumTargetSpeedMetersPerSecond: demandingApproaches.has(target.checkpoint.id) ? 12 : 0,
-        targetPosition: checkpointTarget(
-          target.checkpoint,
-          retryBiases[retryIndex % retryBiases.length]!,
-        ),
-      });
-      const input = steps < reverseUntilStep ? createRouteEscapeInput() : routeInput;
+      const input = aiDriver
+        ? aiDriver.advance(stepSeconds, {
+            position: runtime.transformHistory.current.position,
+            headingRadians: telemetry.headingRadians,
+            speedMetersPerSecond: telemetry.speedMetersPerSecond,
+            precedingCheckpoint: preceding,
+            checkpoint: target.checkpoint,
+            followingCheckpoint: following,
+          })
+        : steps < reverseUntilStep
+          ? createRouteEscapeInput()
+          : createRouteInput({
+              position: runtime.transformHistory.current.position,
+              headingRadians: telemetry.headingRadians,
+              speedMetersPerSecond: telemetry.speedMetersPerSecond,
+              precedingCheckpoint: preceding,
+              checkpoint: target.checkpoint,
+              followingCheckpoint: following,
+              minimumTargetSpeedMetersPerSecond: demandingApproaches.has(target.checkpoint.id) ? 12 : 0,
+              targetPosition: checkpointTarget(
+                target.checkpoint,
+                retryBiases[retryIndex % retryBiases.length]!,
+              ),
+            });
       if (input.drive < 0) {
         reverseFrames += 1;
       }
