@@ -76,6 +76,8 @@ Stage 6 alpha slices and their acceptance boundaries live in
 [`reference/ALPHA.md`](./reference/ALPHA.md).
 AI format findings, route-driver contracts, and follow-up acceptance live in
 [`reference/AI_FOUNDATION.md`](./reference/AI_FOUNDATION.md).
+Championship rules, source boundaries, and the versioned series-save contract live in
+[`reference/CHAMPIONSHIP_FOUNDATION.md`](./reference/CHAMPIONSHIP_FOUNDATION.md).
 
 ## Inspect Stage 2 fixtures
 

@@ -89,10 +89,19 @@ All 28 AI and 29 LED files in the local reference set parse, but unconfirmed tab
 names and do not influence steering. Detailed format findings, browser evidence, and the 6.4b boundary
 live in [AI_FOUNDATION.md](./AI_FOUNDATION.md).
 
+## Slice 6.5a — championship rule substrate
+
+A pure `ChampionshipSession` now owns an ordered multi-event series, explicit rank points, deterministic
+standings/tie breakers, final medals, and strict event transitions. Its versioned save contract is
+fully revalidated on restore rather than trusted as typed input. Extracted English identifiers confirm
+the original championship/tournament/cup vocabulary, but no standalone source event table was found,
+so the forthcoming alpha cup remains explicitly clean-room and data-driven. Details live in
+[CHAMPIONSHIP_FOUNDATION.md](./CHAMPIONSHIP_FOUNDATION.md).
+
 ## Planned slices
 
-1. **6.5 tournament flow:** main-menu to event-series progression, championship results, local save
-   schema, and English UI strings.
+1. **6.5b tournament runtime:** connect the championship session to an English menu, event/series
+   results, next-event flow, and resilient local persistence.
 2. **6.6 content batches:** full vehicle roster and tracks in measured batches. Every admitted track
    gets a load smoke, rules replay, and an explicit unsupported-resource record.
 3. **6.7 settings and alpha gate:** controls/audio/graphics/difficulty settings, persistence, complete
