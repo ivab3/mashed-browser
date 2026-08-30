@@ -104,7 +104,7 @@ persists the strict versioned save by course and roster size. Browser acceptance
 series, restored its final table after navigation, and restarted it at zero points. Details live in
 [CHAMPIONSHIP_FOUNDATION.md](./CHAMPIONSHIP_FOUNDATION.md).
 
-## Slices 6.6a–c — first measured content batches
+## Slices 6.6a–d — measured content batches and complete vehicle roster
 
 The first admission beyond the Warzone proof baseline adds City (course 26) and Wildfire. A
 source-free batch registry records stable identities and every deferred/parsed-only resource family.
@@ -129,10 +129,18 @@ the production combat adapter. Browser loading binds the complete world/collisio
 60 FPS with no dropped time or console errors. The Hard route driver reaches checkpoint 8 before an
 authored obstacle exposes the next AI-physics follow-up; autonomous Arctic completion is not claimed.
 
+The fourth admission is roster-only and closes the Stage 6 full-vehicle requirement. All 15 source
+archives now contribute six validated numbered skins: 90 DFFs, 75 texture entries, 4,182 atomics, and
+508,956 triangles in total. The validator rejects missing or unclassified archive files; BigBoss's
+absent arms mesh and Advantage's two non-numbered alternates are explicit rather than normalized away.
+The browser loaded the 12 newly admitted skin-0/TXD pairs together and bound every model in turn with
+no warnings or errors. Only Wildfire's display-name mapping is direct, so all other selectors retain
+their source labels.
+
 ## Planned slices
 
-1. **6.6d+ content batches:** extend the vehicle roster and tracks in measured batches. Every admitted
-   track keeps the load smoke, rules replay, and explicit unsupported-resource record.
+1. **6.6e+ track batches:** extend the playable track catalog in measured batches. Every admitted track
+   keeps the load smoke, rules replay, and explicit unsupported-resource record.
 2. **6.7 settings and alpha gate:** controls/audio/graphics/difficulty settings, persistence, complete
    menu-to-series acceptance, and the Milestone M2 compatibility report.
 

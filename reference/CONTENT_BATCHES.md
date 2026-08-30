@@ -1,9 +1,9 @@
 # Stage 6 content batches
 
 Status: batches 6.6a (`City` course 26 + `Wildfire`), 6.6b (`Neustein` course 39 + `Crusader`),
-and 6.6c (`Arctic` course 0 + `Shorty`) admitted on 2026-08-30. Original files remain in the user's
-ignored `game-data/` tree; the repository contains only source-free admission metadata, validators,
-and measurements.
+6.6c (`Arctic` course 0 + `Shorty`), and the roster-only batch 6.6d admitted on 2026-08-30.
+Original files remain in the user's ignored `game-data/` tree; the repository contains only
+source-free admission metadata, validators, and measurements.
 
 ## Admission contract
 
@@ -142,5 +142,42 @@ is therefore a follow-up, not evidence claimed by this loading/rules admission.
 - Shorty arms, lights, ghost presentation, and six vehicle-specific debris meshes are deferred;
 - the current route driver is deterministic on Arctic but is not yet obstacle-aware enough for a
   complete physics lap, so only the full rules replay and partial browser driving smoke are admitted.
+
+## Batch 6.6d — complete numbered vehicle roster
+
+This roster-only batch admits the 12 remaining vehicle archives after checking every numbered DFF,
+shared TXD, and extra top-level file. Together with Wildfire, Crusader, and Shorty from 6.6a–c, the
+alpha registry now covers all 15 source vehicle archives and all six numbered skins per archive.
+
+| Source archive | Position-derived display metadata | Six-skin atomics | Six-skin triangles |
+|---|---|---:|---:|
+| Shuriken | Hammerhead | 288 | 29,964 |
+| Advantag / `ADVANTAGE` | Shuriken | 288 | 32,232 |
+| Atmos | Thunderstrike | 288 | 30,204 |
+| Stallion | Venom | 288 | 32,640 |
+| Bullet | Nemesis | 276 | 32,832 |
+| Sputter | Banshee | 276 | 37,518 |
+| Cooler | Miglia | 270 | 37,122 |
+| Creeper | Switchblade | 276 | 35,022 |
+| BamBam | Genesis | 276 | 36,966 |
+| Kustom | Hurricane | 276 | 27,330 |
+| Formula | Imperial | 276 | 31,962 |
+| BigBoss | Slugger | 276 | 30,174 |
+
+The batch adds 72 intact numbered models, 60 texture entries, 3,354 atomics, and 393,966 triangles.
+The complete admitted roster totals 90 models, 75 texture entries, 4,182 atomics, and 508,956
+triangles. A browser smoke loaded each new archive's skin 0 and TXD through one normal 24-file chooser,
+then selected all 12 models in turn. Every selection reported one bound original vehicle model at 60
+FPS with zero dropped time and no console warnings or errors.
+
+## Explicit 6.6d boundaries
+
+- all user-facing names except Wildfire remain position-derived metadata; selectors continue to show
+  source archive labels until a direct mapping is found;
+- vehicle arms, lights, ghost presentation, and six archive-specific debris meshes remain deferred;
+- BigBoss contains no separate arms DFF, and its boundary is recorded without inventing one;
+- `ADVANTAGE0SLT.DFF` and `ADVANTAGE0SM.DFF` are non-numbered alternate presentation meshes and are
+  deferred rather than silently promoted to roster skins;
+- this is a roster-only admission, so no additional track replay is claimed by 6.6d.
 
 Future batches must extend the admission registry rather than weakening or bypassing these checks.

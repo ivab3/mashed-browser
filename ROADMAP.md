@@ -351,7 +351,7 @@ Milestone M1: публично показываемый proof of concept.
 
 Milestone M2: feature-complete alpha.
 
-Статус 2026-08-30: **этап 6 выполняется; срезы 6.1–6.5 и content batches 6.6a–c завершены**. Срез 6.1 вводит безопасный reader исходных
+Статус 2026-08-30: **этап 6 выполняется; срезы 6.1–6.5 и content batches 6.6a–d завершены**. Срез 6.1 вводит безопасный reader исходных
 `POWERUPS_ALL.LUA`/`POWERUPS_GOLD.LUA`: нормализованы все встречающиеся type ID, глобальные loadout
 для 26 course ID и source-authored position/respawn metadata. Срез 6.2 подключает девять подтверждённых
 обучающими строками типов: machine gun, guided missile, mortar, rear flame, oil, proximity mine, drum
@@ -388,8 +388,11 @@ collision triangles; Hard CPU достигает checkpoint 23 при 60 FPS б�
 `Lap_Line(-1)` sentinel и привязку нестандартных BSP-имён из `COURSE.LUA`. Arctic даёт полный
 94-checkpoint replay на 30/60/120 Hz, 18 authored pickups и browser-bound world/collision/vehicle при
 60 FPS без dropped time или console errors. Hard CPU доходит до checkpoint 8, где статическое
-препятствие оставляет obstacle-aware AI physics отдельной границей. Следующий рабочий блок —
-расширение 6.6d+ теми же измеряемыми пакетами.
+препятствие оставляет obstacle-aware AI physics отдельной границей. Roster-only пакет 6.6d закрывает
+все 15 source vehicle archives и 90 numbered skins: validator проверяет 4 182 atomics и 508 956
+triangles, а browser smoke связывает по очереди все 12 новых skin-0/TXD пар без ошибок. Все
+позиционно выведенные display names остаются metadata, и UI продолжает показывать source labels.
+Следующий рабочий блок — расширение трасс пакетами 6.6e+.
 
 ### Этап 7. Beta: доставка, производительность и совместимость — 3–6 недель
 

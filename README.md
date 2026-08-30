@@ -12,9 +12,9 @@ Human/Easy/Normal/Hard drivers, deterministic checkpoint steering, and structura
 `.AI`/`.LED` data. CPU item use respects each weapon's useful target arc/range, and the production Hard
 driver completes the 136-checkpoint Warzone gate without recovery. A clean-room three-event Alpha
 Championship adds aggregate points, final medals, next-event flow, and a strict versioned local save
-that resumes after navigation. The first three measured content batches admit City/Wildfire,
-Neustein/Crusader, and Arctic/Shorty behind source-free metadata, deterministic full-route gates, and
-explicit resource boundaries. Stage 1
+that resumes after navigation. Measured content batches admit City, Neustein, and Arctic behind
+deterministic full-route gates and cover the complete 15-vehicle, 90-skin roster with explicit
+source-free resource boundaries. Stage 1
 provides a reproducible local extraction pipeline; Stage 2 provides RenderWare DFF/TXD readers, full
 graphical/collision BSP sector parsing, and a Three.js asset viewer. Stage 3 adds a deterministic
 fixed-step core, replay checks, Rapier/Three.js/Web Audio adapters, debug tooling, and the browser
@@ -126,13 +126,13 @@ bytes remain local and parsed typed arrays are transferred back without cloning.
 [`reference/RUNTIME_FOUNDATION.md`](./reference/RUNTIME_FOUNDATION.md) for runtime contracts and
 acceptance evidence. Loading a numbered vehicle DFF such as `CRUSADER0.DFF` together with its shared
 `CRUSADER.TXD` adds it to the local roster selectors.
-The first three measured content admissions add City (course 26) with Wildfire, Neustein (course 39)
-with Crusader, and Arctic (course 0) with Shorty; each vehicle contributes all six intact numbered
-skins. `pnpm content:validate` checks every admitted local bundle, runs each track's 30/60/120 Hz
-route-rules matrix, and fails if a source file is neither exercised nor explicitly classified. The
-browser uses each course's declared BSP filenames, including Arctic's nonstandard names. Inferred
-localized vehicle-name mappings stay registry metadata; the runtime keeps source archive labels until
-direct evidence exists.
+Measured track admissions currently cover City (course 26), Neustein (course 39), and Arctic (course
+0). The vehicle registry covers all 15 source archives and all 90 intact numbered skins.
+`pnpm content:validate` checks every admitted local bundle, runs each track's 30/60/120 Hz route-rules
+matrix, and fails if a source file is neither exercised nor explicitly classified. The browser uses
+each course's declared BSP filenames, including Arctic's nonstandard names. Inferred localized
+vehicle-name mappings stay registry metadata; the runtime keeps source archive labels until direct
+evidence exists.
 Choose 1–4 local players in the runtime roster. P1 uses WASD and gamepad 1; P2 uses the arrow keys
 and gamepad 2; P3/P4 use gamepads 3/4. Every active slot has independent physics and telemetry, and
 can select any complete numbered DFF/shared-TXD pair loaded in the current session. The camera

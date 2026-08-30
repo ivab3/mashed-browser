@@ -59,4 +59,22 @@ describe("Stage 6 content admissions", () => {
       "powerups_gold.dff",
     ]));
   });
+
+  it("admits the complete 15-vehicle numbered-skin roster without promoting inferred names", () => {
+    const vehicles = ALPHA_CONTENT_BATCHES.flatMap((batch) => batch.vehicles);
+    expect(vehicles).toHaveLength(15);
+    expect(vehicles.every((vehicle) => (
+      vehicle.variants.join(",") === "0,1,2,3,4,5"
+    ))).toBe(true);
+    expect(vehicles.filter((vehicle) => vehicle.nameMapping === "exact-name").map((vehicle) => (
+      vehicle.assetBaseName
+    ))).toEqual(["WILDFIRE"]);
+    expect(admittedVehicleByAssetName("advantage")).toMatchObject({
+      displayName: "Shuriken",
+      directoryName: "Advantag",
+    });
+    expect(admittedVehicleByAssetName("bigboss")?.resourceBoundaries.flatMap((boundary) => (
+      boundary.fileNames
+    ))).not.toContain("BIGBOSSARMS.DFF");
+  });
 });

@@ -120,6 +120,68 @@ const CITY_RESOURCE_BOUNDARIES: readonly ContentResourceBoundary[] = Object.free
   },
 ]);
 
+type VehicleResourceBoundary = AlphaVehicleAdmission["resourceBoundaries"][number];
+
+const STANDARD_VEHICLE_VARIANTS: readonly number[] = Object.freeze([0, 1, 2, 3, 4, 5]);
+const STANDARD_DEBRIS_FILES: readonly string[] = Object.freeze([
+  "DEBRIS0.DFF",
+  "DEBRIS1.DFF",
+  "DEBRIS2.DFF",
+  "DEBRIS3.DFF",
+  "DEBRIS4.DFF",
+  "DEBRIS5.DFF",
+]);
+
+function standardVehicleBoundaries(
+  assetBaseName: string,
+  options: {
+    arms?: boolean;
+    extras?: readonly VehicleResourceBoundary[];
+  } = {},
+): readonly VehicleResourceBoundary[] {
+  return [
+    ...(options.arms === false ? [] : [{
+      fileNames: [`${assetBaseName}ARMS.DFF`],
+      disposition: "deferred" as const,
+      reason: "Original vehicle weapon-arm attachment behavior is not implemented.",
+    }]),
+    {
+      fileNames: [`${assetBaseName}LIGHTS.DFF`],
+      disposition: "deferred",
+      reason: "Original vehicle light attachment behavior is not implemented.",
+    },
+    {
+      fileNames: ["GHOST.DFF"],
+      disposition: "deferred",
+      reason: "Original ghost presentation is not implemented.",
+    },
+    {
+      fileNames: STANDARD_DEBRIS_FILES,
+      disposition: "deferred",
+      reason: "Vehicle-specific debris meshes are not spawned on destruction.",
+    },
+    ...(options.extras ?? []),
+  ];
+}
+
+function inferredVehicle(
+  id: string,
+  displayName: string,
+  directoryName: string,
+  assetBaseName: string,
+  options?: Parameters<typeof standardVehicleBoundaries>[1],
+): AlphaVehicleAdmission {
+  return {
+    id,
+    displayName,
+    directoryName,
+    assetBaseName,
+    variants: STANDARD_VEHICLE_VARIANTS,
+    nameMapping: "inferred-position",
+    resourceBoundaries: standardVehicleBoundaries(assetBaseName, options),
+  };
+}
+
 /** Source-free admission metadata for content that has passed its Stage 6 gates. */
 export const ALPHA_CONTENT_BATCHES: readonly AlphaContentBatch[] = Object.freeze([
   {
@@ -360,6 +422,31 @@ export const ALPHA_CONTENT_BATCHES: readonly AlphaContentBatch[] = Object.freeze
           },
         ],
       },
+    ],
+  },
+  {
+    id: "6.6d-complete-vehicle-roster",
+    status: "admitted",
+    tracks: [],
+    vehicles: [
+      inferredVehicle("shuriken", "Hammerhead", "Shuriken", "SHURIKEN"),
+      inferredVehicle("advantage", "Shuriken", "Advantag", "ADVANTAGE", {
+        extras: [{
+          fileNames: ["ADVANTAGE0SLT.DFF", "ADVANTAGE0SM.DFF"],
+          disposition: "deferred",
+          reason: "Alternate non-numbered presentation meshes are outside the admitted skin contract.",
+        }],
+      }),
+      inferredVehicle("atmos", "Thunderstrike", "Atmos", "ATMOS"),
+      inferredVehicle("stallion", "Venom", "Stallion", "STALLION"),
+      inferredVehicle("bullet", "Nemesis", "Bullet", "BULLET"),
+      inferredVehicle("sputter", "Banshee", "Sputter", "SPUTTER"),
+      inferredVehicle("cooler", "Miglia", "Cooler", "COOLER"),
+      inferredVehicle("creeper", "Switchblade", "Creeper", "CREEPER"),
+      inferredVehicle("bambam", "Genesis", "BamBam", "BAMBAM"),
+      inferredVehicle("kustom", "Hurricane", "Kustom", "KUSTOM"),
+      inferredVehicle("formula", "Imperial", "Formula", "FORMULA"),
+      inferredVehicle("bigboss", "Slugger", "BigBoss", "BIGBOSS", { arms: false }),
     ],
   },
 ]);
