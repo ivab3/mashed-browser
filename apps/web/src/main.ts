@@ -1572,7 +1572,8 @@ function vehiclePairKey(pair: VehicleAssetPair): string {
 }
 
 function vehicleDisplayName(assetName: string): string {
-  return admittedVehicleByAssetName(assetName)?.displayName ?? assetName;
+  const admission = admittedVehicleByAssetName(assetName);
+  return admission?.nameMapping === "exact-name" ? admission.displayName : assetName;
 }
 
 function refreshVehicleCatalog(): void {

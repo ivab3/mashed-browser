@@ -5,6 +5,7 @@ import { fileURLToPath } from "node:url";
 import { FixedStepClock, LapSession, type LapProgress } from "@mashed/core";
 
 import {
+  ALPHA_CONTENT_BATCHES,
   alphaContentBatch,
   deriveTrackDefinition,
   parseBspWorld,
@@ -13,6 +14,7 @@ import {
   parseLapDataLua,
   parsePiTextureDictionary,
   parsePowerupPlacementsLua,
+  parseTrackPowerupLoadoutsLua,
   type AlphaTrackAdmission,
   type AlphaVehicleAdmission,
   type DerivedTrackDefinition,
@@ -141,6 +143,14 @@ async function validateTrack(contentRoot: string, admission: AlphaTrackAdmission
       (await loadFile(directory, admission.powerupFileName, acceptedNames)).toString("utf8"),
     )
     : [];
+  const powerupLoadout = admission.powerupLoadoutPath
+    ? parseTrackPowerupLoadoutsLua(
+      await readFile(resolve(contentRoot, admission.powerupLoadoutPath), "utf8"),
+    ).find((loadout) => loadout.courseId === admission.courseId)
+    : undefined;
+  if (admission.powerupLoadoutPath && !powerupLoadout) {
+    throw new Error(`${admission.id} is missing course ${admission.courseId} in its shared power-up loadout`);
+  }
   const replayMatrix = [30, 60, 120].map((refreshRate) => ({
     refreshRate,
     outcome: runRouteRulesReplay(track, refreshRate),
@@ -190,6 +200,7 @@ async function validateTrack(contentRoot: string, admission: AlphaTrackAdmission
     textures: textureDictionary.textures.length,
     courseModels: dffMetrics(declaredModels),
     powerups: powerups.length,
+    powerupLoadoutTypes: powerupLoadout?.powerups ?? [],
     routeReplay: {
       deterministic,
       matrix: replayMatrix.map(({ refreshRate, outcome }) => ({
@@ -250,23 +261,25 @@ async function validateVehicle(
   };
 }
 
-const batchId = argumentValue("--batch") ?? "6.6a-city-wildfire";
+const requestedBatchId = argumentValue("--batch");
 const contentRoot = resolve(argumentValue("--root") ?? DEFAULT_CONTENT_ROOT);
-const batch = alphaContentBatch(batchId);
-if (!batch) {
-  throw new Error(`Unknown alpha content batch ${batchId}`);
+const requestedBatch = requestedBatchId ? alphaContentBatch(requestedBatchId) : undefined;
+if (requestedBatchId && !requestedBatch) {
+  throw new Error(`Unknown alpha content batch ${requestedBatchId}`);
 }
+const batches = requestedBatch ? [requestedBatch] : ALPHA_CONTENT_BATCHES;
 
-const [tracks, vehicles] = await Promise.all([
-  Promise.all(batch.tracks.map((track) => validateTrack(contentRoot, track))),
-  Promise.all(batch.vehicles.map((vehicle) => validateVehicle(contentRoot, vehicle))),
-]);
+const reports = await Promise.all(batches.map(async (batch) => {
+  const [tracks, vehicles] = await Promise.all([
+    Promise.all(batch.tracks.map((track) => validateTrack(contentRoot, track))),
+    Promise.all(batch.vehicles.map((vehicle) => validateVehicle(contentRoot, vehicle))),
+  ]);
+  return { batchId: batch.id, tracks, vehicles };
+}));
 
 console.log(JSON.stringify({
   version: 1,
   accepted: true,
-  batchId: batch.id,
   contentRoot,
-  tracks,
-  vehicles,
+  batches: reports,
 }, null, 2));

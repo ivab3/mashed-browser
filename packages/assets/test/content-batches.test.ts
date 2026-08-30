@@ -27,6 +27,14 @@ describe("Stage 6 content admissions", () => {
       nameMapping: "exact-name",
       variants: [0, 1, 2, 3, 4, 5],
     });
+    expect(admittedTrackByCourseId(39)).toMatchObject({
+      id: "neustein-39",
+      powerupLoadoutPath: "Common/POWERUPS/Powerups/POWERUPS_ALL.LUA",
+    });
+    expect(admittedVehicleByAssetName("crusader")).toMatchObject({
+      displayName: "Bahnstormer",
+      nameMapping: "inferred-position",
+    });
   });
 
   it("records every deferred City source family explicitly", () => {

@@ -1,15 +1,15 @@
 # Stage 6 content batches
 
-Status: batch 6.6a (`City` course 26 + `Wildfire`) admitted on 2026-08-30. Original files remain in
-the user's ignored `game-data/` tree; the repository contains only source-free admission metadata,
-validators, and measurements.
+Status: batches 6.6a (`City` course 26 + `Wildfire`) and 6.6b (`Neustein` course 39 + `Crusader`)
+admitted on 2026-08-30. Original files remain in the user's ignored `game-data/` tree; the repository
+contains only source-free admission metadata, validators, and measurements.
 
 ## Admission contract
 
 `@mashed/assets` owns `ALPHA_CONTENT_BATCHES`. A batch is admitted only when:
 
 - each track's `COURSE.LUA`, `LAPDATA.LUA`, AI/collision/graphics BSPs, track TXD, declared course
-  DFFs, and authored power-up placements parse through production readers;
+  DFFs, and authored power-up placements or shared course loadout parse through production readers;
 - an ordered full-lap rules tape derived from the track's real checkpoint polygons produces the same
   final `LapSession` outcome behind 30, 60, and 120 Hz presentation clocks;
 - the ordinary browser file-input binds the route, collision, world, declared models, power-ups, and
@@ -66,4 +66,41 @@ Supported parsing is intentionally narrower than claiming complete presentation:
   intact numbered vehicle skins are the admitted roster content.
 
 The exact filenames and reasons live in the batch metadata and are echoed by `pnpm content:validate`.
-Future batches must extend that registry rather than weakening or bypassing these checks.
+
+## Batch 6.6b — Neustein + Crusader
+
+`Neustein` is the confirmed internal family/course label for course 39. The `Crusader` archive's
+position suggests the localized vehicle name `Bahnstormer`, but that mapping is not directly named by
+the extracted asset. Admission metadata therefore records it as inferred while the browser continues
+to display the honest source label `crusader`.
+
+The repeatable local gate reports:
+
+| Asset | Accepted evidence |
+|---|---|
+| Neustein route | 72 ordered checkpoints, 5 split checkpoints, one complete deterministic lap at 30/60/120 Hz |
+| Neustein world | 13,342 graphics triangles, 4,127 source collision triangles, 37 textures |
+| Neustein models | 14 declared DFFs parse, 17 atomics, 1,506 triangles |
+| Neustein rules | Shared course-39 loadout resolves machine gun, flash, proximity mine, mortar, and guided missile |
+| Crusader | 6 numbered skins, 5 textures, 276 atomics, 34,602 triangles across the six DFFs |
+
+The browser smoke loaded 23 files through the normal chooser. The production adapters bound 72
+checkpoints, 4,102 filtered drive/scenery collision triangles, 13,342 rendered world triangles, 10
+placed course atomics, and the intact 13-atomic/3,037-triangle `CRUSADER0` vehicle. A Hard CPU reached
+checkpoint 23 on the loaded route at 60 FPS with zero dropped simulation time. This is the browser
+loading smoke; the full route-rules replay remains the deterministic completion gate.
+
+## Explicit 6.6b boundaries
+
+- `.ANM` object/camera animation and `.MTS` material/physics template binding are deferred;
+- course 39 uses the shared `POWERUPS_ALL.LUA` loadout; `POWERUPS_GOLD.DFF` is not rendered and no
+  authored pickup-position Lua exists in this track directory;
+- `POST_01.DFF` is not referenced by the admitted course definition;
+- both sky domes, `TRUNK.DFF`, `RBARREL.DFF`, `POST_1.DFF`, `TROLLY_1.DFF`, `CABLECAR.DFF`, and
+  `LIGHTS.DFF` parse, but their local-template transforms or light behavior are not instantiated;
+- `.MTS.TXT` sidecars are source diagnostics, not runtime inputs;
+- Crusader arms, lights, ghost presentation, and six vehicle-specific debris meshes are deferred;
+- all six numbered Crusader skins are admitted, but the inferred localized-name mapping remains
+  metadata only until direct source evidence is found.
+
+Future batches must extend the admission registry rather than weakening or bypassing these checks.

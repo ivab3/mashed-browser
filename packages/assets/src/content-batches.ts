@@ -12,6 +12,7 @@ export interface AlphaTrackAdmission {
   directoryName: string;
   courseId: number;
   powerupFileName?: string;
+  powerupLoadoutPath?: string;
   resourceBoundaries: readonly ContentResourceBoundary[];
 }
 
@@ -145,6 +146,99 @@ export const ALPHA_CONTENT_BATCHES: readonly AlphaContentBatch[] = Object.freeze
         resourceBoundaries: [
           {
             fileNames: ["WILDFIRELIGHTS.DFF"],
+            disposition: "deferred",
+            reason: "Original vehicle light attachment behavior is not implemented.",
+          },
+          {
+            fileNames: ["GHOST.DFF"],
+            disposition: "deferred",
+            reason: "Original ghost presentation is not implemented.",
+          },
+          {
+            fileNames: [
+              "DEBRIS0.DFF",
+              "DEBRIS1.DFF",
+              "DEBRIS2.DFF",
+              "DEBRIS3.DFF",
+              "DEBRIS4.DFF",
+              "DEBRIS5.DFF",
+            ],
+            disposition: "deferred",
+            reason: "Vehicle-specific debris meshes are not spawned on destruction.",
+          },
+        ],
+      },
+    ],
+  },
+  {
+    id: "6.6b-neustein-crusader",
+    status: "admitted",
+    tracks: [
+      {
+        id: "neustein-39",
+        displayName: "Neustein",
+        directoryName: "Neustein",
+        courseId: 39,
+        powerupLoadoutPath: "Common/POWERUPS/Powerups/POWERUPS_ALL.LUA",
+        resourceBoundaries: [
+          {
+            suffix: ".anm",
+            disposition: "deferred",
+            reason: "Authored object and camera animation playback is not implemented.",
+          },
+          {
+            suffix: ".mts",
+            disposition: "deferred",
+            reason: "Authored material/physics template binding is not implemented.",
+          },
+          {
+            suffix: "powerups_gold.dff",
+            disposition: "deferred",
+            reason: "The original pickup DFF is not rendered; course 39 uses the shared loadout table.",
+          },
+          {
+            suffix: "post_01.dff",
+            disposition: "deferred",
+            reason: "The model is not referenced by the admitted course definition.",
+          },
+          ...[
+            "skydome_01.dff",
+            "skydome_02.dff",
+            "trunk.dff",
+            "rbarrel.dff",
+            "post_1.dff",
+            "trolly_1.dff",
+            "cablecar.dff",
+            "lights.dff",
+          ].map((suffix) => ({
+            suffix,
+            disposition: "parsed-only" as const,
+            reason: "The DFF parses, but its local-template transform is not placed by the renderer.",
+          })),
+          {
+            suffix: ".mts.txt",
+            disposition: "non-runtime",
+            reason: "Extracted text sidecars are diagnostics and are not runtime inputs.",
+          },
+        ],
+      },
+    ],
+    vehicles: [
+      {
+        id: "crusader",
+        displayName: "Bahnstormer",
+        directoryName: "Crusader",
+        assetBaseName: "CRUSADER",
+        variants: [0, 1, 2, 3, 4, 5],
+        nameMapping: "inferred-position",
+        resourceBoundaries: [
+          {
+            fileNames: ["CRUSADERARMS.DFF"],
+            disposition: "deferred",
+            reason: "Original vehicle weapon-arm attachment behavior is not implemented.",
+          },
+          {
+            fileNames: ["CRUSADERLIGHTS.DFF"],
             disposition: "deferred",
             reason: "Original vehicle light attachment behavior is not implemented.",
           },

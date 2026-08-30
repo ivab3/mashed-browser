@@ -12,7 +12,9 @@ Human/Easy/Normal/Hard drivers, deterministic checkpoint steering, and structura
 `.AI`/`.LED` data. CPU item use respects each weapon's useful target arc/range, and the production Hard
 driver completes the 136-checkpoint Warzone gate without recovery. A clean-room three-event Alpha
 Championship adds aggregate points, final medals, next-event flow, and a strict versioned local save
-that resumes after navigation. Stage 1
+that resumes after navigation. The first two measured content batches admit City/Wildfire and
+Neustein/Crusader behind source-free metadata, deterministic full-route gates, and explicit resource
+boundaries. Stage 1
 provides a reproducible local extraction pipeline; Stage 2 provides RenderWare DFF/TXD readers, full
 graphical/collision BSP sector parsing, and a Three.js asset viewer. Stage 3 adds a deterministic
 fixed-step core, replay checks, Rapier/Three.js/Web Audio adapters, debug tooling, and the browser
@@ -124,9 +126,11 @@ bytes remain local and parsed typed arrays are transferred back without cloning.
 [`reference/RUNTIME_FOUNDATION.md`](./reference/RUNTIME_FOUNDATION.md) for runtime contracts and
 acceptance evidence. Loading a numbered vehicle DFF such as `CRUSADER0.DFF` together with its shared
 `CRUSADER.TXD` adds it to the local roster selectors.
-The first measured content admission adds City (course 26) and all six intact Wildfire skins.
-`pnpm content:validate` checks their local extracted files, runs City's 30/60/120 Hz route-rules
-matrix, and fails if a source file is neither exercised nor explicitly classified.
+The first two measured content admissions add City (course 26) with all six intact Wildfire skins and
+Neustein (course 39) with all six intact Crusader skins. `pnpm content:validate` checks every admitted
+local bundle, runs each track's 30/60/120 Hz route-rules matrix, and fails if a source file is neither
+exercised nor explicitly classified. The inferred Crusader-to-localized-name mapping stays registry
+metadata; the runtime keeps the source archive label until direct evidence exists.
 Choose 1–4 local players in the runtime roster. P1 uses WASD and gamepad 1; P2 uses the arrow keys
 and gamepad 2; P3/P4 use gamepads 3/4. Every active slot has independent physics and telemetry, and
 can select any complete numbered DFF/shared-TXD pair loaded in the current session. The camera

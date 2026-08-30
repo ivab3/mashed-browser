@@ -104,19 +104,26 @@ persists the strict versioned save by course and roster size. Browser acceptance
 series, restored its final table after navigation, and restarted it at zero points. Details live in
 [CHAMPIONSHIP_FOUNDATION.md](./CHAMPIONSHIP_FOUNDATION.md).
 
-## Slice 6.6a — first measured content batch
+## Slices 6.6a–b — first measured content batches
 
 The first admission beyond the Warzone proof baseline adds City (course 26) and Wildfire. A
 source-free batch registry records stable identities and every deferred/parsed-only resource family.
 `pnpm content:validate` parses the complete admitted bundle and fails on any unclassified source file.
 City's 117-checkpoint full-lap rules replay is identical at 30, 60, and 120 Hz. The ordinary browser
 loader binds City world/collision/course data plus the intact Wildfire model; a Hard CPU crossed the
-first 19 checkpoints at 60 FPS with no dropped simulation time. Measurements and exact boundaries live
-in [CONTENT_BATCHES.md](./CONTENT_BATCHES.md).
+first 19 checkpoints at 60 FPS with no dropped simulation time.
+
+The second admission adds Neustein (course 39) and Crusader. Its 72-checkpoint full-lap rules replay
+is also identical at 30, 60, and 120 Hz, and the shared course loadout resolves all five source weapon
+types through production readers. The browser binds 13,342 rendered world triangles, 4,102 filtered
+collision triangles, and the intact Crusader model; a Hard CPU crossed checkpoint 23 at 60 FPS with no
+dropped simulation time. The unconfirmed `Crusader` → `Bahnstormer` position mapping remains metadata
+instead of being presented as fact. Measurements and exact boundaries live in
+[CONTENT_BATCHES.md](./CONTENT_BATCHES.md).
 
 ## Planned slices
 
-1. **6.6b+ content batches:** extend the vehicle roster and tracks in measured batches. Every admitted
+1. **6.6c+ content batches:** extend the vehicle roster and tracks in measured batches. Every admitted
    track keeps the load smoke, rules replay, and explicit unsupported-resource record.
 2. **6.7 settings and alpha gate:** controls/audio/graphics/difficulty settings, persistence, complete
    menu-to-series acceptance, and the Milestone M2 compatibility report.
