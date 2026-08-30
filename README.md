@@ -10,7 +10,9 @@ positions and respawn timings, distinct deterministic rules for all nine base we
 multi-round local match modes with persistent scores and objectives. The first AI slice adds per-slot
 Human/Easy/Normal/Hard drivers, deterministic checkpoint steering, and structural readers for original
 `.AI`/`.LED` data. CPU item use respects each weapon's useful target arc/range, and the production Hard
-driver completes the 136-checkpoint Warzone gate without recovery. Stage 1
+driver completes the 136-checkpoint Warzone gate without recovery. A clean-room three-event Alpha
+Championship adds aggregate points, final medals, next-event flow, and a strict versioned local save
+that resumes after navigation. Stage 1
 provides a reproducible local extraction pipeline; Stage 2 provides RenderWare DFF/TXD readers, full
 graphical/collision BSP sector parsing, and a Three.js asset viewer. Stage 3 adds a deterministic
 fixed-step core, replay checks, Rapier/Three.js/Web Audio adapters, debug tooling, and the browser
@@ -135,6 +137,11 @@ elimination/results flow as camera distance, while oil and flash show timed hand
 With 2–4 players, choose Standard Play, Team Play, Hold the Flag, or The Fugitive before starting.
 The mode HUD tracks the live objective and series score; `Next round` resets race/combat state while
 preserving points, and the fugitive role rotates between rounds.
+Choose `Alpha Championship` under Game flow to run Standard Play, Hold the Flag, and The Fugitive as
+a three-event series on the current route. The championship HUD tracks aggregate `5 / 3 / 2 / 1`
+rank points and final medals; `Next event` preserves the table, and the versioned local save resumes
+the same course/roster series after navigation. The event order and scoring are clean-room alpha data,
+not a claim about the original executable's hidden cup table.
 Each roster slot can use a Human, Easy, Normal, or Hard CPU driver once a track route is loaded. CPU
 cars submit the same fixed-step vehicle inputs as human adapters; source `.AI`/`.LED` files can be
 loaded for validated structural inspection while their still-unconfirmed tables remain out of rules.

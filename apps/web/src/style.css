@@ -188,6 +188,29 @@ h1 { margin: 3px 0 0; color: #fff8e9; font-size: 26px; letter-spacing: -0.04em; 
 .mode-hud ol { display: grid; gap: 4px; margin: 3px 0 0; padding: 0; list-style: none; }
 .mode-hud li { display: flex; justify-content: space-between; gap: 14px; color: #aebdc0; font: 700 10px/1.2 ui-monospace, SFMono-Regular, Menlo, monospace; }
 .mode-hud li b { color: #fff8e9; }
+.mode-hud.with-championship { top: 430px; }
+
+.championship-hud {
+  position: absolute;
+  z-index: 3;
+  top: 290px;
+  right: 30px;
+  display: grid;
+  min-width: 220px;
+  gap: 6px;
+  padding: 11px 12px;
+  border: 1px solid rgb(255 138 76 / 42%);
+  border-radius: 11px;
+  background: rgb(22 15 13 / 84%);
+  backdrop-filter: blur(14px);
+}
+
+.championship-hud > strong { color: #fff0dc; font-size: 11px; text-transform: uppercase; }
+.championship-hud > span { color: #c79372; font: 9px/1.35 ui-monospace, SFMono-Regular, Menlo, monospace; }
+.championship-hud ol { display: grid; gap: 4px; margin: 3px 0 0; padding: 0; list-style: none; }
+.championship-hud li { display: flex; justify-content: space-between; gap: 14px; color: #bca99d; font: 700 10px/1.2 ui-monospace, SFMono-Regular, Menlo, monospace; }
+.championship-hud li[data-leader="true"] { color: #ffb182; }
+.championship-hud li b { color: #fff8e9; }
 
 .race-banner {
   position: absolute;

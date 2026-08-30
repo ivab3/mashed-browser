@@ -1,7 +1,7 @@
 # Stage 6 championship foundation
 
-Status: pure series-rules slice 6.5a complete on 2026-08-30. Browser menu/results integration is the
-next half of the slice.
+Status: slice 6.5 complete on 2026-08-30: pure series rules, browser flow, results, and resilient
+local persistence are connected.
 
 ## Source boundary
 
@@ -29,9 +29,28 @@ Restore treats local JSON as untrusted input: it verifies version/definition ide
 event order, every complete ranking, awarded points, aggregate totals, and tie-breaker fields before
 accepting state. A restored snapshot and re-exported save are identical to the original session.
 
-## Next runtime slice
+## Browser runtime contract
 
-Slice 6.5b should expose an English `Single match / Championship` menu choice, an explicit alpha cup
-definition, event briefing and series standings, automatic transfer of final match ranking into the
-series, next-event flow, and local persistence through a small storage adapter. Storage failures must
-leave the in-memory championship playable.
+The English roster menu exposes `Single match / Alpha Championship`. The clean-room alpha definition
+uses the current loaded course (or the asset-free route) for three ordered events: Standard Play,
+Hold the Flag, and The Fugitive. Championship events use a one-point match target and award
+`5 / 3 / 2 / 1` series points by complete final ranking. A live HUD shows the current event and table;
+results show points gained, aggregate points, and final medals. `Next event` advances without a page
+reload, while `New championship` resets the completed series.
+
+Final race order automatically closes the active match rule when a track/camera/combat terminal event
+arrives, so its full ranking reaches the series even when the objective did not finish first. Manual
+`Finish round` remains a development shortcut and follows the same match-completed event path.
+
+`ChampionshipSaveStorage` stores only the versioned core save, under a definition-scoped key that also
+separates course and entrant count. Access, quota, and malformed-JSON failures are contained; core
+restore remains the authority that accepts or rejects the loaded value. A failed save never prevents
+the in-memory series from continuing.
+
+## Acceptance evidence
+
+- Web typecheck and storage tests cover JSON round-trip plus unavailable/malformed storage.
+- A production-shaped browser pass completed all three events, produced a `15–9` table with
+  Gold/Silver medals, restored that final table after navigation, and started a fresh zero-point series.
+- The complete workspace suite, build, replay matrix, soak gate, and Hard-AI lap gate remain the
+  regression boundary for this slice.

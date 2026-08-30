@@ -351,7 +351,7 @@ Milestone M1: публично показываемый proof of concept.
 
 Milestone M2: feature-complete alpha.
 
-Статус 2026-08-30: **этап 6 выполняется; срезы 6.1–6.4 и 6.5a завершены**. Срез 6.1 вводит безопасный reader исходных
+Статус 2026-08-30: **этап 6 выполняется; срезы 6.1–6.5 завершены**. Срез 6.1 вводит безопасный reader исходных
 `POWERUPS_ALL.LUA`/`POWERUPS_GOLD.LUA`: нормализованы все встречающиеся type ID, глобальные loadout
 для 26 course ID и source-authored position/respawn metadata. Срез 6.2 подключает девять подтверждённых
 обучающими строками типов: machine gun, guided missile, mortar, rear flame, oil, proximity mine, drum
@@ -369,12 +369,14 @@ multi-round `MatchModeSession` для Standard Play, Team Play, Hold the Flag и
 секторе/дальности конкретного типа. `pnpm ai:lap` проводит production Hard controller через все 136
 checkpoint Warzone за 56,02 с без reverse/recovery; двухпроцессорный browser-раунд естественно дошёл
 до results без debug completion и ошибок консоли.
-Срез 6.5a добавляет чистую data-driven `ChampionshipSession`: очки за полную event ranking, строгие
+Срез 6.5 добавляет чистую data-driven `ChampionshipSession`: очки за полную event ranking, строгие
 переходы серии, детерминированные tie breakers, финальные медали и проверяемый versioned save/restore.
 Исходные English identifiers подтверждают cup/qualification/league vocabulary, но отдельной таблицы
-оригинального event order в извлечённом PIZ не найдено; browser runtime 6.5b не будет выдавать
-clean-room alpha cup за точное восстановление оригинальной сетки.
-Следующий рабочий блок — browser championship flow и local persistence.
+оригинального event order в извлечённом PIZ не найдено, поэтому текущий clean-room alpha cup не
+выдаётся за точное восстановление оригинальной сетки. Browser runtime связывает три события с live
+standings, event/final results, medal table, next-event/restart flow и отказоустойчивым local save.
+Полный UI-проход восстановил финальную таблицу после navigation. Следующий рабочий блок — 6.6:
+vehicle roster и трассы измеряемыми content batches со smoke/replay/unsupported-resource evidence.
 
 ### Этап 7. Beta: доставка, производительность и совместимость — 3–6 недель
 

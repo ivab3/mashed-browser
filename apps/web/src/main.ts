@@ -25,6 +25,7 @@ import {
 import {
   AiRouteDriver,
   CameraEliminationTracker,
+  ChampionshipSession,
   CombatSession,
   createLocalPlayerGrid,
   FixedStepClock,
@@ -34,6 +35,8 @@ import {
   RuntimeEventBus,
   RuntimeStateMachine,
   type AiDifficulty,
+  type ChampionshipDefinition,
+  type ChampionshipSaveV1,
   type FixedStepFrame,
   type CameraEliminationWarning,
   type CombatEvent,
@@ -67,6 +70,7 @@ import {
 import { RuntimeRenderer } from "@mashed/renderer";
 
 import { AssetLoadingClient } from "./asset-loader.js";
+import { ChampionshipSaveStorage } from "./championship-storage.js";
 import type { LoadedAsset } from "./loading-protocol.js";
 import {
   evaluateM1Evidence,
@@ -182,12 +186,17 @@ const secondaryActionGuide = element<HTMLElement>("secondary-action-guide");
 const gamepadGuide = element<HTMLElement>("gamepad-guide");
 const runtimeShortcuts = element<HTMLElement>("runtime-shortcuts");
 const playerCountSelect = element<HTMLSelectElement>("player-count");
+const gameFlowSelect = element<HTMLSelectElement>("game-flow");
 const matchModeRow = element<HTMLElement>("match-mode-row");
 const matchModeSelect = element<HTMLSelectElement>("match-mode");
 const modeHud = element<HTMLElement>("mode-hud");
 const modeHudTitle = element<HTMLElement>("mode-hud-title");
 const modeHudObjective = element<HTMLElement>("mode-hud-objective");
 const modeHudScores = element<HTMLOListElement>("mode-hud-scores");
+const championshipHud = element<HTMLElement>("championship-hud");
+const championshipHudTitle = element<HTMLElement>("championship-hud-title");
+const championshipHudEvent = element<HTMLElement>("championship-hud-event");
+const championshipHudStandings = element<HTMLOListElement>("championship-hud-standings");
 const vehicleSelectRows = [
   element<HTMLElement>("vehicle-select-row-one"),
   element<HTMLElement>("vehicle-select-row-two"),
@@ -233,6 +242,7 @@ const clock = new FixedStepClock({ stepSeconds: STEP_SECONDS, maxSubSteps: 8, ev
 const audio = new AudioRuntime(events);
 const renderer = new RuntimeRenderer(viewport, events);
 const assetLoader = new AssetLoadingClient();
+const championshipStorage = new ChampionshipSaveStorage(() => window.localStorage);
 const loadedAssets = new Map<string, LoadedAsset>();
 const trackParts: {
   ai?: BspWorld;
@@ -253,6 +263,8 @@ let raceSession: RaceSession | undefined;
 let combatSession: CombatSession | undefined;
 let matchModeSession: MatchModeSession | undefined;
 let matchModeSignature: string | undefined;
+let championshipSession: ChampionshipSession | undefined;
+let roundEliminationOrder: string[] = [];
 let flagPosition: readonly [number, number, number] = [-4, 0.8, 8];
 let fugitiveInterceptorId: string | undefined;
 const cameraElimination = new CameraEliminationTracker();
@@ -291,6 +303,10 @@ function selectedPlayerCount(): number {
   return Number.isInteger(value) && value >= 1 && value <= LOCAL_PLAYER_SLOTS.length ? value : 1;
 }
 
+function selectedGameFlow(): "single" | "championship" {
+  return gameFlowSelect.value === "championship" ? "championship" : "single";
+}
+
 const MATCH_MODE_LABELS: Readonly<Record<MatchModeType, string>> = Object.freeze({
   standard: "Standard Play",
   team: "Team Play",
@@ -299,6 +315,9 @@ const MATCH_MODE_LABELS: Readonly<Record<MatchModeType, string>> = Object.freeze
 });
 
 function selectedMatchMode(): MatchModeType {
+  if (selectedGameFlow() === "championship" && championshipSession) {
+    return championshipSession.snapshot.currentEvent.mode;
+  }
   const value = matchModeSelect.value;
   return value === "team" || value === "hold-the-flag" || value === "fugitive"
     ? value
@@ -311,7 +330,8 @@ function selectedAiDifficulty(index: number): AiDifficulty | undefined {
 }
 
 function currentMatchModeSignature(): string {
-  return `${selectedPlayerCount()}:${selectedMatchMode()}:${driverSelects
+  const championshipEvent = championshipSession?.snapshot.currentEvent.id ?? "none";
+  return `${selectedGameFlow()}:${championshipEvent}:${selectedPlayerCount()}:${selectedMatchMode()}:${driverSelects
     .slice(0, selectedPlayerCount())
     .map((select) => select.value)
     .join(",")}`;
@@ -336,10 +356,75 @@ function createMatchModeSession(): MatchModeSession | undefined {
       displayName: slot.label,
       ...(mode === "team" ? { teamId: index % 2 === 0 ? "Orange" : "Blue" } : {}),
     })),
-    pointsToWin: 8,
+    pointsToWin: championshipSession ? 1 : 8,
     flagHoldSeconds: 12,
     fugitiveSurvivalSeconds: 45,
   });
+}
+
+function alphaChampionshipDefinition(): ChampionshipDefinition {
+  const courseId = trackParts.course?.id;
+  const courseLabel = courseId === undefined ? "Loaded Track" : `Course ${courseId}`;
+  const event = (id: string, name: string, mode: MatchModeType) => ({
+    id,
+    name: `${courseLabel} · ${name}`,
+    mode,
+    ...(courseId === undefined ? {} : { courseId }),
+  });
+  return {
+    id: `alpha-cup-v1-${courseId ?? "route"}-${selectedPlayerCount()}p`,
+    name: "Alpha Championship",
+    entrants: activePlayerSlots().map((slot) => ({ id: slot.id, displayName: slot.label })),
+    events: [
+      event("standard", "Standard Play", "standard"),
+      event("flag", "Hold the Flag", "hold-the-flag"),
+      event("fugitive", "The Fugitive", "fugitive"),
+    ],
+    pointsByRank: [5, 3, 2, 1],
+  };
+}
+
+function persistChampionship(): string | undefined {
+  if (!championshipSession) {
+    return undefined;
+  }
+  const result = championshipStorage.save(championshipSession.save());
+  return result.ok ? undefined : `Championship save unavailable: ${result.error}`;
+}
+
+function syncChampionshipEventMode(): void {
+  if (!championshipSession) {
+    return;
+  }
+  matchModeSelect.value = championshipSession.snapshot.currentEvent.mode;
+}
+
+function prepareChampionshipSession(): string {
+  if (selectedGameFlow() !== "championship") {
+    championshipSession = undefined;
+    return "Single match selected";
+  }
+  const definition = alphaChampionshipDefinition();
+  const loaded = championshipStorage.load(definition.id);
+  let resumed = false;
+  if (loaded.ok && loaded.save !== undefined) {
+    try {
+      championshipSession = ChampionshipSession.restore(
+        definition,
+        loaded.save as ChampionshipSaveV1,
+      );
+      resumed = true;
+    } catch {
+      championshipSession = new ChampionshipSession(definition);
+    }
+  } else {
+    championshipSession = new ChampionshipSession(definition);
+  }
+  syncChampionshipEventMode();
+  const saveWarning = persistChampionship();
+  const snapshot = championshipSession.snapshot;
+  return saveWarning
+    ?? `${resumed ? "Resumed" : "Started"} ${snapshot.name} · event ${snapshot.eventNumber}/${snapshot.eventCount}`;
 }
 
 function currentM1EvidenceReport(): M1EvidenceReport {
@@ -483,9 +568,16 @@ function applyState(next: RuntimeState): void {
   stateBadge.textContent = next;
   stateBadge.dataset["state"] = next;
   startButton.disabled = next !== "menu" && next !== "results";
-  startButton.textContent = next === "results"
-    ? matchModeSession?.snapshot.phase === "round-complete" ? "Next round" : "New match"
-    : trackDefinition ? "Start lap" : "Start simulation";
+  const championshipPhase = championshipSession?.snapshot.phase;
+  startButton.textContent = championshipPhase === "event-complete"
+    ? "Next event"
+    : championshipPhase === "finished"
+      ? "New championship"
+      : next === "results"
+        ? matchModeSession?.snapshot.phase === "round-complete" ? "Next round" : "New match"
+        : championshipSession
+          ? `Start event ${championshipSession.snapshot.eventNumber}`
+          : trackDefinition ? "Start lap" : "Start simulation";
   pauseButton.disabled = !matchActive;
   pauseButton.textContent = next === "paused" ? "Resume" : "Pause";
   pauseButton.dataset["action"] = next === "paused" ? "resume" : "pause";
@@ -495,7 +587,11 @@ function applyState(next: RuntimeState): void {
   resetButton.disabled = next === "paused";
   assetInput.disabled = next === "loading" || matchActive;
   playerCountSelect.disabled = next === "loading" || matchActive;
-  matchModeSelect.disabled = next === "loading" || matchActive || selectedPlayerCount() < 2;
+  gameFlowSelect.disabled = next === "loading" || matchActive;
+  matchModeSelect.disabled = next === "loading"
+    || matchActive
+    || selectedPlayerCount() < 2
+    || selectedGameFlow() === "championship";
   vehicleSelects.forEach((select) => {
     select.disabled = next === "loading" || matchActive;
   });
@@ -505,6 +601,7 @@ function applyState(next: RuntimeState): void {
   pauseOverlay.hidden = next !== "paused";
   applyCombatHud();
   applyModeHud();
+  applyChampionshipHud();
 }
 
 function formatRaceTime(seconds: number): string {
@@ -567,6 +664,55 @@ function applyModeHud(): void {
   }));
 }
 
+function applyChampionshipHud(): void {
+  const snapshot = championshipSession?.snapshot;
+  championshipHud.hidden = !snapshot || selectedGameFlow() !== "championship";
+  modeHud.classList.toggle("with-championship", !championshipHud.hidden && state.state !== "menu");
+  if (!snapshot) {
+    return;
+  }
+  const leader = snapshot.standings[0];
+  championshipHudTitle.textContent = snapshot.phase === "finished"
+    ? `${snapshot.name} · complete`
+    : snapshot.name;
+  championshipHudEvent.textContent = snapshot.phase === "finished"
+    ? `${leader?.displayName ?? "—"} wins the series`
+    : `Event ${snapshot.eventNumber} / ${snapshot.eventCount} · ${snapshot.currentEvent.name}`;
+  championshipHudStandings.replaceChildren(...snapshot.standings.map((standing, index) => {
+    const item = document.createElement("li");
+    item.dataset["leader"] = String(index === 0);
+    const label = document.createElement("span");
+    label.textContent = `${standing.rank}. ${standing.displayName}`;
+    const points = document.createElement("b");
+    points.textContent = `${standing.points} PT${standing.medal === "none" ? "" : ` · ${standing.medal.toUpperCase()}`}`;
+    item.append(label, points);
+    return item;
+  }));
+}
+
+function applyChampionshipResultBanner(): boolean {
+  const snapshot = championshipSession?.snapshot;
+  if (!snapshot || state.state !== "results" || matchModeSession?.snapshot.phase !== "finished") {
+    return false;
+  }
+  const eventResult = snapshot.completedEvents.at(-1);
+  const eventWinnerId = eventResult?.ranking[0];
+  const eventWinner = snapshot.standings.find((standing) => standing.entrantId === eventWinnerId);
+  raceBanner.hidden = false;
+  raceBannerLabel.textContent = snapshot.phase === "finished" ? "Championship complete" : `Event ${snapshot.eventNumber} complete`;
+  raceBannerValue.textContent = snapshot.phase === "finished"
+    ? `${snapshot.standings[0]?.displayName ?? "—"} · GOLD`
+    : `${eventWinner?.displayName ?? eventWinnerId ?? "—"} wins`;
+  raceResults.replaceChildren(...snapshot.standings.map((standing) => {
+    const item = document.createElement("li");
+    const eventPoints = eventResult?.awardedPoints[standing.entrantId] ?? 0;
+    item.innerHTML = `<span>${standing.rank}</span><b>${standing.displayName}</b><em>${standing.points} PT · +${eventPoints}</em>`;
+    return item;
+  }));
+  raceResults.hidden = false;
+  return true;
+}
+
 function applyModeResultBanner(): boolean {
   const snapshot = matchModeSession?.snapshot;
   if (!snapshot || snapshot.phase === "playing" || state.state !== "results") {
@@ -593,6 +739,9 @@ function applyModeResultBanner(): boolean {
 }
 
 function applyRaceBanner(): void {
+  if (applyChampionshipResultBanner()) {
+    return;
+  }
   if (applyModeResultBanner()) {
     return;
   }
@@ -749,6 +898,40 @@ function applyCombatHud(): void {
   });
 }
 
+function resolveMatchModeFromFinishedRace(
+  event: Extract<RaceEvent, { type: "race-finished" }>,
+): string | undefined {
+  const snapshot = matchModeSession?.snapshot;
+  const winner = event.results.find((result) => result.status !== "eliminated");
+  if (!matchModeSession || snapshot?.phase !== "playing" || !winner) {
+    return undefined;
+  }
+  const activePlayerIds = [winner.playerId];
+  let modeEvents: readonly MatchModeEvent[];
+  switch (snapshot.mode) {
+    case "standard":
+    case "team":
+      modeEvents = matchModeSession.advance(STEP_SECONDS, { activePlayerIds });
+      break;
+    case "hold-the-flag":
+      modeEvents = matchModeSession.advance(snapshot.flagHoldTargetSeconds, {
+        activePlayerIds,
+        flagCapturePlayerId: winner.playerId,
+      });
+      break;
+    case "fugitive":
+      modeEvents = matchModeSession.advance(STEP_SECONDS, {
+        activePlayerIds,
+        ...(snapshot.fugitiveId === winner.playerId
+          ? { completedLapPlayerIds: [winner.playerId] }
+          : { fugitiveEliminatedByPlayerId: fugitiveInterceptorId ?? winner.playerId }),
+      });
+      break;
+  }
+  fugitiveInterceptorId = undefined;
+  return handleMatchModeEvents(modeEvents);
+}
+
 function handleRaceEvents(raceEvents: readonly RaceEvent[]): string | undefined {
   let finishReason: string | undefined;
   for (const event of raceEvents) {
@@ -776,6 +959,9 @@ function handleRaceEvents(raceEvents: readonly RaceEvent[]): string | undefined 
         break;
       case "player-eliminated":
         physics?.deactivateVehicle(event.playerId);
+        if (!roundEliminationOrder.includes(event.playerId)) {
+          roundEliminationOrder.push(event.playerId);
+        }
         runtimeStatus.textContent = `${event.playerId} eliminated: ${event.reason}`;
         break;
       case "race-finished": {
@@ -785,12 +971,46 @@ function handleRaceEvents(raceEvents: readonly RaceEvent[]): string | undefined 
           : winner?.status === "finished"
             ? `${winner.displayName} finished in ${formatRaceTime(winner.timeSeconds)}`
           : "All players eliminated";
+        finishReason = resolveMatchModeFromFinishedRace(event) ?? finishReason;
         break;
       }
     }
   }
   applyRaceBanner();
   return finishReason;
+}
+
+function championshipEventRanking(winnerIds: readonly string[]): readonly string[] {
+  const entrantIds: string[] = activePlayerSlots().map((slot) => slot.id);
+  const entrantSet = new Set(entrantIds);
+  const winnerSet = new Set(winnerIds);
+  const ranking: string[] = winnerIds.filter((id) => entrantSet.has(id));
+  for (const id of [...roundEliminationOrder].reverse()) {
+    if (entrantSet.has(id) && !winnerSet.has(id) && !ranking.includes(id)) {
+      ranking.push(id);
+    }
+  }
+  const racePlayers = new Map(raceSession?.snapshot.players.map((player) => [player.id, player]));
+  const remaining = entrantIds.filter((id) => !ranking.includes(id)).sort((left, right) => {
+    const leftProgress = racePlayers.get(left)?.progress;
+    const rightProgress = racePlayers.get(right)?.progress;
+    return (rightProgress?.completedLaps ?? 0) - (leftProgress?.completedLaps ?? 0)
+      || (rightProgress?.passedCheckpoints ?? 0) - (leftProgress?.passedCheckpoints ?? 0)
+      || entrantIds.indexOf(left) - entrantIds.indexOf(right);
+  });
+  return [...ranking, ...remaining];
+}
+
+function completeChampionshipEvent(winnerIds: readonly string[]): void {
+  if (!championshipSession || championshipSession.snapshot.phase !== "event-ready") {
+    return;
+  }
+  championshipSession.completeEvent(championshipEventRanking(winnerIds));
+  const warning = persistChampionship();
+  if (warning) {
+    runtimeStatus.textContent = warning;
+  }
+  applyChampionshipHud();
 }
 
 function combatSampleName(weapon: CombatWeaponType): string {
@@ -1014,6 +1234,7 @@ function handleMatchModeEvents(modeEvents: readonly MatchModeEvent[]): string | 
         break;
       case "match-completed":
         resultReason = `${event.winnerIds.join(" + ")} wins the match ${event.score}`;
+        completeChampionshipEvent(event.winnerIds);
         break;
     }
   }
@@ -1088,6 +1309,28 @@ async function startRace(): Promise<void> {
     return;
   }
   await audio.unlock();
+  if (selectedGameFlow() === "championship") {
+    if (!championshipSession) {
+      prepareChampionshipSession();
+    }
+    if (championshipSession?.snapshot.phase === "event-complete") {
+      championshipSession.startNextEvent();
+      syncChampionshipEventMode();
+      const warning = persistChampionship();
+      if (warning) {
+        runtimeStatus.textContent = warning;
+      }
+    } else if (championshipSession?.snapshot.phase === "finished") {
+      championshipSession = new ChampionshipSession(alphaChampionshipDefinition());
+      syncChampionshipEventMode();
+      const warning = persistChampionship();
+      if (warning) {
+        runtimeStatus.textContent = warning;
+      }
+    }
+  } else {
+    championshipSession = undefined;
+  }
   const signature = currentMatchModeSignature();
   if (
     matchModeSession?.snapshot.phase === "round-complete"
@@ -1100,6 +1343,7 @@ async function startRace(): Promise<void> {
   }
   flagPosition = defaultFlagPosition();
   fugitiveInterceptorId = undefined;
+  roundEliminationOrder = [];
   physics.resetDemo();
   resetCameraElimination();
   raceSession = createTrackRaceSession();
@@ -1219,6 +1463,9 @@ resetButton.addEventListener("click", () => {
 });
 debugCamera.addEventListener("change", () => renderer.setDebugCamera(debugCamera.checked));
 playerCountSelect.addEventListener("change", () => {
+  if (selectedGameFlow() === "championship" && selectedPlayerCount() < 2) {
+    playerCountSelect.value = "2";
+  }
   raceSession = undefined;
   combatSession = undefined;
   matchModeSession = undefined;
@@ -1229,8 +1476,33 @@ playerCountSelect.addEventListener("change", () => {
   rebuildVehicleInputs();
   applyRosterPresentation();
   configureLocalRoster();
+  const championshipStatus = selectedGameFlow() === "championship"
+    ? prepareChampionshipSession()
+    : undefined;
   applyState(state.state);
-  runtimeStatus.textContent = `${selectedPlayerCount()} local player${selectedPlayerCount() === 1 ? "" : "s"} ready`;
+  runtimeStatus.textContent = championshipStatus
+    ?? `${selectedPlayerCount()} local player${selectedPlayerCount() === 1 ? "" : "s"} ready`;
+});
+gameFlowSelect.addEventListener("change", () => {
+  if (selectedGameFlow() === "championship" && selectedPlayerCount() < 2) {
+    playerCountSelect.value = "2";
+  }
+  raceSession = undefined;
+  combatSession = undefined;
+  matchModeSession = undefined;
+  matchModeSignature = undefined;
+  aiDrivers.clear();
+  latestVehicleInputs = {};
+  resetCameraElimination();
+  rebuildVehicleInputs();
+  applyRosterPresentation();
+  configureLocalRoster();
+  const flowStatus = selectedGameFlow() === "championship"
+    ? prepareChampionshipSession()
+    : "Single match selected";
+  applyState(state.state);
+  applyRaceBanner();
+  runtimeStatus.textContent = flowStatus;
 });
 matchModeSelect.addEventListener("change", () => {
   matchModeSession = undefined;
@@ -1398,6 +1670,7 @@ assetInput.addEventListener("change", () => {
   void (async () => {
     raceSession = undefined;
     combatSession = undefined;
+    championshipSession = undefined;
     aiDrivers.clear();
     latestVehicleInputs = {};
     applyRaceBanner();
@@ -1482,14 +1755,20 @@ assetInput.addEventListener("change", () => {
       }
       const bound = bindTrackParts();
       assetStatus.textContent = [...summaries, ...(bound.length > 0 ? [`Track bound: ${bound.join(" · ")}`] : [])].join(" · ");
+      const championshipStatus = selectedGameFlow() === "championship"
+        ? prepareChampionshipSession()
+        : undefined;
       state.transition(
         "menu",
-        trackDefinition
+        `${trackDefinition
           ? `Playable track ready · ${trackDefinition.checkpoints.length} checkpoints`
-          : `${loadedAssets.size} asset${loadedAssets.size === 1 ? "" : "s"} cached in memory`,
+          : `${loadedAssets.size} asset${loadedAssets.size === 1 ? "" : "s"} cached in memory`}${championshipStatus ? ` · ${championshipStatus}` : ""}`,
       );
     } catch (error) {
       assetStatus.textContent = error instanceof Error ? error.message : String(error);
+      if (selectedGameFlow() === "championship") {
+        prepareChampionshipSession();
+      }
       state.transition("menu", "Asset parsing failed; runtime remains available");
     } finally {
       assetInput.value = "";

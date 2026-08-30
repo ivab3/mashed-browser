@@ -51,6 +51,12 @@
           <ol id="mode-hud-scores"></ol>
         </aside>
 
+        <aside id="championship-hud" class="championship-hud" aria-label="Championship status" hidden>
+          <strong id="championship-hud-title">Alpha Championship</strong>
+          <span id="championship-hud-event">Event 1 / 3</span>
+          <ol id="championship-hud-standings"></ol>
+        </aside>
+
         <div id="race-banner" class="race-banner" role="status" aria-live="polite" hidden>
           <span id="race-banner-label">Get ready</span>
           <strong id="race-banner-value">3</strong>
@@ -103,6 +109,13 @@
               <option value="2">2 players</option>
               <option value="3">3 players</option>
               <option value="4">4 players</option>
+            </select>
+          </label>
+          <label id="game-flow-row" class="player-count-label" for="game-flow">
+            <span class="section-label">Game flow</span>
+            <select id="game-flow">
+              <option value="single">Single match</option>
+              <option value="championship">Alpha Championship</option>
             </select>
           </label>
           <label id="match-mode-row" class="player-count-label" for="match-mode" hidden>
