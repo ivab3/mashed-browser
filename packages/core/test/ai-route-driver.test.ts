@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   AiRouteDriver,
+  selectAiWeaponTarget,
   type AiDifficulty,
   type AiRouteDriverState,
   type LapCheckpoint,
@@ -88,6 +89,28 @@ describe("AI route driver", () => {
     expect(driver.snapshot.escapeSecondsRemaining).toBeGreaterThan(0);
   });
 
+  it("selects targets in the useful arc of forward, rear, and radial weapons", () => {
+    const opponents = [
+      { id: "front", position: [0, 0, 10] as const },
+      { id: "rear", position: [0, 0, -5] as const },
+      { id: "side", position: [5, 0, 0] as const },
+    ];
+    const context = { position: [0, 0, 0] as const, headingRadians: 0, opponents, difficulty: "hard" as const };
+    expect(selectAiWeaponTarget({ ...context, weapon: "machine-gun" })?.id).toBe("front");
+    expect(selectAiWeaponTarget({ ...context, weapon: "oil" })?.id).toBe("rear");
+    expect(selectAiWeaponTarget({ ...context, weapon: "shotgun" })?.id).toBe("rear");
+  });
+
+  it("does not request an item without a tactical target", () => {
+    const driver = new AiRouteDriver({ difficulty: "hard", seed: 2 });
+    const inputs = Array.from({ length: 180 }, () => driver.advance(1 / 60, routeState({
+      heldWeapon: "machine-gun",
+      opponents: [{ id: "behind", position: [0, 0, -5] }],
+    })));
+    expect(inputs.every((input) => !input.useItem)).toBe(true);
+    expect(driver.snapshot.targetPlayerId).toBeNull();
+  });
+
   it("rejects invalid time and telemetry", () => {
     const driver = new AiRouteDriver({ seed: 1 });
     expect(() => driver.advance(0, routeState())).toThrow(/stepSeconds/);
@@ -95,5 +118,8 @@ describe("AI route driver", () => {
       .toThrow(/finite/);
     expect(() => driver.advance(1 / 60, routeState({ speedMetersPerSecond: -1 })))
       .toThrow(/cannot be negative/);
+    expect(() => driver.advance(1 / 60, routeState({
+      opponents: [{ id: "bad", position: [Number.NaN, 0, 0] }],
+    }))).toThrow(/position must be finite/);
   });
 });

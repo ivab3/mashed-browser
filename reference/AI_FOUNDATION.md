@@ -1,9 +1,9 @@
 # Stage 6 AI foundation
 
-Status: route-opponent slice 6.4a and autonomous-lap gate complete on 2026-08-30. The accepted scope is deterministic
-checkpoint following through ordinary vehicle inputs, explicit difficulty profiles, structural readers
-for the original `.AI`/`.LED` resources, and browser/runtime integration. Combat tactics and a complete
-autonomous-lap gate remain follow-up work.
+Status: slice 6.4 complete on 2026-08-30. The accepted scope is deterministic checkpoint following
+through ordinary vehicle inputs, explicit difficulty profiles, structurally characterized original
+`.AI`/`.LED` resources, opponent-aware item decisions, an autonomous-lap gate, and browser/runtime
+integration.
 
 ## Original data characterization
 
@@ -44,6 +44,9 @@ The controller provides:
 - corner/heading severity, target speed, braking, and bounded steering;
 - reverse-and-steer escape after a deterministic stuck timeout, without teleport recovery;
 - seeded one-shot item decisions;
+- weapon-aware target selection: forward delivery requires a target ahead, rear weapons and hazards
+  require a target behind, and radial effects require a nearby target; practical range, aim cone,
+  decision cadence, and fire chance scale with difficulty;
 - Easy, Normal, and Hard profiles with explicit reaction cadence, speed, steering, braking, lane
   variation, escape, and item-use parameters;
 - a serializable snapshot for replay diagnostics.
@@ -64,13 +67,18 @@ inputs. A CPU selected without a loaded route remains neutral rather than silent
   seconds P1 had passed 29 of 136 checkpoints and both cars reported 33 km/h, four grounded wheels,
   asphalt contact, and no console errors.
 - `pnpm ai:lap` drives the production Hard controller through all 136 Warzone checkpoints using the
-  real collision route. The accepted baseline completes in 57.6 seconds (3,456 fixed steps), reaches
-  39.58 km/h, finishes with four grounded wheels, and uses neither reverse escape nor recovery. The
+  real collision route. The accepted tactical-driver baseline completes in 56.02 seconds (3,361 fixed
+  steps), reaches 39.00 km/h, finishes with four grounded wheels, and uses neither reverse escape nor recovery. The
   command fails if the lap is incomplete, exceeds 75 seconds, uses more than 180 reverse frames, or
   requests recovery.
+- A second production-browser run loaded Warzone route/collision/course metadata and the original
+  global power-up loadout for two Hard CPU drivers. Standard Play reached natural `RESULTS` around 25
+  seconds at checkpoint 50/136 with P2 winning, without the debug finish control and without console
+  errors. Camera distance resolved that particular round before weapon damage.
 
-## Follow-up boundary
+## Post-6.4 refinement boundary
 
-The remaining 6.4b work should add opponent-aware weapon timing, recovery and pack behavior under
-combat, and a browser round that resolves without the debug finish control. Semantics from `.AI`/`.LED` should be promoted from neutral fields
-only when an observable original-game behavior or stronger binary evidence confirms them.
+Future tuning may add deliberate pickup pursuit, predictive projectile lead, team coordination, and
+more detailed pack behavior. These are refinements rather than blockers for the route-opponent slice.
+Semantics from `.AI`/`.LED` should be promoted from neutral fields only when an observable original-game
+behavior or stronger binary evidence confirms them.

@@ -351,7 +351,7 @@ Milestone M1: публично показываемый proof of concept.
 
 Milestone M2: feature-complete alpha.
 
-Статус 2026-08-30: **этап 6 выполняется; срезы 6.1–6.3 и 6.4a завершены**. Срез 6.1 вводит безопасный reader исходных
+Статус 2026-08-30: **этап 6 выполняется; срезы 6.1–6.4 завершены**. Срез 6.1 вводит безопасный reader исходных
 `POWERUPS_ALL.LUA`/`POWERUPS_GOLD.LUA`: нормализованы все встречающиеся type ID, глобальные loadout
 для 26 course ID и source-authored position/respawn metadata. Срез 6.2 подключает девять подтверждённых
 обучающими строками типов: machine gun, guided missile, mortar, rear flame, oil, proximity mine, drum
@@ -365,9 +365,10 @@ multi-round `MatchModeSession` для Standard Play, Team Play, Hold the Flag и
 Срез 6.4a добавляет чистый seeded `AiRouteDriver`, профили Easy/Normal/Hard, per-slot Human/CPU выбор
 и replay 30/60/120 Hz. CPU проходит тот же input/status/Rapier путь, что игрок. Структурные readers
 приняли все 28 `.AI` и 29 `.LED` файлов локального reference set; неподтверждённые поля остаются
-нейтральными и пока не участвуют в рулении. Следующий срез 6.4b закрывает combat tactics и
-естественное завершение browser-раунда. Первый gate 6.4b уже закрыт: `pnpm ai:lap`
-проводит production Hard controller через все 136 checkpoint Warzone за 57,6 с без reverse/recovery.
+нейтральными и пока не участвуют в рулении. Weapon-aware AI стреляет только при сопернике в полезном
+секторе/дальности конкретного типа. `pnpm ai:lap` проводит production Hard controller через все 136
+checkpoint Warzone за 56,02 с без reverse/recovery; двухпроцессорный browser-раунд естественно дошёл
+до results без debug completion и ошибок консоли. Следующий рабочий блок — tournament/championship flow.
 
 ### Этап 7. Beta: доставка, производительность и совместимость — 3–6 недель
 

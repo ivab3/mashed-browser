@@ -1649,6 +1649,14 @@ function sampleVehicleInputs(
       const telemetry = physics.getVehicleTelemetry(slot.id);
       if (checkpointIndex >= 0 && history && telemetry) {
         const checkpoint = trackDefinition.checkpoints[checkpointIndex]!;
+        const heldWeapon = combatPlayers.get(slot.id)?.inventory?.weapon;
+        const opponents = activePlayerSlots().flatMap((opponentSlot) => {
+          if (opponentSlot.id === slot.id || !physics?.activeVehicleIds.includes(opponentSlot.id)) {
+            return [];
+          }
+          const opponentPosition = physics.getVehicleTransformHistory(opponentSlot.id)?.current.position;
+          return opponentPosition ? [{ id: opponentSlot.id, position: opponentPosition }] : [];
+        });
         input = aiDriver.advance(stepSeconds, {
           position: history.current.position,
           headingRadians: telemetry.headingRadians,
@@ -1660,6 +1668,7 @@ function sampleVehicleInputs(
           followingCheckpoint: trackDefinition.checkpoints[
             (checkpointIndex + 1) % trackDefinition.checkpoints.length
           ]!,
+          ...(heldWeapon ? { heldWeapon, opponents } : {}),
         });
       }
     } else if (canDrive && !aiDifficulty) {

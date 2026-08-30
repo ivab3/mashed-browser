@@ -22,6 +22,8 @@ function routeTape() {
       precedingCheckpoint: checkpoint(checkpointId - 1, checkpointId * 10 - 10, 0),
       checkpoint: checkpoint(checkpointId, checkpointId * 10, 0),
       followingCheckpoint: checkpoint(checkpointId + 1, checkpointId * 10 + 10, 0),
+      heldWeapon: "machine-gun",
+      opponents: [{ id: "target", position: [step / 30 + 8, 0, 0] }],
     });
   }
   return recorder.finish();

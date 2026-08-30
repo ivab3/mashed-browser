@@ -71,13 +71,18 @@ Production-browser smoke covered starting, resolving, and advancing Standard Pla
 Play, Hold the Flag, and The Fugitive with four local players. All transitions reached the expected
 race/results state without console errors.
 
-## Slice 6.4a — deterministic route opponents
+## Slice 6.4 — deterministic AI opponents
 
 The first AI slice adds per-slot Human/Easy/Normal/Hard selection and a pure fixed-step route driver.
 CPU cars follow the verified ordered checkpoint polygons through the same input, combat-status, and
 Rapier vehicle path as human cars. Seeded lane choice, item decisions, reaction cadence, corner speed,
 braking, and stuck escape are replayable; the recorded driver outcome is identical at 30, 60, and
 120 Hz presentation rates.
+
+Item decisions now require an opponent in the held weapon's useful delivery arc and range. Easy,
+Normal, and Hard profiles vary aim cone, practical range, cadence, and fire chance. `pnpm ai:lap`
+completes all 136 Warzone checkpoints with the production Hard controller in 56.02 seconds without
+reverse/recovery, and a two-Hard-CPU browser round reaches natural results without debug completion.
 
 `@mashed/assets` also structurally decodes the original fixed-size `.AI` and `.LED` RenderWare chunks.
 All 28 AI and 29 LED files in the local reference set parse, but unconfirmed tables retain neutral
@@ -86,13 +91,11 @@ live in [AI_FOUNDATION.md](./AI_FOUNDATION.md).
 
 ## Planned slices
 
-1. **6.4b AI hardening:** add opponent-aware combat decisions, production recovery/pack behavior, and
-   a naturally resolved browser round. The autonomous Warzone lap gate is already green at 57.6 s.
-2. **6.5 tournament flow:** main-menu to event-series progression, championship results, local save
+1. **6.5 tournament flow:** main-menu to event-series progression, championship results, local save
    schema, and English UI strings.
-3. **6.6 content batches:** full vehicle roster and tracks in measured batches. Every admitted track
+2. **6.6 content batches:** full vehicle roster and tracks in measured batches. Every admitted track
    gets a load smoke, rules replay, and an explicit unsupported-resource record.
-4. **6.7 settings and alpha gate:** controls/audio/graphics/difficulty settings, persistence, complete
+3. **6.7 settings and alpha gate:** controls/audio/graphics/difficulty settings, persistence, complete
    menu-to-series acceptance, and the Milestone M2 compatibility report.
 
 This order may interleave a content batch after a new mode or weapon family so the abstractions are

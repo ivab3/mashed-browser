@@ -9,7 +9,8 @@ work is underway with validated parsing of original per-course power-up loadouts
 positions and respawn timings, distinct deterministic rules for all nine base weapon types, and four
 multi-round local match modes with persistent scores and objectives. The first AI slice adds per-slot
 Human/Easy/Normal/Hard drivers, deterministic checkpoint steering, and structural readers for original
-`.AI`/`.LED` data. Stage 1
+`.AI`/`.LED` data. CPU item use respects each weapon's useful target arc/range, and the production Hard
+driver completes the 136-checkpoint Warzone gate without recovery. Stage 1
 provides a reproducible local extraction pipeline; Stage 2 provides RenderWare DFF/TXD readers, full
 graphical/collision BSP sector parsing, and a Three.js asset viewer. Stage 3 adds a deterministic
 fixed-step core, replay checks, Rapier/Three.js/Web Audio adapters, debug tooling, and the browser

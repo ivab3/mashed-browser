@@ -1,4 +1,5 @@
 import type { LapCheckpoint, TrackVector3 } from "./lap-session.js";
+import { COMBAT_WEAPON_CONFIGS, type CombatWeaponType } from "./combat-session.js";
 import { SeededRandom } from "./random.js";
 
 export type AiDifficulty = "easy" | "normal" | "hard";
@@ -15,6 +16,8 @@ export interface AiDifficultyProfile {
   escapeSeconds: number;
   itemDecisionSeconds: number;
   itemUseChance: number;
+  tacticalRangeScale: number;
+  tacticalConeRadians: number;
 }
 
 export const AI_DIFFICULTY_PROFILES: Readonly<Record<AiDifficulty, Readonly<AiDifficultyProfile>>> =
@@ -31,6 +34,8 @@ export const AI_DIFFICULTY_PROFILES: Readonly<Record<AiDifficulty, Readonly<AiDi
       escapeSeconds: 1.6,
       itemDecisionSeconds: 2.5,
       itemUseChance: 0.25,
+      tacticalRangeScale: 0.72,
+      tacticalConeRadians: 0.35,
     }),
     normal: Object.freeze({
       reactionSeconds: 0.1,
@@ -44,6 +49,8 @@ export const AI_DIFFICULTY_PROFILES: Readonly<Record<AiDifficulty, Readonly<AiDi
       escapeSeconds: 1.4,
       itemDecisionSeconds: 1.75,
       itemUseChance: 0.45,
+      tacticalRangeScale: 0.88,
+      tacticalConeRadians: 0.55,
     }),
     hard: Object.freeze({
       reactionSeconds: 1 / 60,
@@ -57,6 +64,8 @@ export const AI_DIFFICULTY_PROFILES: Readonly<Record<AiDifficulty, Readonly<AiDi
       escapeSeconds: 1.2,
       itemDecisionSeconds: 1.25,
       itemUseChance: 0.65,
+      tacticalRangeScale: 1,
+      tacticalConeRadians: 0.8,
     }),
   });
 
@@ -67,6 +76,13 @@ export interface AiRouteDriverState {
   precedingCheckpoint: LapCheckpoint;
   checkpoint: LapCheckpoint;
   followingCheckpoint: LapCheckpoint;
+  heldWeapon?: CombatWeaponType;
+  opponents?: readonly AiOpponentState[];
+}
+
+export interface AiOpponentState {
+  id: string;
+  position: TrackVector3;
 }
 
 export interface AiVehicleInput {
@@ -90,6 +106,7 @@ export interface AiRouteDriverSnapshot {
   stuckSeconds: number;
   escapeSecondsRemaining: number;
   targetCheckpointId: number | null;
+  targetPlayerId: string | null;
   laneBias: number;
   input: AiVehicleInput;
 }
@@ -130,6 +147,16 @@ function assertFiniteState(state: AiRouteDriverState): void {
   if (state.speedMetersPerSecond < 0) {
     throw new Error("AI route driver speedMetersPerSecond cannot be negative");
   }
+  const opponentIds = new Set<string>();
+  for (const opponent of state.opponents ?? []) {
+    if (!opponent.id || opponentIds.has(opponent.id)) {
+      throw new Error(`AI route driver opponent id ${JSON.stringify(opponent.id)} is empty or duplicated`);
+    }
+    opponentIds.add(opponent.id);
+    if (opponent.position.some((value) => !Number.isFinite(value))) {
+      throw new Error(`AI route driver opponent ${opponent.id} position must be finite`);
+    }
+  }
 }
 
 function checkpointTarget(checkpoint: LapCheckpoint, bias: number): TrackVector3 {
@@ -167,6 +194,7 @@ export class AiRouteDriver {
   #escapeSecondsRemaining = 0;
   #escapeSteer = 0;
   #targetCheckpointId: number | undefined;
+  #targetPlayerId: string | undefined;
   #laneBias = 0;
   #input: AiVehicleInput = { ...NEUTRAL_INPUT };
 
@@ -185,6 +213,7 @@ export class AiRouteDriver {
       stuckSeconds: this.#stuckSeconds,
       escapeSecondsRemaining: this.#escapeSecondsRemaining,
       targetCheckpointId: this.#targetCheckpointId ?? null,
+      targetPlayerId: this.#targetPlayerId ?? null,
       laneBias: this.#laneBias,
       input: { ...this.#input },
     };
@@ -199,6 +228,7 @@ export class AiRouteDriver {
     this.#escapeSecondsRemaining = 0;
     this.#escapeSteer = 0;
     this.#targetCheckpointId = undefined;
+    this.#targetPlayerId = undefined;
     this.#laneBias = 0;
     this.#input = { ...NEUTRAL_INPUT };
   }
@@ -246,10 +276,21 @@ export class AiRouteDriver {
       this.#decisionSeconds = this.#profile.reactionSeconds;
     }
 
+    const tacticalTarget = state.heldWeapon
+      ? selectAiWeaponTarget({
+          position: state.position,
+          headingRadians: state.headingRadians,
+          weapon: state.heldWeapon,
+          opponents: state.opponents ?? [],
+          difficulty: this.#difficulty,
+        })
+      : undefined;
+    this.#targetPlayerId = tacticalTarget?.id;
+
     let useItem = false;
     if (this.#itemDecisionSeconds + 1e-9 >= this.#profile.itemDecisionSeconds) {
       this.#itemDecisionSeconds %= this.#profile.itemDecisionSeconds;
-      useItem = this.#random.nextFloat() < this.#profile.itemUseChance;
+      useItem = tacticalTarget !== undefined && this.#random.nextFloat() < this.#profile.itemUseChance;
     }
     if (this.#decisionSeconds + 1e-9 >= this.#profile.reactionSeconds) {
       this.#decisionSeconds %= this.#profile.reactionSeconds;
@@ -289,4 +330,50 @@ export class AiRouteDriver {
       useItem: false,
     };
   }
+}
+
+const AI_WEAPON_RANGES: Readonly<Record<CombatWeaponType, number>> = Object.freeze({
+  "machine-gun": 18,
+  "guided-missile": 34,
+  mortar: 28,
+  "rear-flame": 8,
+  oil: 10,
+  "proximity-mine": 11,
+  "drum-bomb": 16,
+  shotgun: 7,
+  flash: 11,
+  rocket: 34,
+  mine: 11,
+});
+
+export interface AiWeaponTargetContext {
+  position: TrackVector3;
+  headingRadians: number;
+  weapon: CombatWeaponType;
+  opponents: readonly AiOpponentState[];
+  difficulty?: AiDifficulty;
+}
+
+/** Selects the nearest opponent inside the held weapon's useful delivery arc and range. */
+export function selectAiWeaponTarget(context: AiWeaponTargetContext): AiOpponentState | undefined {
+  const profile = AI_DIFFICULTY_PROFILES[context.difficulty ?? "normal"];
+  const config = COMBAT_WEAPON_CONFIGS[context.weapon];
+  const range = AI_WEAPON_RANGES[context.weapon] * profile.tacticalRangeScale;
+  const cone = profile.tacticalConeRadians * (
+    context.weapon === "guided-missile" || context.weapon === "rocket" ? 1.45 : 1
+  );
+  return context.opponents
+    .map((opponent) => {
+      const deltaX = opponent.position[0] - context.position[0];
+      const deltaZ = opponent.position[2] - context.position[2];
+      const distance = Math.hypot(deltaX, deltaZ);
+      const bearing = wrapRadians(Math.atan2(deltaX, deltaZ) - context.headingRadians);
+      const inArc = config.delivery === "radial"
+        || (config.delivery === "forward" && Math.abs(bearing) <= cone)
+        || ((config.delivery === "rear" || config.delivery === "rear-hazard")
+          && Math.abs(wrapRadians(bearing - Math.PI)) <= cone * 1.25);
+      return { opponent, distance, inArc };
+    })
+    .filter((candidate) => candidate.inArc && candidate.distance <= range)
+    .sort((left, right) => left.distance - right.distance)[0]?.opponent;
 }
