@@ -2,16 +2,20 @@ import { AudioRuntime } from "@mashed/audio";
 import {
   deriveTrackDefinition,
   listVehicleAssetPairs,
+  parseAiData,
+  parseLedData,
   parsePowerupPlacementsLua,
   parseTrackPowerupLoadoutsLua,
   parseVehicleDffName,
   parseCourseLua,
   parseLapDataLua,
+  type AiDataFile,
   type BspWorld,
   type CourseDefinition,
   type DerivedTrackDefinition,
   type DffModel,
   type LapDataDefinition,
+  type LedDataFile,
   type OriginalPowerupPlacement,
   type OriginalPowerupType,
   type PiTextureDictionary,
@@ -19,6 +23,7 @@ import {
   type VehicleAssetPair,
 } from "@mashed/assets";
 import {
+  AiRouteDriver,
   CameraEliminationTracker,
   CombatSession,
   createLocalPlayerGrid,
@@ -28,6 +33,7 @@ import {
   RaceSession,
   RuntimeEventBus,
   RuntimeStateMachine,
+  type AiDifficulty,
   type FixedStepFrame,
   type CameraEliminationWarning,
   type CombatEvent,
@@ -194,6 +200,18 @@ const vehicleSelects = [
   element<HTMLSelectElement>("vehicle-select-three"),
   element<HTMLSelectElement>("vehicle-select-four"),
 ];
+const driverSelectRows = [
+  element<HTMLElement>("driver-select-row-one"),
+  element<HTMLElement>("driver-select-row-two"),
+  element<HTMLElement>("driver-select-row-three"),
+  element<HTMLElement>("driver-select-row-four"),
+];
+const driverSelects = [
+  element<HTMLSelectElement>("driver-select-one"),
+  element<HTMLSelectElement>("driver-select-two"),
+  element<HTMLSelectElement>("driver-select-three"),
+  element<HTMLSelectElement>("driver-select-four"),
+];
 const additionalPlayerMetrics = [
   {
     row: element<HTMLElement>("metric-player-two-row"),
@@ -224,6 +242,8 @@ const trackParts: {
   course?: CourseDefinition;
   powerupPlacements?: readonly OriginalPowerupPlacement[];
   powerupLoadouts?: readonly TrackPowerupLoadout[];
+  sourceAi?: AiDataFile;
+  sourceLed?: LedDataFile;
 } = {};
 const loadedDffs = new Map<string, DffModel>();
 const loadedTextureDictionaries = new Map<string, PiTextureDictionary>();
@@ -238,6 +258,7 @@ let fugitiveInterceptorId: string | undefined;
 const cameraElimination = new CameraEliminationTracker();
 let eliminationWarnings: readonly CameraEliminationWarning[] = [];
 let vehicleInputs: BrowserVehicleInput[] = [];
+let aiDrivers = new Map<string, AiRouteDriver>();
 let latestVehicleInputs: VehicleInputById = {};
 let vehicleCatalog: readonly VehicleAssetPair[] = [];
 let animationFrame = 0;
@@ -284,8 +305,16 @@ function selectedMatchMode(): MatchModeType {
     : "standard";
 }
 
+function selectedAiDifficulty(index: number): AiDifficulty | undefined {
+  const value = driverSelects[index]?.value;
+  return value === "easy" || value === "normal" || value === "hard" ? value : undefined;
+}
+
 function currentMatchModeSignature(): string {
-  return `${selectedPlayerCount()}:${selectedMatchMode()}`;
+  return `${selectedPlayerCount()}:${selectedMatchMode()}:${driverSelects
+    .slice(0, selectedPlayerCount())
+    .map((select) => select.value)
+    .join(",")}`;
 }
 
 function defaultFlagPosition(): readonly [number, number, number] {
@@ -363,6 +392,24 @@ function activePlayerSlots(): readonly (typeof LOCAL_PLAYER_SLOTS)[number][] {
   return LOCAL_PLAYER_SLOTS.slice(0, selectedPlayerCount());
 }
 
+function createAiDrivers(): Map<string, AiRouteDriver> {
+  const drivers = new Map<string, AiRouteDriver>();
+  if (!trackDefinition) {
+    return drivers;
+  }
+  const round = matchModeSession?.snapshot.round ?? 1;
+  activePlayerSlots().forEach((slot, index) => {
+    const difficulty = selectedAiDifficulty(index);
+    if (difficulty) {
+      drivers.set(slot.id, new AiRouteDriver({
+        difficulty,
+        seed: (0xa164_0000 ^ (round << 8) ^ index) >>> 0,
+      }));
+    }
+  });
+  return drivers;
+}
+
 function localRosterGrid(): readonly LocalPlayerGridSlot[] {
   return createLocalPlayerGrid(
     trackDefinition?.spawn ?? DEFAULT_VEHICLE_CONFIG.spawn,
@@ -395,6 +442,9 @@ function applyRosterPresentation(): void {
   vehicleSelectRows.forEach((row, index) => {
     row.hidden = index >= count;
   });
+  driverSelectRows.forEach((row, index) => {
+    row.hidden = index >= count;
+  });
   additionalPlayerMetrics.forEach((metric, index) => {
     metric.row.hidden = index + 1 >= count;
   });
@@ -409,7 +459,10 @@ function applyRosterPresentation(): void {
     secondaryDriveGuide.hidden = true;
     secondaryActionGuide.hidden = true;
   }
-  gamepadGuide.innerHTML = `<b>Gamepads 1–${count}</b> left stick · triggers · A/B/X/Y${count > 2 ? " · P3/P4 gamepad only" : ""}`;
+  const cpuCount = driverSelects.slice(0, count).filter((select) => select.value !== "human").length;
+  gamepadGuide.innerHTML = cpuCount > 0
+    ? `<b>${cpuCount} CPU driver${cpuCount === 1 ? "" : "s"}</b> use fixed-step route input · human slots keep keyboard/gamepads`
+    : `<b>Gamepads 1–${count}</b> left stick · triggers · A/B/X/Y${count > 2 ? " · P3/P4 gamepad only" : ""}`;
   resetButton.textContent = multiplayer ? "Reset vehicles" : "Reset vehicle";
   runtimeShortcuts.textContent = multiplayer
     ? `P1 WASD + E · P2 arrows + / · ${count} gamepads · C colliders`
@@ -444,6 +497,9 @@ function applyState(next: RuntimeState): void {
   playerCountSelect.disabled = next === "loading" || matchActive;
   matchModeSelect.disabled = next === "loading" || matchActive || selectedPlayerCount() < 2;
   vehicleSelects.forEach((select) => {
+    select.disabled = next === "loading" || matchActive;
+  });
+  driverSelects.forEach((select) => {
     select.disabled = next === "loading" || matchActive;
   });
   pauseOverlay.hidden = next !== "paused";
@@ -1048,6 +1104,7 @@ async function startRace(): Promise<void> {
   resetCameraElimination();
   raceSession = createTrackRaceSession();
   combatSession = createCombatSession();
+  aiDrivers = createAiDrivers();
   latestVehicleInputs = {};
   clock.restart(performance.now() / 1000);
   totalDroppedSeconds = 0;
@@ -1128,6 +1185,7 @@ finishButton.addEventListener("click", () => {
     combatSession = undefined;
     matchModeSession = undefined;
     matchModeSignature = undefined;
+    aiDrivers.clear();
     latestVehicleInputs = {};
     resetCameraElimination();
     state.transition("results", "Simulation completed without clock drift");
@@ -1141,6 +1199,7 @@ menuButton.addEventListener("click", () => {
     combatSession = undefined;
     matchModeSession = undefined;
     matchModeSignature = undefined;
+    aiDrivers.clear();
     latestVehicleInputs = {};
     resetCameraElimination();
     state.transition("menu", "Runtime ready");
@@ -1153,6 +1212,7 @@ resetButton.addEventListener("click", () => {
   resetCameraElimination();
   raceSession = state.state === "race" ? createTrackRaceSession() : undefined;
   combatSession = state.state === "race" ? createCombatSession() : undefined;
+  aiDrivers = state.state === "race" ? createAiDrivers() : new Map();
   latestVehicleInputs = {};
   applyRaceBanner();
   applyCombatHud();
@@ -1163,6 +1223,7 @@ playerCountSelect.addEventListener("change", () => {
   combatSession = undefined;
   matchModeSession = undefined;
   matchModeSignature = undefined;
+  aiDrivers.clear();
   latestVehicleInputs = {};
   resetCameraElimination();
   rebuildVehicleInputs();
@@ -1177,6 +1238,19 @@ matchModeSelect.addEventListener("change", () => {
   applyState(state.state);
   applyModeHud();
   runtimeStatus.textContent = `${MATCH_MODE_LABELS[selectedMatchMode()]} selected`;
+});
+driverSelects.forEach((select, index) => {
+  select.addEventListener("change", () => {
+    matchModeSession = undefined;
+    matchModeSignature = undefined;
+    aiDrivers.clear();
+    applyRosterPresentation();
+    applyState(state.state);
+    const difficulty = selectedAiDifficulty(index);
+    runtimeStatus.textContent = difficulty
+      ? `${LOCAL_PLAYER_SLOTS[index]!.label} CPU ${difficulty} selected`
+      : `${LOCAL_PLAYER_SLOTS[index]!.label} human driver selected`;
+  });
 });
 vehicleSelects.forEach((select) => {
   select.addEventListener("change", () => {
@@ -1324,6 +1398,7 @@ assetInput.addEventListener("change", () => {
   void (async () => {
     raceSession = undefined;
     combatSession = undefined;
+    aiDrivers.clear();
     latestVehicleInputs = {};
     applyRaceBanner();
     applyCombatHud();
@@ -1333,7 +1408,27 @@ assetInput.addEventListener("change", () => {
       matchModeSession = undefined;
       matchModeSignature = undefined;
       for (const file of files) {
-        if (file.name.toLocaleLowerCase("en-US").endsWith(".lua")) {
+        const normalizedName = file.name.toLocaleLowerCase("en-US");
+        if (normalizedName.endsWith(".ai")) {
+          const startedAt = performance.now();
+          trackParts.sourceAi = parseAiData(await file.arrayBuffer());
+          const occupiedCells = trackParts.sourceAi.grid.cells.reduce((sum, value) => (
+            sum + Number(value !== 0xff)
+          ), 0);
+          summaries.push(
+            `${file.name}: ${occupiedCells.toLocaleString()} occupied grid cells · declared ${trackParts.sourceAi.declaredEntryCount} · 2×${trackParts.sourceAi.tableA.length} entries, ${(performance.now() - startedAt).toFixed(1)} ms`,
+          );
+          continue;
+        }
+        if (normalizedName.endsWith(".led")) {
+          const startedAt = performance.now();
+          trackParts.sourceLed = parseLedData(await file.arrayBuffer());
+          summaries.push(
+            `${file.name}: ${trackParts.sourceLed.entries.length} float triplets, ${(performance.now() - startedAt).toFixed(1)} ms`,
+          );
+          continue;
+        }
+        if (normalizedName.endsWith(".lua")) {
           if (/lapdata/i.test(file.name)) {
             const startedAt = performance.now();
             trackParts.lapData = parseLapDataLua(await file.text());
@@ -1531,17 +1626,45 @@ function updateCameraEliminations(
   return finishReason;
 }
 
-function sampleVehicleInputs(gamepads: readonly (Gamepad | null)[]): VehicleInputById {
+function sampleVehicleInputs(
+  gamepads: readonly (Gamepad | null)[],
+  stepSeconds: number,
+): VehicleInputById {
   const sampled: Record<string, VehicleInputFrame> = {};
-  const racePlayers = new Map(raceSession?.snapshot.players.map((player) => [player.id, player.status]));
+  const racePlayers = new Map(raceSession?.snapshot.players.map((player) => [player.id, player]));
   const combatPlayers = new Map(combatSession?.snapshot.players.map((player) => [player.id, player]));
   activePlayerSlots().forEach((slot, index) => {
     const canDrive = !raceSession || (
-      raceSession.phase === "racing" && racePlayers.get(slot.id) === "racing"
+      raceSession.phase === "racing" && racePlayers.get(slot.id)?.status === "racing"
     );
-    const input = canDrive
-      ? vehicleInputs[index]?.sample(gamepads) ?? NEUTRAL_VEHICLE_INPUT
-      : NEUTRAL_VEHICLE_INPUT;
+    let input: VehicleInputFrame = NEUTRAL_VEHICLE_INPUT;
+    const aiDriver = aiDrivers.get(slot.id);
+    const aiDifficulty = selectedAiDifficulty(index);
+    const player = racePlayers.get(slot.id);
+    if (canDrive && aiDriver && player && trackDefinition && physics) {
+      const checkpointIndex = trackDefinition.checkpoints.findIndex((checkpoint) => (
+        checkpoint.id === player.progress.nextCheckpointId
+      ));
+      const history = physics.getVehicleTransformHistory(slot.id);
+      const telemetry = physics.getVehicleTelemetry(slot.id);
+      if (checkpointIndex >= 0 && history && telemetry) {
+        const checkpoint = trackDefinition.checkpoints[checkpointIndex]!;
+        input = aiDriver.advance(stepSeconds, {
+          position: history.current.position,
+          headingRadians: telemetry.headingRadians,
+          speedMetersPerSecond: telemetry.speedMetersPerSecond,
+          precedingCheckpoint: trackDefinition.checkpoints[
+            (checkpointIndex - 1 + trackDefinition.checkpoints.length) % trackDefinition.checkpoints.length
+          ]!,
+          checkpoint,
+          followingCheckpoint: trackDefinition.checkpoints[
+            (checkpointIndex + 1) % trackDefinition.checkpoints.length
+          ]!,
+        });
+      }
+    } else if (canDrive && !aiDifficulty) {
+      input = vehicleInputs[index]?.sample(gamepads) ?? NEUTRAL_VEHICLE_INPUT;
+    }
     const effects = combatPlayers.get(slot.id)?.effects ?? [];
     const oiled = effects.some((effect) => effect.type === "oiled");
     const flashed = effects.some((effect) => effect.type === "flashed");
@@ -1609,7 +1732,7 @@ function renderFrame(timestampMilliseconds: number): void {
       if (eliminationFinishReason) {
         raceFinishReason = eliminationFinishReason;
       }
-      const sampledInputs = sampleVehicleInputs(gamepads);
+      const sampledInputs = sampleVehicleInputs(gamepads, stepSeconds);
       latestVehicleInputs = sampledInputs;
       if (combatSession && (!raceSession || raceSession.phase === "racing")) {
         const useRequests = Object.fromEntries(Object.entries(sampledInputs).map(([id, input]) => (

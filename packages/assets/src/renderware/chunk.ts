@@ -1,6 +1,8 @@
 const CHUNK_HEADER_SIZE = 12;
 
 export const RW_CHUNK_IDS = {
+  ledData: 0x13269901,
+  aiData: 0x13269902,
   struct: 0x01,
   string: 0x02,
   extension: 0x03,

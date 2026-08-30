@@ -1,4 +1,5 @@
 export * from "./renderware/chunk.js";
+export * from "./ai-data.js";
 export * from "./course.js";
 export * from "./powerups.js";
 export * from "./renderware/conventions.js";

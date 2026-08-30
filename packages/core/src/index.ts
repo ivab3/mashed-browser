@@ -1,4 +1,5 @@
 export * from "./camera-elimination.js";
+export * from "./ai-route-driver.js";
 export * from "./combat-session.js";
 export * from "./events.js";
 export * from "./fixed-step.js";

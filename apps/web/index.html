@@ -118,17 +118,53 @@
             <label for="vehicle-select-one">P1 vehicle</label>
             <select id="vehicle-select-one"><option value="">Debug proxy</option></select>
           </div>
+          <div id="driver-select-row-one" class="vehicle-select-row">
+            <label for="driver-select-one">P1 driver</label>
+            <select id="driver-select-one">
+              <option value="human">Human</option>
+              <option value="easy">CPU · Easy</option>
+              <option value="normal">CPU · Normal</option>
+              <option value="hard">CPU · Hard</option>
+            </select>
+          </div>
           <div id="vehicle-select-row-two" class="vehicle-select-row" hidden>
             <label for="vehicle-select-two">P2 vehicle</label>
             <select id="vehicle-select-two"><option value="">Debug proxy</option></select>
+          </div>
+          <div id="driver-select-row-two" class="vehicle-select-row" hidden>
+            <label for="driver-select-two">P2 driver</label>
+            <select id="driver-select-two">
+              <option value="human">Human</option>
+              <option value="easy">CPU · Easy</option>
+              <option value="normal">CPU · Normal</option>
+              <option value="hard">CPU · Hard</option>
+            </select>
           </div>
           <div id="vehicle-select-row-three" class="vehicle-select-row" hidden>
             <label for="vehicle-select-three">P3 vehicle</label>
             <select id="vehicle-select-three"><option value="">Debug proxy</option></select>
           </div>
+          <div id="driver-select-row-three" class="vehicle-select-row" hidden>
+            <label for="driver-select-three">P3 driver</label>
+            <select id="driver-select-three">
+              <option value="human">Human</option>
+              <option value="easy">CPU · Easy</option>
+              <option value="normal">CPU · Normal</option>
+              <option value="hard">CPU · Hard</option>
+            </select>
+          </div>
           <div id="vehicle-select-row-four" class="vehicle-select-row" hidden>
             <label for="vehicle-select-four">P4 vehicle</label>
             <select id="vehicle-select-four"><option value="">Debug proxy</option></select>
+          </div>
+          <div id="driver-select-row-four" class="vehicle-select-row" hidden>
+            <label for="driver-select-four">P4 driver</label>
+            <select id="driver-select-four">
+              <option value="human">Human</option>
+              <option value="easy">CPU · Easy</option>
+              <option value="normal">CPU · Normal</option>
+              <option value="hard">CPU · Hard</option>
+            </select>
           </div>
         </section>
 
@@ -150,9 +186,9 @@
           <div class="section-label">Playable track bundle</div>
           <label class="file-picker">
             <span>Load track, vehicles + RWS audio</span>
-            <input id="asset-files" type="file" accept=".dff,.txd,.bsp,.lua,.rws" multiple />
+            <input id="asset-files" type="file" accept=".dff,.txd,.bsp,.lua,.rws,.ai,.led" multiple />
           </label>
-          <p id="asset-status">Core: GRAPHICS, track TXD, COLLIDE, AI1, LAPDATA. Optional: COURSE, POWERUPS_GOLD/ALL, world DFFs, vehicle NAME0.DFF + NAME.TXD, and PERMDICT.RWS.</p>
+          <p id="asset-status">Core: GRAPHICS, track TXD, COLLIDE, AI1, LAPDATA. Optional: COURSE, POWERUPS_GOLD/ALL, source AI/LED data, world DFFs, vehicle NAME0.DFF + NAME.TXD, and PERMDICT.RWS.</p>
         </section>
 
         <footer>

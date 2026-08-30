@@ -50,6 +50,7 @@ export class ReplayCursor<TInput> {
   }
 }
 
+export * from "./ai-driver-replay.js";
 export * from "./match-replay.js";
 export * from "./match-mode-replay.js";
 export * from "./stage-five-scenario.js";

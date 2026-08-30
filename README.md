@@ -7,7 +7,9 @@ from a user-owned disc image or installed copy and are always kept below ignored
 Milestones **M0: Asset feasibility** and **M1: public proof of concept** are complete. Stage 6 alpha
 work is underway with validated parsing of original per-course power-up loadouts, authored pickup
 positions and respawn timings, distinct deterministic rules for all nine base weapon types, and four
-multi-round local match modes with persistent scores and objectives. Stage 1
+multi-round local match modes with persistent scores and objectives. The first AI slice adds per-slot
+Human/Easy/Normal/Hard drivers, deterministic checkpoint steering, and structural readers for original
+`.AI`/`.LED` data. Stage 1
 provides a reproducible local extraction pipeline; Stage 2 provides RenderWare DFF/TXD readers, full
 graphical/collision BSP sector parsing, and a Three.js asset viewer. Stage 3 adds a deterministic
 fixed-step core, replay checks, Rapier/Three.js/Web Audio adapters, debug tooling, and the browser
@@ -70,6 +72,8 @@ Stage 5 scope, completed slices, and next work live in
 [`reference/VERTICAL_SLICE.md`](./reference/VERTICAL_SLICE.md).
 Stage 6 alpha slices and their acceptance boundaries live in
 [`reference/ALPHA.md`](./reference/ALPHA.md).
+AI format findings, route-driver contracts, and follow-up acceptance live in
+[`reference/AI_FOUNDATION.md`](./reference/AI_FOUNDATION.md).
 
 ## Inspect Stage 2 fixtures
 
@@ -127,6 +131,9 @@ elimination/results flow as camera distance, while oil and flash show timed hand
 With 2–4 players, choose Standard Play, Team Play, Hold the Flag, or The Fugitive before starting.
 The mode HUD tracks the live objective and series score; `Next round` resets race/combat state while
 preserving points, and the fugitive role rotates between rounds.
+Each roster slot can use a Human, Easy, Normal, or Hard CPU driver once a track route is loaded. CPU
+cars submit the same fixed-step vehicle inputs as human adapters; source `.AI`/`.LED` files can be
+loaded for validated structural inspection while their still-unconfirmed tables remain out of rules.
 Moving projectiles stop on track/scenery, explosives splash from the world hit, and explosive prop
 hits use the same destruction/reset flow. Load the extracted `PERMDICT.RWS` alongside the track bundle to replace
 fallback tones with the original engine, weapon, collision, explosion, race, and menu samples.

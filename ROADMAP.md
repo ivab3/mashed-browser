@@ -351,7 +351,7 @@ Milestone M1: публично показываемый proof of concept.
 
 Milestone M2: feature-complete alpha.
 
-Статус 2026-08-29: **этап 6 начат; срезы 6.1–6.3 завершены**. Срез 6.1 вводит безопасный reader исходных
+Статус 2026-08-30: **этап 6 выполняется; срезы 6.1–6.3 и 6.4a завершены**. Срез 6.1 вводит безопасный reader исходных
 `POWERUPS_ALL.LUA`/`POWERUPS_GOLD.LUA`: нормализованы все встречающиеся type ID, глобальные loadout
 для 26 course ID и source-authored position/respawn metadata. Срез 6.2 подключает девять подтверждённых
 обучающими строками типов: machine gun, guided missile, mortar, rear flame, oil, proximity mine, drum
@@ -362,6 +362,11 @@ multi-round `MatchModeSession` для Standard Play, Team Play, Hold the Flag и
 режимы с race/combat runtime, objective/score HUD и same-page round reset. Отдельные replay каждого
 режима дают одинаковый результат при presentation clocks 30/60/120 Hz; production-browser smoke
 проверил старт и завершение всех четырёх режимов с четырьмя локальными игроками без ошибок консоли.
+Срез 6.4a добавляет чистый seeded `AiRouteDriver`, профили Easy/Normal/Hard, per-slot Human/CPU выбор
+и replay 30/60/120 Hz. CPU проходит тот же input/status/Rapier путь, что игрок. Структурные readers
+приняли все 28 `.AI` и 29 `.LED` файлов локального reference set; неподтверждённые поля остаются
+нейтральными и пока не участвуют в рулении. Следующий срез 6.4b закрывает combat tactics, полный
+автономный круг и естественное завершение browser-раунда.
 
 ### Этап 7. Beta: доставка, производительность и совместимость — 3–6 недель
 
