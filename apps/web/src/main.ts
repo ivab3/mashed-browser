@@ -29,11 +29,14 @@ import {
   CameraEliminationTracker,
   ChampionshipSession,
   CombatSession,
+  createAlphaChampionshipDefinition,
+  createAlphaMatchOptions,
   createLocalPlayerGrid,
   FixedStepClock,
   LOCAL_PLAYER_SLOTS,
   MatchModeSession,
   RaceSession,
+  rankChampionshipEvent,
   RuntimeEventBus,
   RuntimeStateMachine,
   type AiDifficulty,
@@ -472,18 +475,11 @@ function createMatchModeSession(): MatchModeSession | undefined {
   if (selectedPlayerCount() < 2) {
     return undefined;
   }
-  const mode = selectedMatchMode();
-  return new MatchModeSession({
-    mode,
-    players: activePlayerSlots().map((slot, index) => ({
-      id: slot.id,
-      displayName: slot.label,
-      ...(mode === "team" ? { teamId: index % 2 === 0 ? "Orange" : "Blue" } : {}),
-    })),
-    pointsToWin: championshipSession ? 1 : 8,
-    flagHoldSeconds: 12,
-    fugitiveSurvivalSeconds: 45,
-  });
+  return new MatchModeSession(createAlphaMatchOptions(
+    selectedMatchMode(),
+    activePlayerSlots().map((slot) => ({ id: slot.id, displayName: slot.label })),
+    championshipSession !== undefined,
+  ));
 }
 
 function alphaChampionshipDefinition(): ChampionshipDefinition {
@@ -491,23 +487,7 @@ function alphaChampionshipDefinition(): ChampionshipDefinition {
   const courseLabel = courseId === undefined
     ? "Loaded Track"
     : admittedTrackByCourseId(courseId)?.displayName ?? `Course ${courseId}`;
-  const event = (id: string, name: string, mode: MatchModeType) => ({
-    id,
-    name: `${courseLabel} · ${name}`,
-    mode,
-    ...(courseId === undefined ? {} : { courseId }),
-  });
-  return {
-    id: `alpha-cup-v1-${courseId ?? "route"}-${selectedPlayerCount()}p`,
-    name: "Alpha Championship",
-    entrants: activePlayerSlots().map((slot) => ({ id: slot.id, displayName: slot.label })),
-    events: [
-      event("standard", "Standard Play", "standard"),
-      event("flag", "Hold the Flag", "hold-the-flag"),
-      event("fugitive", "The Fugitive", "fugitive"),
-    ],
-    pointsByRank: [5, 3, 2, 1],
-  };
+  return createAlphaChampionshipDefinition(selectedPlayerCount(), courseId, courseLabel);
 }
 
 function persistChampionship(): string | undefined {
@@ -718,6 +698,9 @@ settingsBindingsStatus.textContent = controlBindingsLoad.ok
 
 function applyState(next: RuntimeState): void {
   const matchActive = next === "race" || next === "paused";
+  if (!matchActive) {
+    eliminationWarning.hidden = true;
+  }
   if ((next === "loading" || matchActive) && pendingBindingAction) {
     pendingBindingAction = undefined;
     syncControlBindingButtons();
@@ -1145,24 +1128,12 @@ function handleRaceEvents(raceEvents: readonly RaceEvent[]): string | undefined 
 }
 
 function championshipEventRanking(winnerIds: readonly string[]): readonly string[] {
-  const entrantIds: string[] = activePlayerSlots().map((slot) => slot.id);
-  const entrantSet = new Set(entrantIds);
-  const winnerSet = new Set(winnerIds);
-  const ranking: string[] = winnerIds.filter((id) => entrantSet.has(id));
-  for (const id of [...roundEliminationOrder].reverse()) {
-    if (entrantSet.has(id) && !winnerSet.has(id) && !ranking.includes(id)) {
-      ranking.push(id);
-    }
-  }
   const racePlayers = new Map(raceSession?.snapshot.players.map((player) => [player.id, player]));
-  const remaining = entrantIds.filter((id) => !ranking.includes(id)).sort((left, right) => {
-    const leftProgress = racePlayers.get(left)?.progress;
-    const rightProgress = racePlayers.get(right)?.progress;
-    return (rightProgress?.completedLaps ?? 0) - (leftProgress?.completedLaps ?? 0)
-      || (rightProgress?.passedCheckpoints ?? 0) - (leftProgress?.passedCheckpoints ?? 0)
-      || entrantIds.indexOf(left) - entrantIds.indexOf(right);
-  });
-  return [...ranking, ...remaining];
+  return rankChampionshipEvent(activePlayerSlots().map((slot) => ({
+    id: slot.id,
+    completedLaps: racePlayers.get(slot.id)?.progress.completedLaps ?? 0,
+    passedCheckpoints: racePlayers.get(slot.id)?.progress.passedCheckpoints ?? 0,
+  })), winnerIds, roundEliminationOrder);
 }
 
 function completeChampionshipEvent(winnerIds: readonly string[]): void {

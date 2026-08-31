@@ -172,11 +172,28 @@ Production-adapter tests verify old/new key behavior and keyup release directly.
 gate passes 173 tests plus typecheck/build, content validation, match replay, 30-minute soak, and the
 Warzone AI lap.
 
-## Planned slices
+## Slice 6.7c — repeatable series acceptance and compatibility audit
+
+The browser and source-free acceptance runner now share the alpha cup definition, real match
+thresholds and complete ranking policy. `pnpm alpha:replay` checks 36 series across 2/3/4 entrants,
+four admitted course/save identities and 30/60/120 Hz. Every event finishes through normal mode rules,
+six JSON restore boundaries retain exact state, and restart clears points/medals. Five new regression
+tests bring the workspace to 178 passing tests.
+
+[M2_ACCEPTANCE.md](./M2_ACCEPTANCE.md) separates rules replay, loading smoke and physical navigation,
+lists incompatible resource families, and records remaining functional gaps. A four-Hard-CPU browser
+series reached final medals naturally, restored after reload/reattachment and restarted at zero;
+the audit also corrected survivor ranking and stale elimination warnings. The gate is deliberately
+not a feature-complete declaration: live one-shot mute, admitted-track navigation and authored
+traps/scripted events still require implementation and acceptance.
+
+## Next slices
 
 1. **6.6f+ track batches:** extend the playable track catalog in measured batches. Every admitted track
    keeps the load smoke, rules replay, and explicit unsupported-resource record.
-2. **6.7c alpha gate:** complete menu-to-series acceptance and the Milestone M2 compatibility report.
+2. **6.7d audio hardening:** apply live volume/mute to already-playing cues and test the audio graph.
+3. **6.4b navigation follow-up:** reproduce and close admitted-track CPU obstruction failures.
+4. **6.8 track events:** connect traps/scripted track behavior, then repeat M2 acceptance.
 
 This order may interleave a content batch after a new mode or weapon family so the abstractions are
 validated on more than Warzone before they spread across the full catalog.
@@ -189,6 +206,7 @@ Run the source-independent committed checks with:
 pnpm test
 pnpm typecheck
 pnpm build
+pnpm alpha:replay
 pnpm content:validate
 ```
 
