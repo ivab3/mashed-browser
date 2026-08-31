@@ -187,13 +187,20 @@ the audit also corrected survivor ranking and stale elimination warnings. The ga
 not a feature-complete declaration: live one-shot mute, admitted-track navigation and authored
 traps/scripted events still require implementation and acceptance.
 
+## Slice 6.7d — live audio hardening
+
+A shared master gain bus now controls every engine and original/synthesized one-shot, including cues
+already playing when mute or volume changes. Per-voice envelopes retain their independent pause and
+speed behavior without double-scaling. Ended source/gain nodes disconnect, and invalid or zero cue
+gains cannot reach an exponential ramp. Four additional graph-level tests and browser live
+mute/pause/volume/resume/results smoke cover the regression.
+
 ## Next slices
 
 1. **6.6f+ track batches:** extend the playable track catalog in measured batches. Every admitted track
    keeps the load smoke, rules replay, and explicit unsupported-resource record.
-2. **6.7d audio hardening:** apply live volume/mute to already-playing cues and test the audio graph.
-3. **6.4b navigation follow-up:** reproduce and close admitted-track CPU obstruction failures.
-4. **6.8 track events:** connect traps/scripted track behavior, then repeat M2 acceptance.
+2. **6.4b navigation follow-up:** reproduce and close admitted-track CPU obstruction failures.
+3. **6.8 track events:** connect traps/scripted track behavior, then repeat M2 acceptance.
 
 This order may interleave a content batch after a new mode or weapon family so the abstractions are
 validated on more than Warzone before they spread across the full catalog.

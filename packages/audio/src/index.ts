@@ -65,6 +65,7 @@ export class AudioRuntime {
   readonly #samples = new Map<string, Pcm16AudioSample>();
   readonly #buffers = new Map<string, AudioBuffer>();
   #context: AudioContext | undefined;
+  #masterGain: GainNode | undefined;
   #paused = false;
   #masterVolume = 1;
 
@@ -95,13 +96,7 @@ export class AudioRuntime {
     if (!context) {
       return;
     }
-    for (const voice of this.#engineVoices.values()) {
-      voice.gain.gain.setTargetAtTime(
-        this.#paused ? 0 : voice.baseGain * this.#masterVolume,
-        context.currentTime,
-        0.035,
-      );
-    }
+    this.#masterGain?.gain.setValueAtTime(this.#masterVolume, context.currentTime);
   }
 
   addSampleBank(samples: readonly Pcm16AudioSample[]): number {
@@ -135,7 +130,7 @@ export class AudioRuntime {
     }
     for (const voice of this.#engineVoices.values()) {
       voice.gain.gain.setTargetAtTime(
-        paused ? 0 : voice.baseGain * this.#masterVolume,
+        paused ? 0 : voice.baseGain,
         context.currentTime,
         0.035,
       );
@@ -172,7 +167,7 @@ export class AudioRuntime {
         : 62 + speed * 155 + throttle * 28;
       nodes.pitch.setTargetAtTime(pitch, context.currentTime, 0.045);
       nodes.gain.gain.setTargetAtTime(
-        this.#paused ? 0 : nodes.baseGain * this.#masterVolume,
+        this.#paused ? 0 : nodes.baseGain,
         context.currentTime,
         0.055,
       );
@@ -187,7 +182,12 @@ export class AudioRuntime {
   }
 
   async unlock(): Promise<void> {
-    this.#context ??= new AudioContext();
+    if (!this.#context) {
+      this.#context = new AudioContext();
+      this.#masterGain = this.#context.createGain();
+      this.#masterGain.gain.value = this.#masterVolume;
+      this.#masterGain.connect(this.#context.destination);
+    }
     this.#rebuildBuffers();
     if (this.#context.state === "suspended") {
       await this.#context.resume();
@@ -203,13 +203,15 @@ export class AudioRuntime {
       const source = context.createBufferSource();
       source.buffer = buffer;
       source.loop = true;
-      source.connect(gain).connect(context.destination);
+      source.connect(gain).connect(this.#masterGain!);
+      source.onended = () => { source.disconnect(); gain.disconnect(); };
       source.start();
       return { source, pitch: source.playbackRate, gain, baseGain: 0, originalSample: true };
     }
     const source = context.createOscillator();
     source.type = "sawtooth";
-    source.connect(gain).connect(context.destination);
+    source.connect(gain).connect(this.#masterGain!);
+    source.onended = () => { source.disconnect(); gain.disconnect(); };
     source.start();
     return { source, pitch: source.frequency, gain, baseGain: 0, originalSample: false };
   }
@@ -255,7 +257,8 @@ export class AudioRuntime {
 
   #play(cue: AudioCue, gainValue: number, requestedName?: string): void {
     const context = this.#context;
-    if (!context || context.state !== "running" || this.#masterVolume <= 0) {
+    if (!context || context.state !== "running" || this.#masterVolume <= 0
+      || !Number.isFinite(gainValue) || gainValue <= 0) {
       return;
     }
     const gain = context.createGain();
@@ -265,10 +268,11 @@ export class AudioRuntime {
       const source = context.createBufferSource();
       source.buffer = originalBuffer;
       gain.gain.setValueAtTime(
-        Math.max(0, Math.min(1, gainValue * 2.5 * this.#masterVolume)),
+        Math.min(1, gainValue * 2.5),
         now,
       );
-      source.connect(gain).connect(context.destination);
+      source.connect(gain).connect(this.#masterGain!);
+      source.onended = () => { source.disconnect(); gain.disconnect(); };
       source.start(now);
       return;
     }
@@ -278,11 +282,12 @@ export class AudioRuntime {
       : cue === "break" || cue === "vehicle-destroyed" ? "sawtooth" : "sine";
     oscillator.frequency.setValueAtTime(CUE_FREQUENCIES[cue], now);
     gain.gain.setValueAtTime(
-      Math.max(0, Math.min(0.3, gainValue * this.#masterVolume)),
+      Math.min(0.3, gainValue),
       now,
     );
     gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.09);
-    oscillator.connect(gain).connect(context.destination);
+    oscillator.connect(gain).connect(this.#masterGain!);
+    oscillator.onended = () => { oscillator.disconnect(); gain.disconnect(); };
     oscillator.start(now);
     oscillator.stop(now + 0.1);
   }
@@ -296,6 +301,8 @@ export class AudioRuntime {
     this.#buffers.clear();
     this.#samples.clear();
     await this.#context?.close();
+    this.#masterGain?.disconnect();
+    this.#masterGain = undefined;
     this.#context = undefined;
   }
 }

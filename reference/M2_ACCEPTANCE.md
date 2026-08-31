@@ -53,7 +53,7 @@ reattachment after reload; asset caching belongs to Beta.
 | Destruction / traps / scripted events | Generic destructible physics props and weapon hazards work; authored track events and traps remain open, not satisfied by listing their files as deferred |
 | Vehicle roster | All 15 archives / 90 skins parse; all archive skin-0 pairs browser-bound; names other than Wildfire are explicitly inferred metadata |
 | Track batches | Four admitted tracks with load smoke and checkpoint rules replay; details below |
-| Settings / persistence | CPU, keyboard, deadzone, audio, graphics and independent strict local saves; live one-shot audio mute needs hardening |
+| Settings / persistence | CPU, keyboard, deadzone, audio, graphics and independent strict local saves; 6.7d master bus applies live mute to already-playing cues |
 | English UI | Production menu, controls, HUD, results and settings are English; untranslated archive labels are source identities |
 
 ## Admitted tracks
@@ -87,7 +87,6 @@ alpha acceptance. Source-free production build still has the documented large-ch
 
 ## Remaining work before M2 sign-off
 
-1. Fix live mute/volume for already-playing one-shot audio and add graph-level regression coverage.
-2. Close the admitted-track navigation gap using reproducible physics checks, not synthetic checkpoints.
-3. Implement and accept track traps/scripted events with explicit source-versus-clean-room boundaries.
-4. Repeat the final UI and regression gates after those changes; only then reassess feature completeness.
+1. Close the admitted-track navigation gap using reproducible physics checks, not synthetic checkpoints.
+2. Implement and accept track traps/scripted events with explicit source-versus-clean-room boundaries.
+3. Repeat the final UI and regression gates after those changes; only then reassess feature completeness.

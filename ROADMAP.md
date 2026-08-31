@@ -351,7 +351,7 @@ Milestone M1: публично показываемый proof of concept.
 
 Milestone M2: feature-complete alpha.
 
-Статус 2026-08-31: **этап 6 выполняется; срезы 6.1–6.5, content batches 6.6a–e и acceptance/settings slices 6.7a–c завершены**. Срез 6.1 вводит безопасный reader исходных
+Статус 2026-08-31: **этап 6 выполняется; срезы 6.1–6.5, content batches 6.6a–e и acceptance/settings slices 6.7a–d завершены**. Срез 6.1 вводит безопасный reader исходных
 `POWERUPS_ALL.LUA`/`POWERUPS_GOLD.LUA`: нормализованы все встречающиеся type ID, глобальные loadout
 для 26 course ID и source-authored position/respawn metadata. Срез 6.2 подключает девять подтверждённых
 обучающими строками типов: machine gun, guided missile, mortar, rear flame, oil, proximity mine, drum
@@ -408,7 +408,9 @@ capture. Browser acceptance проверил capture/swap/reject/restore/results
 173 теста, typecheck/build, content validation, replay, soak и AI lap. Срез 6.7c выносит cup definition,
 match thresholds и ranking в общий production contract, добавляет 36 полных rules/save series replay
 на 30/60/120 Hz и доводит suite до 178 тестов. [M2 acceptance report](./reference/M2_ACCEPTANCE.md)
-явно отделяет loading smoke от physics navigation. M2 ещё не закрыт: live one-shot audio mute,
+явно отделяет loading smoke от physics navigation. Срез 6.7d исправляет live audio через общий
+master gain bus для уже звучащих original/synthesized cues, сохраняет engine pause и добавляет
+четыре graph-level regression tests (182 теста всего). M2 ещё не закрыт:
 навигация оставшихся admitted tracks и traps/scripted events требуют дальнейших срезов; расширение
 трасс продолжается пакетами 6.6f+.
 

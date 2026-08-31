@@ -1,6 +1,7 @@
 # Stage 6 alpha settings
 
-Status: slice 6.7a accepted on 2026-08-30; P1 rebinding slice 6.7b accepted on 2026-08-31.
+Status: slice 6.7a accepted on 2026-08-30; P1 rebinding 6.7b and live-audio hardening 6.7d accepted
+on 2026-08-31.
 
 The production browser menu exposes runtime-backed settings:
 
@@ -50,8 +51,12 @@ erase championship saves.
 ## Acceptance evidence
 
 Unit coverage round-trips a custom record and rejects unknown versions, invalid enum members,
-out-of-range values, malformed JSON, and unavailable storage. Audio coverage checks safe master-gain
-normalization before an `AudioContext` is unlocked.
+out-of-range values, malformed JSON, and unavailable storage. Audio graph tests cover safe gain
+normalization before unlock, original and synthesized one-shot routing, live mute/unmute of existing
+cues, engine scaling exactly once, pause preservation, repeated unlock, invalid/zero cue gains and
+ended-node/dispose cleanup. One shared master GainNode now connects every voice to the destination;
+changing volume therefore affects a sample that started before the change. Per-voice envelopes no
+longer multiply master volume a second time.
 
 The production browser acceptance changed all four categories (`Hard`, `Performance`, 35% volume,
 24% deadzone, muted), confirmed that the CPU preset changed an active Easy CPU to Hard, navigated to a
@@ -79,5 +84,7 @@ pnpm typecheck
 pnpm build
 ```
 
-P2 remapping, configurable gamepad button mapping, and the final M2 compatibility report remain
-follow-up work; they are not claimed by these slices.
+The 6.7d browser smoke exercised live mute, pause, unmute/volume adjustment, resume and results with
+no console warnings/errors. Audible output is established by graph-level routing tests rather than a
+claim to have listened to browser audio. P2 remapping and configurable gamepad buttons remain
+follow-up work; current M2 status is in [M2_ACCEPTANCE.md](M2_ACCEPTANCE.md).
