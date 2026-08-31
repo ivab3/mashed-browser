@@ -68,6 +68,7 @@ import {
   DEFAULT_VEHICLE_CONFIG,
   deriveRouteCollisionLayers,
   PRIMARY_VEHICLE_ID,
+  probeAiNavigation,
   type PhysicsRuntime,
   type PhysicsRuntimeOptions,
   type VehicleInputById,
@@ -2188,7 +2189,7 @@ function sampleVehicleInputs(
           const opponentPosition = physics.getVehicleTransformHistory(opponentSlot.id)?.current.position;
           return opponentPosition ? [{ id: opponentSlot.id, position: opponentPosition }] : [];
         });
-        input = aiDriver.advance(stepSeconds, {
+        const driverState = {
           position: history.current.position,
           headingRadians: telemetry.headingRadians,
           speedMetersPerSecond: telemetry.speedMetersPerSecond,
@@ -2200,6 +2201,10 @@ function sampleVehicleInputs(
             (checkpointIndex + 1) % trackDefinition.checkpoints.length
           ]!,
           ...(heldWeapon ? { heldWeapon, opponents } : {}),
+        };
+        input = aiDriver.advance(stepSeconds, {
+          ...driverState,
+          navigationTargets: probeAiNavigation(physics, driverState),
         });
       }
     } else if (canDrive && !aiDifficulty) {

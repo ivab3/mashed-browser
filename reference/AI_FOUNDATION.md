@@ -76,9 +76,47 @@ inputs. A CPU selected without a loaded route remains neutral rather than silent
   seconds at checkpoint 50/136 with P2 winning, without the debug finish control and without console
   errors. Camera distance resolved that particular round before weapon damage.
 
+## Slice 6.4b — admitted-track navigation gate (2026-08-31)
+
+The original route controller could deadlock within three metres of a checkpoint, chase an overshot
+gate in circles and enter short bends too quickly. The production controller now uses a short
+crossing/reapproach target, reverse steering toward gates behind the vehicle, deterministic
+obstruction escape at any checkpoint distance and a segment-length/curvature speed cap. Wide gates
+offer five lane targets; the physics adapter probes each with three bounded chassis-width rays.
+Upward road normals do not become walls, and very narrow gates keep their route line instead of
+attempting a lateral detour. Browser and CLI feed the same probe data to the pure controller.
+
+`pnpm ai:tracks` discovers every admitted track, resolves AI/collision BSP names through `COURSE.LUA`,
+and runs each complete physical lap twice with both the existing acceptance seed and browser P1's
+first-round seed. It requires identical reports, a natural finish within 180 seconds, zero recovery
+inputs and zero actual recovery operations (including automatic upright recovery). An additional P1
+variant settles the chassis for 179 neutral frames, matching the countdown's pre-drive duration.
+All 24 laps pass; immediate-start measurements are:
+
+| Track | Acceptance seed | Browser P1 seed | Reverse time range |
+| --- | ---: | ---: | ---: |
+| City | 81.40 s | 75.20 s | 4.8–6.0 s |
+| Neustein | 38.95 s | 38.95 s | 0.017 s |
+| Arctic | 86.63 s | 82.27 s | 30.2–31.2 s |
+| Warzone | 55.57 s | 55.57 s | 0 s |
+
+Settled P1 laps take City 74.92 s, Neustein 39.10 s, Arctic 175.72 s and Warzone 55.32 s.
+A separate browser Arctic smoke (six core track files, solo Hard, proxy vehicle) finishes all 94
+checkpoints naturally in 4:39.00 with no console warnings/errors and zero dropped time in observed
+frames. Browser scene setup and lap-update ordering differ from this solo physics harness; its times
+are not interchangeable. Browser recovery count was not instrumented in this smoke. The wide timing
+variation and extensive Arctic reversing remain AI quality work, not a claim of competitive pace.
+
+Arctic completes using considerable reverse manoeuvring; this is functional navigation, not a claim
+of polished competitive AI. No checkpoint is skipped, no collision resource is weakened and no
+teleport is used to make the gate pass. The stricter historical Warzone `ai:lap` limit remains 75
+seconds with at most 180 reverse frames. Source-free tests cover feelers, near-gate escape, reverse
+steering, narrow-gate behavior, invalid probe data and 30/60/120 Hz recorded probe determinism.
+
 ## Post-6.4 refinement boundary
 
 Future tuning may add deliberate pickup pursuit, predictive projectile lead, team coordination, and
-more detailed pack behavior. These are refinements rather than blockers for the route-opponent slice.
+more detailed pack behavior, less Arctic reversing and broader seed/difficulty coverage. The complete
+physics gate currently claims solo Hard AI for its two explicit seeds, not every possible pack race.
 Semantics from `.AI`/`.LED` should be promoted from neutral fields only when an observable original-game
 behavior or stronger binary evidence confirms them.

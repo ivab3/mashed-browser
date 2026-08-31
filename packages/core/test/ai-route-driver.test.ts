@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   AiRouteDriver,
+  createAiNavigationTargets,
   selectAiWeaponTarget,
   type AiDifficulty,
   type AiRouteDriverState,
@@ -84,9 +85,41 @@ describe("AI route driver", () => {
     input = driver.advance(1, routeState({ speedMetersPerSecond: 0 }));
     input = driver.advance(1, routeState({ speedMetersPerSecond: 0 }));
     expect(input.drive).toBe(-0.75);
-    expect(Math.abs(input.steer)).toBe(0.45);
+    expect(input.steer).toBe(1);
     expect(input.recover).toBe(false);
     expect(driver.snapshot.escapeSecondsRemaining).toBeGreaterThan(0);
+  });
+
+  it("backs out of a near-checkpoint obstruction and reverses toward an overshot gate", () => {
+    const driver = new AiRouteDriver({ difficulty: "hard", seed: 9 });
+    const nearby = routeState({ position: [9, 0, 0], speedMetersPerSecond: 0 });
+    for (let step = 0; step < 179; step += 1) driver.advance(1 / 60, nearby);
+    expect(driver.advance(1 / 60, nearby).drive).toBe(-0.75);
+    const overshot = new AiRouteDriver({ difficulty: "hard", seed: 1 }).advance(1 / 60, routeState({
+      position: [12, 0, 0], headingRadians: Math.PI / 2, speedMetersPerSecond: 1,
+    }));
+    expect(overshot.drive).toBeLessThan(0);
+    expect(Math.abs(overshot.steer)).toBeLessThan(0.3);
+    expect(overshot.recover).toBe(false);
+  });
+
+  it("chooses a clear lane deterministically but avoids lateral alternatives in narrow gates", () => {
+    const driver = new AiRouteDriver({ difficulty: "hard", seed: 9 });
+    const input = driver.advance(1 / 60, routeState({
+      headingRadians: 0,
+      navigationTargets: [
+        { bias: 0, position: [0, 0, 10], clearance: 0.2 },
+        { bias: 0.2, position: [4, 0, 10], clearance: 1 },
+      ],
+    }));
+    expect(input.steer).toBeLessThan(0);
+    const narrow: LapCheckpoint = {
+      ...checkpoint(1, 0, 10), triangles: [[[-1, -1, 10], [1, -1, 10], [0, 1, 10]]],
+    };
+    expect(createAiNavigationTargets(routeState({ checkpoint: narrow }))).toEqual([]);
+    expect(() => driver.advance(1 / 60, routeState({
+      navigationTargets: [{ bias: 0, position: [0, 0, 10], clearance: Number.NaN }],
+    }))).toThrow(/clearance/);
   });
 
   it("selects targets in the useful arc of forward, rear, and radial weapons", () => {

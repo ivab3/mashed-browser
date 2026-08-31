@@ -78,6 +78,13 @@ export interface AiRouteDriverState {
   followingCheckpoint: LapCheckpoint;
   heldWeapon?: CombatWeaponType;
   opponents?: readonly AiOpponentState[];
+  navigationTargets?: readonly AiNavigationTarget[];
+}
+
+export interface AiNavigationTarget {
+  position: TrackVector3;
+  bias: number;
+  clearance: number;
 }
 
 export interface AiOpponentState {
@@ -148,6 +155,13 @@ function assertFiniteState(state: AiRouteDriverState): void {
     throw new Error("AI route driver speedMetersPerSecond cannot be negative");
   }
   const opponentIds = new Set<string>();
+  for (const target of state.navigationTargets ?? []) {
+    if (target.position.some((value) => !Number.isFinite(value))
+      || !Number.isFinite(target.bias) || !Number.isFinite(target.clearance)
+      || target.clearance < 0 || target.clearance > 1) {
+      throw new Error("AI navigation target must contain finite coordinates and clearance in [0, 1]");
+    }
+  }
   for (const opponent of state.opponents ?? []) {
     if (!opponent.id || opponentIds.has(opponent.id)) {
       throw new Error(`AI route driver opponent id ${JSON.stringify(opponent.id)} is empty or duplicated`);
@@ -179,6 +193,32 @@ function checkpointTarget(checkpoint: LapCheckpoint, bias: number): TrackVector3
     checkpoint.center[1],
     checkpoint.center[2] + (second[2] - first[2]) * bias,
   ];
+}
+
+function routeTarget(state: AiRouteDriverState, bias: number): TrackVector3 {
+  const target = checkpointTarget(state.checkpoint, bias);
+  const dx = state.followingCheckpoint.center[0] - state.checkpoint.center[0];
+  const dz = state.followingCheckpoint.center[2] - state.checkpoint.center[2];
+  const length = Math.hypot(dx, dz);
+  const beyondCheckpoint = (state.position[0] - state.checkpoint.center[0]) * dx
+    + (state.position[2] - state.checkpoint.center[2]) * dz > length * 0.3;
+  const lookAhead = Math.min(0.9, length * 0.25) * (beyondCheckpoint ? -1 : 1);
+  return length < 1e-5 ? target : [
+    target[0] + dx / length * lookAhead, target[1], target[2] + dz / length * lookAhead,
+  ];
+}
+
+/** Candidate positions stay within the authored checkpoint width, with a short crossing target. */
+export function createAiNavigationTargets(
+  state: AiRouteDriverState,
+): readonly Omit<AiNavigationTarget, "clearance">[] {
+  const left = checkpointTarget(state.checkpoint, -0.5);
+  const right = checkpointTarget(state.checkpoint, 0.5);
+  // A chassis plus steering margin leaves no safe alternate lane in the narrowest gates.
+  if (Math.hypot(right[0] - left[0], right[2] - left[2]) < 2.5) {
+    return [];
+  }
+  return [0, -0.2, 0.2, -0.4, 0.4].map((bias) => ({ bias, position: routeTarget(state, bias) }));
 }
 
 /** Deterministic fixed-step driver that turns ordered checkpoint geometry into normal vehicle input. */
@@ -241,12 +281,11 @@ export class AiRouteDriver {
     this.#elapsedSeconds += stepSeconds;
     this.#decisionSeconds += stepSeconds;
     this.#itemDecisionSeconds += stepSeconds;
-
-    const distanceToCheckpoint = Math.hypot(
-      state.checkpoint.center[0] - state.position[0],
-      state.checkpoint.center[2] - state.position[2],
+    const targetError = wrapRadians(
+      headingBetween(state.position, routeTarget(state, this.#laneBias)) - state.headingRadians,
     );
-    this.#stuckSeconds = state.speedMetersPerSecond < 0.6 && distanceToCheckpoint > 3
+
+    this.#stuckSeconds = state.speedMetersPerSecond < 0.6
       ? this.#stuckSeconds + stepSeconds
       : 0;
     if (
@@ -254,7 +293,7 @@ export class AiRouteDriver {
       && this.#stuckSeconds + 1e-9 >= this.#profile.stuckSecondsBeforeEscape
     ) {
       this.#escapeSecondsRemaining = this.#profile.escapeSeconds;
-      this.#escapeSteer = this.#random.nextFloat() < 0.5 ? -0.45 : 0.45;
+      this.#escapeSteer = clamp(targetError, -1, 1);
       this.#stuckSeconds = 0;
     }
     if (this.#escapeSecondsRemaining > 0) {
@@ -300,7 +339,13 @@ export class AiRouteDriver {
   }
 
   #routeDecision(state: AiRouteDriverState): AiVehicleInput {
-    const target = checkpointTarget(state.checkpoint, this.#laneBias);
+    const candidates = state.navigationTargets;
+    const target = candidates?.length
+      ? [...candidates].sort((left, right) => (
+          right.clearance - left.clearance
+          || Math.abs(left.bias - this.#laneBias) - Math.abs(right.bias - this.#laneBias)
+        ))[0]!.position
+      : routeTarget(state, this.#laneBias);
     const targetHeading = headingBetween(state.position, target);
     const entryHeading = headingBetween(
       state.precedingCheckpoint.center,
@@ -308,14 +353,35 @@ export class AiRouteDriver {
     );
     const exitHeading = headingBetween(state.checkpoint.center, state.followingCheckpoint.center);
     const headingError = wrapRadians(targetHeading - state.headingRadians);
+    if (Math.abs(headingError) > 2.1) {
+      return {
+        drive: -0.65,
+        steer: clamp(wrapRadians(headingError + Math.PI) * this.#profile.steeringGain, -1, 1),
+        brake: state.speedMetersPerSecond > 3 ? 0.5 : 0,
+        handbrake: 0,
+        recover: false,
+        useItem: false,
+      };
+    }
     const cornerAngle = Math.abs(wrapRadians(exitHeading - entryHeading));
     const severity = Math.max(
       clamp(Math.abs(headingError) / 1.25, 0, 1),
       clamp(cornerAngle / 1.4, 0, 1),
     );
-    const targetSpeed = this.#profile.minimumSpeedMetersPerSecond
+    const segmentLength = Math.min(
+      Math.hypot(
+        state.checkpoint.center[0] - state.precedingCheckpoint.center[0],
+        state.checkpoint.center[2] - state.precedingCheckpoint.center[2],
+      ),
+      Math.hypot(
+        state.followingCheckpoint.center[0] - state.checkpoint.center[0],
+        state.followingCheckpoint.center[2] - state.checkpoint.center[2],
+      ),
+    );
+    const cornerSpeedLimit = Math.sqrt(Math.max(1, segmentLength / Math.max(0.01, cornerAngle)) * 5);
+    const targetSpeed = Math.min(cornerSpeedLimit, this.#profile.minimumSpeedMetersPerSecond
       + (this.#profile.maximumSpeedMetersPerSecond - this.#profile.minimumSpeedMetersPerSecond)
-        * (1 - severity);
+        * (1 - severity));
     const overspeed = state.speedMetersPerSecond - targetSpeed;
     const brake = overspeed > 0.6
       ? clamp(overspeed / this.#profile.brakingResponse, 0, 1)

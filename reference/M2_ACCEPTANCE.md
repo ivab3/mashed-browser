@@ -14,6 +14,7 @@ pnpm content:validate
 pnpm match:replay
 pnpm m1:soak
 pnpm ai:lap
+pnpm ai:tracks
 ```
 
 `alpha:replay` runs the same clean-room cup definition, match thresholds and ranking function as the
@@ -26,7 +27,7 @@ navigation. Course identities exercise save namespaces, not course geometry.
 
 `content:validate` requires the user's extracted local data. It parses every admitted bundle, rejects
 unclassified files, and completes a checkpoint rules replay for each track on 30/60/120 Hz. The other
-commands except `ai:lap` are source-independent. No original resource is embedded in a test or report.
+commands except `ai:lap` and `ai:tracks` are source-independent. No original resource is embedded in a test or report.
 
 ## Browser acceptance (6.7c)
 
@@ -48,7 +49,7 @@ reattachment after reload; asset caching belongs to Beta.
 | --- | --- |
 | Base arsenal | Nine normalized types, timed effects, physical adapters, tactical AI and replay tests; [arsenal notes](ALPHA.md#slice-62--complete-base-arsenal) |
 | Key local modes | Standard, Team, Flag and Fugitive rules and browser smoke; objective rules remain clean-room |
-| AI | Difficulty profiles and deterministic controller; autonomous Warzone lap accepted; Arctic obstacle navigation remains open |
+| AI | Difficulty profiles, deterministic collision probes and full physical laps on all admitted tracks; two explicit Hard seeds, not all pack scenarios |
 | Championship | Shared versioned definition, points, medals, strict restore, restart and `alpha:replay`; original cup schedule is not reconstructed |
 | Destruction / traps / scripted events | Generic destructible physics props and weapon hazards work; authored track events and traps remain open, not satisfied by listing their files as deferred |
 | Vehicle roster | All 15 archives / 90 skins parse; all archive skin-0 pairs browser-bound; names other than Wildfire are explicitly inferred metadata |
@@ -60,10 +61,10 @@ reattachment after reload; asset caching belongs to Beta.
 
 | Track | Course | Checkpoints | Loading smoke | Autonomous physics boundary |
 | --- | ---: | ---: | --- | --- |
-| Warzone | 33 | 136 | Full 51-file bundle, natural solo lap | Hard CPU full lap; `ai:lap` |
-| City | 26 | 117 | 24 files, world/collision/vehicle bound | Partial CPU smoke; complete AI lap not claimed |
-| Neustein | 39 | 72 | 23 files, world/collision/vehicle bound | Partial CPU smoke; complete AI lap not claimed |
-| Arctic | 0 | 94 | 22 files, declared nonstandard BSP names | CPU blocked near checkpoint 8; open |
+| Warzone | 33 | 136 | Full 51-file bundle, natural solo lap | Hard full lap 55.57 s; `ai:lap` / `ai:tracks` |
+| City | 26 | 117 | 24 files, world/collision/vehicle bound | Hard full lap 75.20–81.40 s; `ai:tracks` |
+| Neustein | 39 | 72 | 23 files, world/collision/vehicle bound | Hard full lap 38.95 s; `ai:tracks` |
+| Arctic | 0 | 94 | 22 files, declared nonstandard BSP names; later six-file solo browser lap 4:39.00 | Hard full lap 82.27–175.72 s including settled start, substantial reversing; `ai:tracks` |
 
 Exact measurements and file-family classifications are in [CONTENT_BATCHES.md](CONTENT_BATCHES.md)
 and the executable registry `packages/assets/src/content-batches.ts`. A loading smoke or checkpoint
@@ -87,6 +88,5 @@ alpha acceptance. Source-free production build still has the documented large-ch
 
 ## Remaining work before M2 sign-off
 
-1. Close the admitted-track navigation gap using reproducible physics checks, not synthetic checkpoints.
-2. Implement and accept track traps/scripted events with explicit source-versus-clean-room boundaries.
-3. Repeat the final UI and regression gates after those changes; only then reassess feature completeness.
+1. Implement and accept track traps/scripted events with explicit source-versus-clean-room boundaries.
+2. Repeat the final UI and regression gates after those changes; only then reassess feature completeness.

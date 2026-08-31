@@ -5,7 +5,7 @@ import {
   type AiDifficulty,
   type LapCheckpoint,
 } from "@mashed/core";
-import type { VehicleInputFrame } from "@mashed/input";
+import { NEUTRAL_VEHICLE_INPUT, type VehicleInputFrame } from "@mashed/input";
 
 import {
   createPhysicsRuntime,
@@ -14,6 +14,7 @@ import {
   type VehicleSpawn,
 } from "./index.js";
 import { deriveRouteCollisionLayers } from "./route-collision.js";
+import { probeAiNavigation } from "./ai-navigation.js";
 
 export interface LapValidationCourse {
   checkpoints: readonly LapCheckpoint[];
@@ -37,6 +38,8 @@ export interface LapValidationOptions {
   maximumSteps?: number;
   aiDifficulty?: AiDifficulty;
   aiSeed?: number;
+  /** Neutral physics frames before the lap clock and driver start. */
+  settlingSteps?: number;
 }
 
 export interface LapValidationReport {
@@ -51,6 +54,7 @@ export interface LapValidationReport {
   maximumSpeedKmh: number;
   reverseFrames: number;
   recoveryFrames: number;
+  recoveryOperations: number;
   finalPosition: readonly [number, number, number];
   finalRotation: readonly [number, number, number, number];
   finalHeadingRadians: number;
@@ -184,6 +188,12 @@ export async function runLapValidation(
 ): Promise<LapValidationReport> {
   const stepSeconds = options.stepSeconds ?? 1 / 60;
   const maximumSteps = options.maximumSteps ?? 60 * 8 * 60;
+  const settlingSteps = options.settlingSteps ?? 0;
+  if (!Number.isFinite(stepSeconds) || stepSeconds <= 0
+    || !Number.isInteger(maximumSteps) || maximumSteps < 1
+    || !Number.isInteger(settlingSteps) || settlingSteps < 0) {
+    throw new Error("Lap validation requires positive stepSeconds/maximumSteps and nonnegative integer settlingSteps");
+  }
   const runtime = await createPhysicsRuntime(
     new RuntimeEventBus(),
     stepSeconds,
@@ -220,6 +230,9 @@ export async function runLapValidation(
   try {
     const collisionTriangles = runtime.setTrackCollision(deriveRouteCollisionLayers(course, collision));
     runtime.setRaceSpawn(course.spawn);
+    for (let settling = 0; settling < settlingSteps; settling += 1) {
+      runtime.step(stepSeconds, NEUTRAL_VEHICLE_INPUT);
+    }
 
     for (steps = 1; steps <= maximumSteps; steps += 1) {
       const progress = lap.progress;
@@ -241,14 +254,17 @@ export async function runLapValidation(
         reverseUntilStep = steps + 90;
         lastCheckpointStep = steps;
       }
+      const driverState = {
+        position: runtime.transformHistory.current.position,
+        headingRadians: telemetry.headingRadians,
+        speedMetersPerSecond: telemetry.speedMetersPerSecond,
+        precedingCheckpoint: preceding,
+        checkpoint: target.checkpoint,
+        followingCheckpoint: following,
+      };
       const input = aiDriver
         ? aiDriver.advance(stepSeconds, {
-            position: runtime.transformHistory.current.position,
-            headingRadians: telemetry.headingRadians,
-            speedMetersPerSecond: telemetry.speedMetersPerSecond,
-            precedingCheckpoint: preceding,
-            checkpoint: target.checkpoint,
-            followingCheckpoint: following,
+            ...driverState, navigationTargets: probeAiNavigation(runtime, driverState),
           })
         : steps < reverseUntilStep
           ? createRouteEscapeInput()
@@ -317,6 +333,7 @@ export async function runLapValidation(
           maximumSpeedKmh,
           reverseFrames,
           recoveryFrames,
+          recoveryOperations: runtime.recoveryCount,
           finalPosition: runtime.transformHistory.current.position,
           finalRotation: runtime.transformHistory.current.rotation,
           finalHeadingRadians: runtime.telemetry.headingRadians,
@@ -343,6 +360,7 @@ export async function runLapValidation(
       maximumSpeedKmh,
       reverseFrames,
       recoveryFrames,
+      recoveryOperations: runtime.recoveryCount,
       finalPosition: runtime.transformHistory.current.position,
       finalRotation: runtime.transformHistory.current.rotation,
       finalHeadingRadians: runtime.telemetry.headingRadians,

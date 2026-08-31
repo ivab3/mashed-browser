@@ -410,8 +410,11 @@ match thresholds и ranking в общий production contract, добавляе�
 на 30/60/120 Hz и доводит suite до 178 тестов. [M2 acceptance report](./reference/M2_ACCEPTANCE.md)
 явно отделяет loading smoke от physics navigation. Срез 6.7d исправляет live audio через общий
 master gain bus для уже звучащих original/synthesized cues, сохраняет engine pause и добавляет
-четыре graph-level regression tests (182 теста всего). M2 ещё не закрыт:
-навигация оставшихся admitted tracks и traps/scripted events требуют дальнейших срезов; расширение
+четыре graph-level regression tests (182 теста всего). Follow-up 6.4b добавляет collision feelers,
+reapproach/reverse steering и curvature speed cap. `ai:tracks` завершает все четыре admitted tracks
+для двух Hard seed, плюс settled-start P1, дважды каждый: 24 совпадающих физических круга без input/automatic recovery.
+Arctic всё ещё требует много заднего хода, но проходит весь круг. Suite — 187 тестов. M2 ещё не закрыт:
+traps/scripted events требуют дальнейшего среза; расширение
 трасс продолжается пакетами 6.6f+.
 
 ### Этап 7. Beta: доставка, производительность и совместимость — 3–6 недель

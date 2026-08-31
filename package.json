@@ -12,6 +12,7 @@
     "assets:probe": "node --import tsx packages/assets/src/probe.ts",
     "asset-viewer": "pnpm --filter @mashed/asset-viewer dev",
     "ai:lap": "pnpm --filter @mashed/physics ai:lap",
+    "ai:tracks": "pnpm --filter @mashed/physics ai:tracks",
     "alpha:replay": "node --import tsx packages/replay/src/alpha-series-cli.ts",
     "lap:validate": "pnpm --filter @mashed/physics lap:validate",
     "m1:soak": "node --expose-gc --import tsx packages/replay/src/soak-cli.ts",

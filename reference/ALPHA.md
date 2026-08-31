@@ -195,12 +195,21 @@ speed behavior without double-scaling. Ended source/gain nodes disconnect, and i
 gains cannot reach an exponential ramp. Four additional graph-level tests and browser live
 mute/pause/volume/resume/results smoke cover the regression.
 
+## Slice 6.4b — physical navigation across admitted tracks
+
+The shared controller now reapproaches missed gates, handles near-checkpoint obstructions, reverses
+toward targets behind it and limits speed through short bends. A deterministic physics adapter probes
+candidate lanes without turning upward road slopes into walls. `pnpm ai:tracks` completes every
+admitted course twice with each of two explicit Hard seeds, plus a settled-start P1 variant: all 24 physical
+laps finish with identical repeated reports and no input or automatic recovery. Arctic still needs
+substantial reverse manoeuvring; broad pack/difficulty tuning is not claimed. Full measurements live
+in [AI_FOUNDATION.md](AI_FOUNDATION.md#slice-64b--admitted-track-navigation-gate-2026-08-31).
+
 ## Next slices
 
 1. **6.6f+ track batches:** extend the playable track catalog in measured batches. Every admitted track
    keeps the load smoke, rules replay, and explicit unsupported-resource record.
-2. **6.4b navigation follow-up:** reproduce and close admitted-track CPU obstruction failures.
-3. **6.8 track events:** connect traps/scripted track behavior, then repeat M2 acceptance.
+2. **6.8 track events:** connect traps/scripted track behavior, then repeat M2 acceptance.
 
 This order may interleave a content batch after a new mode or weapon family so the abstractions are
 validated on more than Warzone before they spread across the full catalog.

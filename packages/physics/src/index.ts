@@ -347,6 +347,7 @@ export class PhysicsRuntime {
   readonly #objectByCollider = new Map<number, ArenaObject>();
   readonly #trackBodies: RapierRigidBody[] = [];
   #trackTriangles = 0;
+  #recoveryCount = 0;
   #activeSpawn: VehicleSpawn;
   #vehicleRosterIds: readonly string[] = [PRIMARY_VEHICLE_ID];
   #primaryActive = true;
@@ -490,6 +491,11 @@ export class PhysicsRuntime {
 
   get vehicleIds(): readonly string[] {
     return [...this.#vehicleRosterIds];
+  }
+
+  /** Lifetime count includes both input-requested and automatic upright recoveries. */
+  get recoveryCount(): number {
+    return this.#recoveryCount;
   }
 
   get activeVehicleIds(): readonly string[] {
@@ -917,6 +923,7 @@ export class PhysicsRuntime {
     if (!this.#primaryActive) {
       return;
     }
+    this.#recoveryCount += 1;
     const position = this.#body.translation();
     this.#placeVehicle(
       [position.x, Math.max(position.y + this.#config.recovery.lift, this.#activeSpawn.position[1]), position.z],
@@ -1372,6 +1379,7 @@ export class PhysicsRuntime {
   }
 
   #recoverCollisionVehicle(vehicle: CollisionVehicleRuntime): void {
+    this.#recoveryCount += 1;
     const position = vehicle.body.translation();
     this.#placeVehicleBody(
       vehicle.body,
@@ -1440,3 +1448,4 @@ export async function createPhysicsRuntime(
   await RAPIER.init();
   return new PhysicsRuntime(RAPIER, events, stepSeconds, config, options);
 }
+export * from "./ai-navigation.js";

@@ -11,6 +11,20 @@ import {
 } from "../src/index.js";
 
 describe("PhysicsRuntime", () => {
+  it("counts actual recovery operations rather than held recovery inputs", async () => {
+    const physics = await createPhysicsRuntime(new RuntimeEventBus(), 1 / 60, DEFAULT_VEHICLE_CONFIG, { collisionObjects: false });
+    try {
+      expect(physics.recoveryCount).toBe(0);
+      physics.recover();
+      expect(physics.recoveryCount).toBe(1);
+      const input = { drive: 0, steer: 0, brake: 0, handbrake: 0, recover: true };
+      physics.step(1 / 60, input);
+      physics.step(1 / 60, input);
+      expect(physics.recoveryCount).toBe(2);
+    } finally {
+      physics.dispose();
+    }
+  });
   it("reproduces the original six-second drive-force build-up curve", () => {
     expect(driveForceBuildUpFactor(0, 0.5, 6)).toBe(0.5);
     expect(driveForceBuildUpFactor(3, 0.5, 6)).toBe(0.75);

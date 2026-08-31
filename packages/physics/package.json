@@ -11,6 +11,7 @@
     "test": "vitest run",
     "content:validate": "node --import tsx src/content-validation-cli.ts",
     "ai:lap": "node --import tsx src/lap-validation-cli.ts --ai",
+    "ai:tracks": "node --import tsx src/ai-tracks-cli.ts",
     "lap:validate": "node --import tsx src/lap-validation-cli.ts",
     "tune": "node --import tsx src/tuning-cli.ts"
   },
