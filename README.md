@@ -134,11 +134,11 @@ matrix, and fails if a source file is neither exercised nor explicitly classifie
 each course's declared BSP filenames, including Arctic's nonstandard names. Inferred localized
 vehicle-name mappings stay registry metadata; the runtime keeps source archive labels until direct
 evidence exists.
-The Settings panel applies CPU presets, gamepad deadzone, master volume/mute, and graphics quality to
-the live adapters. Values restore from a strict versioned local record; malformed or unavailable
-storage falls back to safe defaults without blocking boot. See
+The Settings panel applies CPU presets, gamepad deadzone, master volume/mute, graphics quality, and
+eight remappable P1 keyboard actions to the live adapters. Strict versioned local records restore
+settings and bindings; malformed or unavailable storage falls back to safe defaults without blocking boot. See
 [`reference/ALPHA_SETTINGS.md`](./reference/ALPHA_SETTINGS.md) for the schema and browser acceptance.
-Choose 1–4 local players in the runtime roster. P1 uses WASD and gamepad 1; P2 uses the arrow keys
+Choose 1–4 local players in the runtime roster. P1 defaults to remappable WASD and gamepad 1; P2 uses the arrow keys
 and gamepad 2; P3/P4 use gamepads 3/4. Every active slot has independent physics and telemetry, and
 can select any complete numbered DFF/shared-TXD pair loaded in the current session. The camera
 centers the active group and pulls back as the cars separate; on a loaded route, a trailing player

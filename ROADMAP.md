@@ -351,7 +351,7 @@ Milestone M1: публично показываемый proof of concept.
 
 Milestone M2: feature-complete alpha.
 
-Статус 2026-08-30: **этап 6 выполняется; срезы 6.1–6.5, content batches 6.6a–e и settings slice 6.7a завершены**. Срез 6.1 вводит безопасный reader исходных
+Статус 2026-08-31: **этап 6 выполняется; срезы 6.1–6.5, content batches 6.6a–e и settings slices 6.7a–b завершены**. Срез 6.1 вводит безопасный reader исходных
 `POWERUPS_ALL.LUA`/`POWERUPS_GOLD.LUA`: нормализованы все встречающиеся type ID, глобальные loadout
 для 26 course ID и source-authored position/respawn metadata. Срез 6.2 подключает девять подтверждённых
 обучающими строками типов: machine gun, guided missile, mortar, rear flame, oil, proximity mine, drum
@@ -400,8 +400,13 @@ collision triangles, 85 textures и все 40 declared DFF, а обычный 51
 graphics profiles. Строгий versioned local record проверяет enum, boolean и numeric ranges, безопасно
 переживает corrupted/unavailable storage и не смешивается с championship progress. Browser acceptance
 изменил все категории, восстановил их после navigation, проверил reset и завершил двухпользовательский
-CPU round без console warnings/errors. Keyboard rebinding и финальный M2 compatibility report остаются
-в 6.7b; расширение трасс продолжается пакетами 6.6f+.
+CPU round без console warnings/errors. Срез 6.7b добавляет переназначение восьми P1 keyboard actions:
+capture/Escape cancel, swap занятых клавиш, защиту P2/runtime keys, строгий независимый versioned save
+и обновляемые подсказки. UI focus не передаёт ввод машине; переход к матчу отменяет незавершённый
+capture. Browser acceptance проверил capture/swap/reject/restore/results/reset без console errors,
+а production-input тест отдельно подтвердил работу новой клавиши и освобождение старой. Полный gate:
+173 теста, typecheck/build, content validation, replay, soak и AI lap. Финальный M2 compatibility report
+и сквозная alpha-приёмка остаются в 6.7c; расширение трасс продолжается пакетами 6.6f+.
 
 ### Этап 7. Beta: доставка, производительность и совместимость — 3–6 недель
 

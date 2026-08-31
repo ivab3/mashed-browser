@@ -112,6 +112,14 @@ export const SINGLE_PLAYER_KEYBOARD_BINDINGS: VehicleKeyboardBindings = Object.f
   useItem: ["KeyE", "Slash"],
 });
 
+/** UI controls retain their native keyboard behavior instead of also driving a car. */
+export function isInteractiveKeyboardTarget(target: EventTarget | null): boolean {
+  const element = target as Element | null;
+  return typeof element?.closest === "function" && element.closest(
+    "input, select, textarea, button, summary, a[href], [contenteditable]:not([contenteditable='false'])",
+  ) !== null;
+}
+
 /** Keyboard and first-gamepad adapter. It owns no simulation state. */
 export class BrowserVehicleInput {
   readonly #target: Window;
@@ -131,6 +139,9 @@ export class BrowserVehicleInput {
     this.#deadzone = options.deadzone ?? 0.12;
     this.#keyboard = options.keyboard ?? SINGLE_PLAYER_KEYBOARD_BINDINGS;
     this.#onKeyDown = (event) => {
+      if (isInteractiveKeyboardTarget(event.target)) {
+        return;
+      }
       if (this.#keyboard.recover.includes(event.code) && !event.repeat) {
         this.#recoveryLatched = true;
       }

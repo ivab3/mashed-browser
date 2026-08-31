@@ -79,6 +79,24 @@ describe("vehicle input normalization", () => {
     }
   });
 
+  it("leaves focused UI keys and one-shot actions out of gameplay input", () => {
+    const target = new EventTarget();
+    const input = new BrowserVehicleInput(target as Window);
+    try {
+      for (const code of ["KeyW", "Space", "KeyR", "KeyE", "ArrowLeft"]) {
+        const event = keyboardEvent("keydown", code);
+        Object.defineProperty(event, "target", { value: { closest: () => ({}) } });
+        target.dispatchEvent(event);
+        expect(event.defaultPrevented).toBe(false);
+      }
+      expect(input.sample([])).toEqual({
+        drive: 0, steer: 0, brake: 0, handbrake: 0, recover: false, useItem: false,
+      });
+    } finally {
+      input.dispose();
+    }
+  });
+
   it("reserves keyboard-free slots for third and fourth gamepads", () => {
     const target = new EventTarget();
     const input = new BrowserVehicleInput(target as Window, {

@@ -8,7 +8,7 @@
   </head>
   <body>
     <main>
-      <section id="viewport" class="viewport" aria-label="Runtime viewport">
+      <section id="viewport" class="viewport" aria-label="Runtime viewport" tabindex="0">
         <header class="topbar">
           <div>
             <span class="eyebrow">Mashed · Feature alpha</span>
@@ -216,6 +216,20 @@
             <input id="settings-muted" type="checkbox" />
             <span>Mute audio</span>
           </label>
+          <details class="settings-bindings">
+            <summary>P1 keyboard bindings</summary>
+            <div>
+              <label><span>Accelerate</span><button id="binding-forward" data-binding-action="forward" type="button" aria-label="Rebind accelerate (W)">W</button></label>
+              <label><span>Reverse</span><button id="binding-reverse" data-binding-action="reverse" type="button" aria-label="Rebind reverse (S)">S</button></label>
+              <label><span>Steer left</span><button id="binding-left" data-binding-action="left" type="button" aria-label="Rebind steer left (A)">A</button></label>
+              <label><span>Steer right</span><button id="binding-right" data-binding-action="right" type="button" aria-label="Rebind steer right (D)">D</button></label>
+              <label><span>Brake</span><button id="binding-brake" data-binding-action="brake" type="button" aria-label="Rebind brake (Left Shift)">Left Shift</button></label>
+              <label><span>Handbrake</span><button id="binding-handbrake" data-binding-action="handbrake" type="button" aria-label="Rebind handbrake (Space)">Space</button></label>
+              <label><span>Recover</span><button id="binding-recover" data-binding-action="recover" type="button" aria-label="Rebind recover (R)">R</button></label>
+              <label><span>Use item</span><button id="binding-use-item" data-binding-action="useItem" type="button" aria-label="Rebind use item (E)">E</button></label>
+            </div>
+            <p id="settings-bindings-status" role="status">Choose an action, then press a key. Escape cancels.</p>
+          </details>
           <p id="settings-status" role="status">Saved locally</p>
         </section>
 

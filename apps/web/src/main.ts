@@ -54,10 +54,10 @@ import {
 import {
   BrowserVehicleInput,
   GAMEPAD_ONLY_KEYBOARD_BINDINGS,
+  isInteractiveKeyboardTarget,
   NEUTRAL_VEHICLE_INPUT,
-  PLAYER_ONE_KEYBOARD_BINDINGS,
   PLAYER_TWO_KEYBOARD_BINDINGS,
-  SINGLE_PLAYER_KEYBOARD_BINDINGS,
+  type VehicleKeyboardBindings,
   type VehicleInputFrame,
 } from "@mashed/input";
 import {
@@ -78,6 +78,17 @@ import {
   type AlphaSettingsV1,
 } from "./alpha-settings.js";
 import { ChampionshipSaveStorage } from "./championship-storage.js";
+import {
+  CONTROL_BINDING_ACTIONS,
+  ControlBindingsStorage,
+  DEFAULT_CONTROL_BINDINGS,
+  formatKeyboardCode,
+  isRebindableKeyboardCode,
+  rebindControlAction,
+  vehicleKeyboardBindings,
+  type ControlBindingAction,
+  type ControlBindingsV1,
+} from "./control-bindings.js";
 import type { LoadedAsset } from "./loading-protocol.js";
 import {
   evaluateM1Evidence,
@@ -238,6 +249,17 @@ const settingsDeadzoneValue = element<HTMLOutputElement>("settings-deadzone-valu
 const settingsMuted = element<HTMLInputElement>("settings-muted");
 const settingsReset = element<HTMLButtonElement>("settings-reset");
 const settingsStatus = element<HTMLElement>("settings-status");
+const settingsBindingsStatus = element<HTMLElement>("settings-bindings-status");
+const bindingButtons: Readonly<Record<ControlBindingAction, HTMLButtonElement>> = {
+  forward: element<HTMLButtonElement>("binding-forward"),
+  reverse: element<HTMLButtonElement>("binding-reverse"),
+  left: element<HTMLButtonElement>("binding-left"),
+  right: element<HTMLButtonElement>("binding-right"),
+  brake: element<HTMLButtonElement>("binding-brake"),
+  handbrake: element<HTMLButtonElement>("binding-handbrake"),
+  recover: element<HTMLButtonElement>("binding-recover"),
+  useItem: element<HTMLButtonElement>("binding-use-item"),
+};
 const additionalPlayerMetrics = [
   {
     row: element<HTMLElement>("metric-player-two-row"),
@@ -263,6 +285,9 @@ const championshipStorage = new ChampionshipSaveStorage(() => window.localStorag
 const settingsStorage = new AlphaSettingsStorage(() => window.localStorage);
 const settingsLoad = settingsStorage.load();
 let alphaSettings = settingsLoad.settings;
+const controlBindingsStorage = new ControlBindingsStorage(() => window.localStorage);
+const controlBindingsLoad = controlBindingsStorage.load();
+let controlBindings: ControlBindingsV1 = controlBindingsLoad.bindings;
 audio.setMasterVolume(alphaSettings.muted ? 0 : alphaSettings.masterVolume);
 renderer.setGraphicsQuality(alphaSettings.graphicsQuality);
 const loadedAssets = new Map<string, LoadedAsset>();
@@ -301,6 +326,7 @@ let smoothedFps = 60;
 let lastOverlayUpdate = 0;
 let physicsMilliseconds = 0;
 let totalDroppedSeconds = 0;
+let pendingBindingAction: ControlBindingAction | undefined;
 const m1Evidence = new M1EvidenceCollector();
 
 playerCountSelect.value = m1EvidenceMode ? "4" : vehiclePairLab ? "2" : "1";
@@ -360,6 +386,40 @@ function syncAlphaSettingsControls(): void {
   settingsDeadzoneValue.value = `${Math.round(alphaSettings.gamepadDeadzone * 100)}%`;
   settingsMuted.checked = alphaSettings.muted;
   settingsVolume.disabled = alphaSettings.muted;
+}
+
+const CONTROL_BINDING_LABELS: Readonly<Record<ControlBindingAction, string>> = Object.freeze({
+  forward: "accelerate",
+  reverse: "reverse",
+  left: "steer left",
+  right: "steer right",
+  brake: "brake",
+  handbrake: "handbrake",
+  recover: "recover",
+  useItem: "use item",
+});
+
+function syncControlBindingButtons(): void {
+  for (const action of CONTROL_BINDING_ACTIONS) {
+    const button = bindingButtons[action];
+    const capturing = action === pendingBindingAction;
+    const keyLabel = formatKeyboardCode(controlBindings.playerOne[action]);
+    button.textContent = capturing ? "Press key…" : keyLabel;
+    button.dataset["capturing"] = String(capturing);
+    button.setAttribute(
+      "aria-label",
+      capturing
+        ? `Waiting to rebind ${CONTROL_BINDING_LABELS[action]}`
+        : `Rebind ${CONTROL_BINDING_LABELS[action]} (${keyLabel})`,
+    );
+  }
+}
+
+function persistControlBindings(status: string): void {
+  const result = controlBindingsStorage.save(controlBindings);
+  settingsBindingsStatus.textContent = result.ok
+    ? `${status} · saved locally`
+    : `${status} · save unavailable: ${result.error}`;
 }
 
 function persistAlphaSettings(status: string): void {
@@ -571,11 +631,22 @@ function localRosterGrid(): readonly LocalPlayerGridSlot[] {
 function rebuildVehicleInputs(): void {
   vehicleInputs.forEach((input) => input.dispose());
   const count = selectedPlayerCount();
+  const playerOneKeyboard = vehicleKeyboardBindings(controlBindings);
+  const singlePlayerKeyboard: VehicleKeyboardBindings = {
+    forward: [...playerOneKeyboard.forward, ...PLAYER_TWO_KEYBOARD_BINDINGS.forward],
+    reverse: [...playerOneKeyboard.reverse, ...PLAYER_TWO_KEYBOARD_BINDINGS.reverse],
+    left: [...playerOneKeyboard.left, ...PLAYER_TWO_KEYBOARD_BINDINGS.left],
+    right: [...playerOneKeyboard.right, ...PLAYER_TWO_KEYBOARD_BINDINGS.right],
+    brake: [...playerOneKeyboard.brake, ...PLAYER_TWO_KEYBOARD_BINDINGS.brake],
+    handbrake: playerOneKeyboard.handbrake,
+    recover: playerOneKeyboard.recover,
+    useItem: [...playerOneKeyboard.useItem, ...PLAYER_TWO_KEYBOARD_BINDINGS.useItem],
+  };
   vehicleInputs = activePlayerSlots().map((slot, index) => {
     const keyboard = count === 1
-      ? SINGLE_PLAYER_KEYBOARD_BINDINGS
+      ? singlePlayerKeyboard
       : index === 0
-        ? PLAYER_ONE_KEYBOARD_BINDINGS
+        ? playerOneKeyboard
         : index === 1
           ? PLAYER_TWO_KEYBOARD_BINDINGS
           : GAMEPAD_ONLY_KEYBOARD_BINDINGS;
@@ -590,6 +661,10 @@ function rebuildVehicleInputs(): void {
 function applyRosterPresentation(): void {
   const count = selectedPlayerCount();
   const multiplayer = count > 1;
+  const binding = (action: ControlBindingAction) => formatKeyboardCode(controlBindings.playerOne[action]);
+  const driveBindings = ["forward", "reverse", "left", "right"]
+    .map((action) => binding(action as ControlBindingAction))
+    .join("/");
   matchModeRow.hidden = !multiplayer;
   metricSpeedLabel.textContent = multiplayer ? "P1 speed" : "Speed";
   metricWheelsLabel.textContent = multiplayer ? "P1 wheels" : "Wheels";
@@ -604,13 +679,13 @@ function applyRosterPresentation(): void {
     metric.row.hidden = index + 1 >= count;
   });
   if (multiplayer) {
-    primaryDriveGuide.innerHTML = "<b>P1 · WASD</b> accelerate, reverse and steer";
-    primaryActionGuide.innerHTML = "<b>Space</b> handbrake · <b>Left Shift</b> brake · <b>R</b> recover · <b>E</b> item";
+    primaryDriveGuide.innerHTML = `<b>P1 · ${driveBindings}</b> accelerate, reverse and steer`;
+    primaryActionGuide.innerHTML = `<b>${binding("handbrake")}</b> handbrake · <b>${binding("brake")}</b> brake · <b>${binding("recover")}</b> recover · <b>${binding("useItem")}</b> item`;
     secondaryDriveGuide.hidden = false;
     secondaryActionGuide.hidden = false;
   } else {
-    primaryDriveGuide.innerHTML = "<b>WASD / arrows</b> accelerate, reverse and steer";
-    primaryActionGuide.innerHTML = "<b>Space</b> handbrake · <b>Shift</b> brake · <b>R</b> recover · <b>E /</b> item";
+    primaryDriveGuide.innerHTML = `<b>${driveBindings} / arrows</b> accelerate, reverse and steer`;
+    primaryActionGuide.innerHTML = `<b>${binding("handbrake")}</b> handbrake · <b>${binding("brake")}</b> brake · <b>${binding("recover")}</b> recover · <b>${binding("useItem")} /</b> item`;
     secondaryDriveGuide.hidden = true;
     secondaryActionGuide.hidden = true;
   }
@@ -620,8 +695,8 @@ function applyRosterPresentation(): void {
     : `<b>Gamepads 1–${count}</b> left stick · triggers · A/B/X/Y${count > 2 ? " · P3/P4 gamepad only" : ""}`;
   resetButton.textContent = multiplayer ? "Reset vehicles" : "Reset vehicle";
   runtimeShortcuts.textContent = multiplayer
-    ? `P1 WASD + E · P2 arrows + / · ${count} gamepads · C colliders`
-    : "E or / uses item · C colliders · R recovers";
+    ? `P1 ${driveBindings} + ${binding("useItem")} · P2 arrows + / · ${count} gamepads · C colliders`
+    : `${binding("useItem")} or / uses item · C colliders · ${binding("recover")} recovers`;
 }
 
 function configureLocalRoster(): void {
@@ -633,12 +708,21 @@ function configureLocalRoster(): void {
 rebuildVehicleInputs();
 applyRosterPresentation();
 syncAlphaSettingsControls();
+syncControlBindingButtons();
 settingsStatus.textContent = settingsLoad.ok
   ? settingsLoad.restored ? "Restored locally" : "Defaults active"
   : `Defaults active · restore unavailable: ${settingsLoad.error}`;
+settingsBindingsStatus.textContent = controlBindingsLoad.ok
+  ? controlBindingsLoad.restored ? "Bindings restored locally" : "Default bindings active · choose an action, then press a key"
+  : `Default bindings active · restore unavailable: ${controlBindingsLoad.error}`;
 
 function applyState(next: RuntimeState): void {
   const matchActive = next === "race" || next === "paused";
+  if ((next === "loading" || matchActive) && pendingBindingAction) {
+    pendingBindingAction = undefined;
+    syncControlBindingButtons();
+    settingsBindingsStatus.textContent = "Binding change cancelled by match transition";
+  }
   stateBadge.textContent = next;
   stateBadge.dataset["state"] = next;
   startButton.disabled = next !== "menu" && next !== "results";
@@ -675,6 +759,9 @@ function applyState(next: RuntimeState): void {
   settingsDifficulty.disabled = next === "loading" || matchActive;
   settingsDeadzone.disabled = next === "loading" || matchActive;
   settingsReset.disabled = next === "loading" || matchActive;
+  CONTROL_BINDING_ACTIONS.forEach((action) => {
+    bindingButtons[action].disabled = next === "loading" || matchActive;
+  });
   pauseOverlay.hidden = next !== "paused";
   applyCombatHud();
   applyModeHud();
@@ -1430,6 +1517,7 @@ async function startRace(): Promise<void> {
   clock.restart(performance.now() / 1000);
   totalDroppedSeconds = 0;
   state.transition("race", raceSession ? "Race countdown started" : "Fixed-step simulation running");
+  viewport.focus({ preventScroll: true });
   applyRaceBanner();
   applyModeHud();
   if (!raceSession) {
@@ -1456,6 +1544,7 @@ function resumeRace(): void {
   void audio.unlock();
   clock.reset(performance.now() / 1000);
   state.transition("race", "Match resumed");
+  viewport.focus({ preventScroll: true });
   events.emit({ type: "audio:cue", cue: "resume", gain: 0.055 });
 }
 
@@ -1585,7 +1674,49 @@ settingsMuted.addEventListener("change", () => {
     settingsMuted.checked ? "Audio muted" : "Audio enabled",
   );
 });
+CONTROL_BINDING_ACTIONS.forEach((action) => {
+  bindingButtons[action].addEventListener("click", () => {
+    if (state.state === "loading" || state.state === "race" || state.state === "paused") {
+      return;
+    }
+    pendingBindingAction = action;
+    syncControlBindingButtons();
+    settingsBindingsStatus.textContent = `Press a key for ${CONTROL_BINDING_LABELS[action]} · Escape cancels`;
+  });
+});
+window.addEventListener("keydown", (event) => {
+  const action = pendingBindingAction;
+  if (!action) {
+    return;
+  }
+  event.preventDefault();
+  event.stopImmediatePropagation();
+  if (event.code === "Escape") {
+    pendingBindingAction = undefined;
+    syncControlBindingButtons();
+    settingsBindingsStatus.textContent = "Binding change cancelled";
+    return;
+  }
+  if (!isRebindableKeyboardCode(event.code)) {
+    settingsBindingsStatus.textContent = `${formatKeyboardCode(event.code)} is reserved or unsupported · choose a letter, number, or driving key`;
+    return;
+  }
+  try {
+    controlBindings = rebindControlAction(controlBindings, action, event.code);
+    pendingBindingAction = undefined;
+    syncControlBindingButtons();
+    rebuildVehicleInputs();
+    applyRosterPresentation();
+    persistControlBindings(`${CONTROL_BINDING_LABELS[action]} uses ${formatKeyboardCode(event.code)}`);
+  } catch (error) {
+    settingsBindingsStatus.textContent = error instanceof Error ? error.message : String(error);
+  }
+}, { capture: true });
 settingsReset.addEventListener("click", () => {
+  controlBindings = DEFAULT_CONTROL_BINDINGS;
+  pendingBindingAction = undefined;
+  syncControlBindingButtons();
+  persistControlBindings("Bindings reset");
   applyAlphaSettings(
     DEFAULT_ALPHA_SETTINGS,
     "Settings reset",
@@ -1942,6 +2073,11 @@ window.addEventListener("blur", () => {
 });
 window.addEventListener("focus", resetPresentationClock);
 window.addEventListener("resize", () => renderer.resize(viewport.clientWidth, viewport.clientHeight));
+viewport.addEventListener("pointerdown", (event) => {
+  if (!isInteractiveKeyboardTarget(event.target)) {
+    viewport.focus({ preventScroll: true });
+  }
+});
 window.addEventListener("keydown", (event) => {
   if (event.code === "Escape" && (state.state === "race" || state.state === "paused")) {
     event.preventDefault();
@@ -1950,7 +2086,7 @@ window.addEventListener("keydown", (event) => {
     } else {
       pauseRace();
     }
-  } else if (event.code === "KeyC") {
+  } else if (event.code === "KeyC" && !isInteractiveKeyboardTarget(event.target)) {
     debugColliders.checked = !debugColliders.checked;
   }
 });

@@ -158,12 +158,25 @@ after navigation, reset them to defaults, restored the reset after another navig
 two-player CPU round without console warnings or errors. Contract details and current boundaries live
 in [ALPHA_SETTINGS.md](./ALPHA_SETTINGS.md).
 
+## Slice 6.7b — P1 keyboard rebinding
+
+Eight P1 actions now support keyboard capture, unique-key conflict swapping, and a separate strict
+versioned local save. Supported-code validation protects P2 and global runtime/browser keys. Custom
+bindings feed the production `BrowserVehicleInput` and visible guides; single-player retains its
+original fallback keys. UI focus no longer leaks keyboard input into gameplay, and an active capture
+is cancelled when a match/loading transition disables the binding controls.
+
+Browser acceptance covered capture, swap, reserved-key rejection, Escape cancellation, fresh-page
+restore, match-transition cancellation, results, and reset/restore with no console warnings or errors.
+Production-adapter tests verify old/new key behavior and keyup release directly. The full repository
+gate passes 173 tests plus typecheck/build, content validation, match replay, 30-minute soak, and the
+Warzone AI lap.
+
 ## Planned slices
 
 1. **6.6f+ track batches:** extend the playable track catalog in measured batches. Every admitted track
    keeps the load smoke, rules replay, and explicit unsupported-resource record.
-2. **6.7b alpha gate:** keyboard rebinding, complete menu-to-series acceptance, and the Milestone M2
-   compatibility report.
+2. **6.7c alpha gate:** complete menu-to-series acceptance and the Milestone M2 compatibility report.
 
 This order may interleave a content batch after a new mode or weapon family so the abstractions are
 validated on more than Warzone before they spread across the full catalog.

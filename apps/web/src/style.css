@@ -435,15 +435,57 @@ button[data-action="resume"] { border-color: #ff8a4c; color: #ffb182; }
   font-size: 11px;
 }
 
-.settings-panel .settings-slider {
-  grid-template-columns: 1fr minmax(82px, 1fr) 34px;
+.settings-panel > label.settings-slider {
+  grid-template-columns: minmax(0, 1fr) minmax(64px, 1fr) 30px;
+  gap: 8px;
 }
 
-.settings-slider input { width: 100%; accent-color: #ff8a4c; }
+.settings-slider input { width: 100%; min-width: 0; margin: 0; accent-color: #ff8a4c; }
 .settings-slider output { color: #dbe6e6; font: 10px ui-monospace, SFMono-Regular, Menlo, monospace; text-align: right; }
 .settings-check { display: flex; gap: 9px; align-items: center; cursor: pointer; }
 .settings-check input { accent-color: #ff8a4c; }
 .settings-panel p { margin: 0; color: #6f8389; font: 9px/1.4 ui-monospace, SFMono-Regular, Menlo, monospace; }
+
+.settings-bindings {
+  padding-top: 2px;
+  border-top: 1px solid #25343b;
+}
+
+.settings-bindings summary {
+  padding: 7px 0 2px;
+  color: #aebdc0;
+  font-size: 10px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.settings-bindings > div {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 6px;
+  padding: 8px 0;
+}
+
+.settings-bindings label {
+  display: grid;
+  grid-template-columns: 1fr minmax(54px, auto);
+  gap: 6px;
+  align-items: center;
+}
+
+.settings-bindings label > span { font-size: 9px; letter-spacing: 0.02em; }
+
+.settings-bindings button {
+  min-height: 28px;
+  padding: 4px 7px;
+  font: 9px ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+.settings-bindings button[data-capturing="true"] {
+  border-color: #ff8a4c;
+  color: #191109;
+  background: #ff8a4c;
+}
 
 .toggles { display: grid; gap: 10px; padding: 16px; border: 1px solid #25343b; border-radius: 10px; background: #0c171d; }
 .toggles label { display: flex; gap: 9px; align-items: center; color: #aebdc0; font-size: 12px; cursor: pointer; }
