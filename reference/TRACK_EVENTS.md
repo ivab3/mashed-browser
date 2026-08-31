@@ -27,3 +27,46 @@ At this slice the pure timeline is not yet connected to the browser or combat da
 must bind supported source instances, report missing/unsupported pairs, route collision/projectile
 impacts into this timeline, apply damage/knockback, and accept reset/pause/chain behavior. M2 remains
 open. Original `.ANM` / `KTCSCRIPT.LUA` events and unsupported object families remain separate gaps.
+
+## 6.8b — source barrels in the playable runtime
+
+Attach `COURSE.LUA`, `RBARREL.DFF` and `RBARREL.MTS` with the usual track bundle. MTS parsing runs in
+the loading Worker. All 93 admitted barrels bind: City 24, Neustein 37, Arctic 26, Warzone 6. The
+renderer uses the original mesh and track texture dictionary; the physical cylinder is fitted to its
+local vertex bounds, without the vehicle-specific model scale. Full rigid MTS transforms preserve
+fallen barrels. Scaled/sheared/reflected matrices and unsupported model frame layouts fail closed.
+Mass (32) and break force (7,000), like explosion settings, are clean-room tuning.
+
+Projectile hits and force-triggered prop destruction feed the same timeline. A blast disables its
+physical object, applies 3D radial damage/knockback through `CombatSession`, emits warning/blast
+particles and audio, and can arm nearby barrels. Environmental deaths have their own event type,
+not a fabricated player/weapon owner. Blast occlusion and original per-profile parameters remain
+unreconstructed. The HUD reports armed / fusing / spent counts.
+
+Pause makes no timeline or physics calls. New rounds and Reset restore props, clear queued impacts
+and reset all fuses. Loading a new COURSE clears the dedicated model/instance cache before parsing,
+so same-named files cannot leak from another track; missing pairs remain inactive and are reported.
+Replacing/removing track props preserves generic arena props and the vehicle roster, releases Rapier
+bodies and removes old renderer objects. A Warzone hut is explicitly reported as unsupported.
+
+`pnpm track-events:validate` reuses the production binder and checks creation, destruction, reset and
+removal for all 93 local source instances. Its scope is binding/lifecycle, not autonomous racing.
+Source-free tests additionally cover finite damage, ownerless deaths, rigid transforms, atomic
+replacement, stale-cache prevention, and actual Rapier prop destruction plus the combat/timeline
+bridge at 30/60/120 Hz. The complete suite has 202 tests.
+
+Browser acceptance on 2026-08-31:
+
+- Arctic's eight-file track/barrel bundle displayed 26 original barrel instances. Solo Hard reached
+  checkpoint 82 before two barrel explosions eliminated P1 at 1:50.32 (6,799 steps including countdown).
+  This is a natural hazard-death result, **not a completed lap**. Reset restored 26 armed / 0 spent.
+- A separate synthetic two-barrel drop fixture, imported through the same file chooser with the local
+  original barrel mesh, paused at step 16 with 100 HP and 2 armed. A later inspection was identical;
+  after Resume both barrels exploded. P1 stayed out of this fixture's blast range. Reset restored both.
+- Loading only a different original COURSE removed those two physics bodies, showed zero hazards and
+  requested the new DFF/MTS pair. Both runs recorded no console warning/error; observed frames showed
+  60 FPS and zero dropped time. These observations are not a performance benchmark.
+
+The synthetic fixture generator is `tools/qa/track-hazard-fixture.mts`: pass an existing empty temporary
+directory, then attach its two generated files plus the user's `RBARREL.DFF` in a fresh tab. It embeds
+no original data, uses exclusive file creation and does not modify the source asset directory.

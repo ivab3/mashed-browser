@@ -127,6 +127,8 @@ export interface CombatSnapshot {
 }
 
 export type CombatEvent =
+  | { type: "environment-damaged"; playerId: string; hazardId: string; damage: number; healthRemaining: number; knockbackImpulse: TrackVector3 }
+  | { type: "environment-destroyed"; playerId: string; hazardId: string }
   | { type: "pickup-collected"; pickupId: string; playerId: string; weapon: CombatWeaponType; ammo: number }
   | { type: "pickup-respawned"; pickupId: string }
   | { type: "weapon-fired"; playerId: string; weapon: CombatWeaponType; projectileId: number; ammoRemaining: number }
@@ -427,7 +429,7 @@ function segmentSphereHitFraction(
 }
 
 function validateVector(vector: TrackVector3, name: string): void {
-  if (vector.some((component) => !Number.isFinite(component))) {
+  if (vector.length !== 3 || vector.some((component) => !Number.isFinite(component))) {
     throw new Error(`${name} must have finite coordinates`);
   }
 }
@@ -587,6 +589,40 @@ export class CombatSession {
     this.#advancePickups(stepSeconds, playerFrames, events);
     this.#fireWeapons(playerFrames, useRequests, events);
     this.#advanceProjectiles(stepSeconds, playerFrames, events, worldCollisionQuery);
+    return events;
+  }
+
+  /** Environmental blasts have no invented player owner or weapon attribution. */
+  applyEnvironmentBlast(
+    blast: { id: string; position: TrackVector3; radiusMeters: number; damage: number; knockbackImpulse: number },
+    playerFrames: CombatPlayerFrames,
+  ): readonly CombatEvent[] {
+    validateVector(blast.position, "Environment blast");
+    if (!blast.id || [blast.radiusMeters, blast.damage, blast.knockbackImpulse].some((value) => !Number.isFinite(value) || value <= 0)) {
+      throw new Error("Environment blast requires an id and finite positive parameters");
+    }
+    for (const [id, frame] of Object.entries(playerFrames)) {
+      if (!this.#players.some((player) => player.definition.id === id)) throw new Error(`Unknown combat player frame ${id}`);
+      if (frame) validateVector(frame.position, `Combat player ${id}`);
+    }
+    const events: CombatEvent[] = [];
+    for (const player of this.#players) {
+      const frame = playerFrames[player.definition.id];
+      if (player.destroyed || !frame || squaredDistance(frame.position, blast.position) > blast.radiusMeters ** 2) continue;
+      const damage = Math.min(player.health, blast.damage);
+      player.health -= damage;
+      events.push({
+        type: "environment-damaged", playerId: player.definition.id, hazardId: blast.id,
+        damage, healthRemaining: player.health,
+        knockbackImpulse: normalizedKnockback(blast.position, frame.position, [0, 0, 1], blast.knockbackImpulse),
+      });
+      if (player.health === 0) {
+        player.destroyed = true;
+        player.inventory = undefined;
+        player.effects.clear();
+        events.push({ type: "environment-destroyed", playerId: player.definition.id, hazardId: blast.id });
+      }
+    }
     return events;
   }
 

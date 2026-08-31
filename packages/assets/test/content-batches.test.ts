@@ -61,7 +61,10 @@ describe("Stage 6 content admissions", () => {
       "ktcscript.lua",
       "powerups_gold.dff",
     ]));
-    expect(boundaries.find((boundary) => boundary.suffix === ".mts")?.disposition).toBe("parsed-only");
+    expect(boundaries.find((boundary) => boundary.suffix === ".mts")?.disposition).toBe("partial");
+    for (const track of ALPHA_CONTENT_BATCHES.flatMap((batch) => batch.tracks)) {
+      expect(track.resourceBoundaries.find((boundary) => boundary.suffix === "rbarrel.dff")?.disposition).toBe("supported");
+    }
   });
 
   it("admits the complete 15-vehicle numbered-skin roster without promoting inferred names", () => {

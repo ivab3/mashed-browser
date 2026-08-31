@@ -15,6 +15,7 @@ pnpm match:replay
 pnpm m1:soak
 pnpm ai:lap
 pnpm ai:tracks
+pnpm track-events:validate
 ```
 
 `alpha:replay` runs the same clean-room cup definition, match thresholds and ranking function as the
@@ -27,7 +28,7 @@ navigation. Course identities exercise save namespaces, not course geometry.
 
 `content:validate` requires the user's extracted local data. It parses every admitted bundle, rejects
 unclassified files, and completes a checkpoint rules replay for each track on 30/60/120 Hz. The other
-commands except `ai:lap` and `ai:tracks` are source-independent. No original resource is embedded in a test or report.
+commands except `ai:lap`, `ai:tracks` and `track-events:validate` are source-independent. No original resource is embedded in a test or report.
 
 ## Browser acceptance (6.7c)
 
@@ -51,7 +52,7 @@ reattachment after reload; asset caching belongs to Beta.
 | Key local modes | Standard, Team, Flag and Fugitive rules and browser smoke; objective rules remain clean-room |
 | AI | Difficulty profiles, deterministic collision probes and full physical laps on all admitted tracks; two explicit Hard seeds, not all pack scenarios |
 | Championship | Shared versioned definition, points, medals, strict restore, restart and `alpha:replay`; original cup schedule is not reconstructed |
-| Destruction / traps / scripted events | Generic destructible physics props and weapon hazards work; authored track events and traps remain open, not satisfied by listing their files as deferred |
+| Destruction / traps / scripted events | 93 source-positioned barrels, collision/projectile activation, warning/blast/chain timeline, physical destruction and environmental damage; original hut/ANM/KTC behavior remains unsupported |
 | Vehicle roster | All 15 archives / 90 skins parse; all archive skin-0 pairs browser-bound; names other than Wildfire are explicitly inferred metadata |
 | Track batches | Four admitted tracks with load smoke and checkpoint rules replay; details below |
 | Settings / persistence | CPU, keyboard, deadzone, audio, graphics and independent strict local saves; 6.7d master bus applies live mute to already-playing cues |
@@ -74,10 +75,10 @@ rules replay must never be described as successful autonomous vehicle navigation
 
 - `.AI` / `.LED`: structurally parsed; unconfirmed tables do not drive steering. `.AID`: deferred.
 - `.ANM`: authored object/camera/copter animation playback is absent.
-- `.MTS`: instance matrices parse strictly (6.8a); scene/physics binding is still absent.
+- `.MTS`: matrices parse strictly; RBARREL meshes/transforms bind (6.8b), other instance families remain unbound.
 - `.UVA`: authored UV animation is absent. Arctic `.SPL` wave paths are deferred.
 - `KTCSCRIPT.LUA`: special Kill-the-Copter behavior is not executed; generic Lua execution is prohibited.
-- Source RWP objects, explosive-object placements, original lights, pickup meshes, ghost/debris variants
+- Source RWP objects, non-barrel explosive-object placements, original lights, pickup meshes, ghost/debris variants
   and some excluded/local-template DFFs are parsed-only or deferred as individually recorded.
 - Exact original cup ordering/scoring and inferred localized vehicle-name mappings are unconfirmed.
 - Source debug logs, editor-only files and `.MTS.TXT` diagnostics are non-runtime inputs.
@@ -88,5 +89,5 @@ alpha acceptance. Source-free production build still has the documented large-ch
 
 ## Remaining work before M2 sign-off
 
-1. Implement and accept track traps/scripted events with explicit source-versus-clean-room boundaries.
+1. Harden no-survivor round outcomes, now reachable through simultaneous environmental blasts.
 2. Repeat the final UI and regression gates after those changes; only then reassess feature completeness.

@@ -69,6 +69,7 @@ import {
   deriveRouteCollisionLayers,
   PRIMARY_VEHICLE_ID,
   probeAiNavigation,
+  TrackHazardRuntime,
   type PhysicsRuntime,
   type PhysicsRuntimeOptions,
   type VehicleInputById,
@@ -76,6 +77,7 @@ import {
 import { RuntimeRenderer } from "@mashed/renderer";
 
 import { AssetLoadingClient } from "./asset-loader.js";
+import { TrackHazardAssets } from "./track-hazard-assets.js";
 import {
   AlphaSettingsStorage,
   DEFAULT_ALPHA_SETTINGS,
@@ -119,6 +121,8 @@ function formatBytes(bytes: number): string {
 
 function assetSummary(asset: LoadedAsset): string {
   switch (asset.kind) {
+    case "mts":
+      return `${asset.data.matrices.length} instance matrices`;
     case "dff":
       return `${asset.data.geometries.length} geometries · ${asset.data.frames.length} frames`;
     case "txd":
@@ -182,6 +186,7 @@ const metricSpeedLabel = element<HTMLElement>("metric-speed-label");
 const metricWheelsLabel = element<HTMLElement>("metric-wheels-label");
 const metricSurfaceLabel = element<HTMLElement>("metric-surface-label");
 const metricObjects = element<HTMLElement>("metric-objects");
+const metricHazards = element<HTMLElement>("metric-hazards");
 const metricTrack = element<HTMLElement>("metric-track");
 const metricLap = element<HTMLElement>("metric-lap");
 const metricCheckpoint = element<HTMLElement>("metric-checkpoint");
@@ -295,6 +300,8 @@ let controlBindings: ControlBindingsV1 = controlBindingsLoad.bindings;
 audio.setMasterVolume(alphaSettings.muted ? 0 : alphaSettings.masterVolume);
 renderer.setGraphicsQuality(alphaSettings.graphicsQuality);
 const loadedAssets = new Map<string, LoadedAsset>();
+const trackHazardAssets = new TrackHazardAssets();
+let trackHazards: TrackHazardRuntime | undefined;
 const trackParts: {
   ai?: BspWorld;
   collision?: BspWorld;
@@ -1257,6 +1264,7 @@ function handleCombatEvents(combatEvents: readonly CombatEvent[]): string | unde
         }
         break;
       }
+      case "environment-damaged":
       case "player-damaged":
         physics?.applyVehicleImpulse(event.playerId, event.knockbackImpulse);
         runtimeStatus.textContent = `${event.playerId} ${event.healthRemaining} HP`;
@@ -1264,7 +1272,7 @@ function handleCombatEvents(combatEvents: readonly CombatEvent[]): string | unde
           type: "audio:cue",
           cue: "impact",
           gain: 0.1,
-          sampleName: event.weapon === "machine-gun" || event.weapon === "shotgun" || event.weapon === "rear-flame"
+          sampleName: event.type === "player-damaged" && (event.weapon === "machine-gun" || event.weapon === "shotgun" || event.weapon === "rear-flame")
             ? "bullethitscar"
             : "explosion1",
         });
@@ -1275,15 +1283,16 @@ function handleCombatEvents(combatEvents: readonly CombatEvent[]): string | unde
             events.emit({
               type: "renderer:burst",
               position,
-              color: COMBAT_EFFECT_COLORS[event.weapon],
+              color: event.type === "player-damaged" ? COMBAT_EFFECT_COLORS[event.weapon] : 0xff652f,
               count: 12,
               durationSeconds: 0.42,
             });
           }
         }
         break;
+      case "environment-destroyed":
       case "player-destroyed": {
-        if (matchModeSession?.snapshot.fugitiveId === event.playerId) {
+        if (event.type === "player-destroyed" && matchModeSession?.snapshot.fugitiveId === event.playerId) {
           fugitiveInterceptorId = event.sourcePlayerId;
         }
         events.emit({
@@ -1316,6 +1325,7 @@ function handleCombatEvents(combatEvents: readonly CombatEvent[]): string | unde
         const explosive = explosiveCombatWeapon(event.weapon);
         const impulseMagnitude = explosive ? 12_000 : 2_400;
         if (event.objectId) {
+          trackHazards?.recordImpact({ id: event.objectId, position: event.position });
           physics?.impactSceneObject(event.objectId, [
             -event.normal[0] * impulseMagnitude,
             Math.max(900, -event.normal[1] * impulseMagnitude),
@@ -1429,6 +1439,7 @@ events.subscribe((event) => {
   } else if (event.type === "simulation:overrun") {
     totalDroppedSeconds += event.droppedSeconds;
   } else if (event.type === "physics:object-destroyed") {
+    if (state.state === "race") trackHazards?.recordImpact({ id: event.id, position: event.position });
     events.emit({
       type: "renderer:burst",
       position: event.position,
@@ -1481,6 +1492,7 @@ async function startRace(): Promise<void> {
   fugitiveInterceptorId = undefined;
   roundEliminationOrder = [];
   physics.resetDemo();
+  trackHazards?.reset();
   resetCameraElimination();
   raceSession = createTrackRaceSession();
   combatSession = createCombatSession();
@@ -1591,6 +1603,7 @@ menuButton.addEventListener("click", () => {
 });
 resetButton.addEventListener("click", () => {
   physics?.resetDemo();
+  trackHazards?.reset();
   resetCameraElimination();
   raceSession = state.state === "race" ? createTrackRaceSession() : undefined;
   combatSession = state.state === "race" ? createCombatSession() : undefined;
@@ -1903,6 +1916,13 @@ function bindTrackParts(): string[] {
     }
   }
   refreshVehicleCatalog();
+  if (trackParts.course && physics) {
+    const placement = trackHazardAssets.bind(trackParts.course);
+    physics.setTrackBarrels(placement.barrels);
+    renderer.setTrackObjectModels(placement.models);
+    trackHazards = new TrackHazardRuntime(placement.hazards, physics);
+    bound.push(`${placement.barrels.length} source barrels · alpha blast rules`, ...placement.warnings);
+  }
   const vehicles = bindVehicleModels();
   if (vehicles.length > 0) {
     bound.push(`vehicles ${vehicles.join(" · ")}`);
@@ -1926,6 +1946,12 @@ assetInput.addEventListener("change", () => {
     state.transition("loading", `Parsing ${files.length} local asset${files.length === 1 ? "" : "s"}…`);
     try {
       const summaries: string[] = [];
+      if (files.some((file) => file.name.toLowerCase() === "course.lua")) {
+        trackHazardAssets.clear();
+        trackHazards = undefined;
+        physics?.setTrackBarrels([]);
+        renderer.setTrackObjectModels([]);
+      }
       matchModeSession = undefined;
       matchModeSignature = undefined;
       for (const file of files) {
@@ -1983,6 +2009,7 @@ assetInput.addEventListener("change", () => {
           continue;
         }
         const result = await assetLoader.load(file);
+        trackHazardAssets.remember(file.name, result.asset);
         loadedAssets.set(file.name.toLocaleLowerCase("en-US"), result.asset);
         let role: string | undefined;
         if (result.asset.kind === "bsp") {
@@ -2294,6 +2321,20 @@ function renderFrame(timestampMilliseconds: number): void {
         }
       }
       if (!raceFinishReason && (!raceSession || raceSession.phase === "racing")) {
+        if (trackHazards && combatSession) {
+          const update = trackHazards.advance(stepSeconds, combatSession, currentCombatPlayerFrames());
+          for (const event of update.hazardEvents) {
+            const exploding = event.type === "hazard-exploded";
+            events.emit({ type: "renderer:burst", position: event.position, color: exploding ? 0xff652f : 0xffdc59,
+              count: exploding ? 36 : 12, durationSeconds: exploding ? 0.8 : 0.35 });
+            events.emit({ type: "audio:cue", cue: exploding ? "impact" : "pickup", gain: exploding ? 0.15 : 0.06,
+              ...(exploding ? { sampleName: "explosion1" } : {}) });
+            runtimeStatus.textContent = exploding ? `${event.id} exploded` : `${event.id} armed`;
+          }
+          raceFinishReason = handleCombatEvents(update.combatEvents) ?? raceFinishReason;
+        }
+      }
+      if (!raceFinishReason && (!raceSession || raceSession.phase === "racing")) {
         const modeFinishReason = updateMatchMode(stepSeconds, positions, raceEvents);
         if (modeFinishReason) {
           raceFinishReason = modeFinishReason;
@@ -2383,6 +2424,8 @@ function renderFrame(timestampMilliseconds: number): void {
         : "inactive";
     });
     metricObjects.textContent = `${physicsMetrics.activeObjects} / ${physicsMetrics.destroyedObjects}`;
+    const hazards = trackHazards?.snapshot.hazards ?? [];
+    metricHazards.textContent = ["armed", "fusing", "spent"].map((phase) => hazards.filter((hazard) => hazard.phase === phase).length).join(" / ");
     metricTrack.textContent = physicsMetrics.trackTriangles.toLocaleString();
     const raceSnapshot = raceSession?.snapshot;
     const playerRace = raceSnapshot?.players[0];

@@ -1,4 +1,4 @@
-export type ContentResourceDisposition = "deferred" | "non-runtime" | "parsed-only";
+export type ContentResourceDisposition = "deferred" | "non-runtime" | "parsed-only" | "partial" | "supported";
 
 export interface ContentResourceBoundary {
   suffix: string;
@@ -37,6 +37,12 @@ export interface AlphaContentBatch {
   vehicles: readonly AlphaVehicleAdmission[];
 }
 
+function localTemplateBoundary(suffix: string): ContentResourceBoundary {
+  return suffix === "rbarrel.dff"
+    ? { suffix, disposition: "supported", reason: "Source barrel mesh and MTS transform bind to alpha explosive physics objects." }
+    : { suffix, disposition: "parsed-only", reason: "The DFF parses, but its local-template transform or light behavior is not instantiated." };
+}
+
 const CITY_RESOURCE_BOUNDARIES: readonly ContentResourceBoundary[] = Object.freeze([
   {
     suffix: ".aid",
@@ -50,8 +56,8 @@ const CITY_RESOURCE_BOUNDARIES: readonly ContentResourceBoundary[] = Object.free
   },
   {
     suffix: ".mts",
-    disposition: "parsed-only",
-    reason: "Instance matrices parse; scene/physics binding remains incomplete.",
+    disposition: "partial",
+    reason: "Matrices parse; RBARREL instances bind to alpha hazards. Other instance families remain unbound.",
   },
   {
     suffix: ".uva",
@@ -95,8 +101,8 @@ const CITY_RESOURCE_BOUNDARIES: readonly ContentResourceBoundary[] = Object.free
   },
   {
     suffix: "rbarrel.dff",
-    disposition: "parsed-only",
-    reason: "The DFF parses, but its local-template transform is not placed by the renderer.",
+    disposition: "supported",
+    reason: "Source barrel mesh and MTS transform bind to alpha explosive physics objects.",
   },
   {
     suffix: "lights.dff",
@@ -250,8 +256,8 @@ export const ALPHA_CONTENT_BATCHES: readonly AlphaContentBatch[] = Object.freeze
           },
           {
             suffix: ".mts",
-            disposition: "parsed-only",
-            reason: "Instance matrices parse; scene/physics binding remains incomplete.",
+            disposition: "partial",
+            reason: "Matrices parse; RBARREL instances bind to alpha hazards. Other instance families remain unbound.",
           },
           {
             suffix: "powerups_gold.dff",
@@ -272,11 +278,7 @@ export const ALPHA_CONTENT_BATCHES: readonly AlphaContentBatch[] = Object.freeze
             "trolly_1.dff",
             "cablecar.dff",
             "lights.dff",
-          ].map((suffix) => ({
-            suffix,
-            disposition: "parsed-only" as const,
-            reason: "The DFF parses, but its local-template transform is not placed by the renderer.",
-          })),
+          ].map(localTemplateBoundary),
           {
             suffix: ".mts.txt",
             disposition: "non-runtime",
@@ -348,8 +350,8 @@ export const ALPHA_CONTENT_BATCHES: readonly AlphaContentBatch[] = Object.freeze
           },
           {
             suffix: ".mts",
-            disposition: "parsed-only",
-            reason: "Instance matrices parse; scene/physics binding remains incomplete.",
+            disposition: "partial",
+            reason: "Matrices parse; RBARREL instances bind to alpha hazards. Other instance families remain unbound.",
           },
           {
             suffix: ".uva",
@@ -376,11 +378,7 @@ export const ALPHA_CONTENT_BATCHES: readonly AlphaContentBatch[] = Object.freeze
             "sky.dff",
             "wall3.dff",
             "whitetyre.dff",
-          ].map((suffix) => ({
-            suffix,
-            disposition: "parsed-only" as const,
-            reason: "The DFF parses, but its local-template transform or light behavior is not instantiated.",
-          })),
+          ].map(localTemplateBoundary),
         ],
       },
     ],
@@ -467,8 +465,8 @@ export const ALPHA_CONTENT_BATCHES: readonly AlphaContentBatch[] = Object.freeze
           },
           {
             suffix: ".mts",
-            disposition: "parsed-only",
-            reason: "Instance matrices parse; scene/physics binding remains incomplete.",
+            disposition: "partial",
+            reason: "Matrices parse; RBARREL instances bind to alpha hazards. Other instance families remain unbound.",
           },
           {
             suffix: "powerups_gold.dff",
@@ -501,11 +499,7 @@ export const ALPHA_CONTENT_BATCHES: readonly AlphaContentBatch[] = Object.freeze
             "rbarrel.dff",
             "skydome.dff",
             "tower.dff",
-          ].map((suffix) => ({
-            suffix,
-            disposition: "parsed-only" as const,
-            reason: "The DFF parses, but its local-template transform or light behavior is not instantiated.",
-          })),
+          ].map(localTemplateBoundary),
           {
             suffix: ".mts.txt",
             disposition: "non-runtime",

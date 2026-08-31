@@ -3,6 +3,7 @@
 import {
   parseBspWorld,
   parseDff,
+  parseMts,
   parsePiTextureDictionary,
   parseRwsSoundDictionary,
 } from "@mashed/assets";
@@ -22,6 +23,9 @@ worker.onmessage = (message: MessageEvent<LoadAssetRequest>): void => {
     const startedAt = performance.now();
     let asset: LoadedAsset;
     switch (request.kind) {
+      case "mts":
+        asset = { kind: "mts", data: parseMts(request.buffer) };
+        break;
       case "dff":
         asset = { kind: "dff", data: parseDff(request.buffer) };
         break;

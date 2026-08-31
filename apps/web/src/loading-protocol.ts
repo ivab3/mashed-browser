@@ -1,8 +1,9 @@
-import type { BspWorld, DffModel, PiTextureDictionary, RwsSoundDictionary } from "@mashed/assets";
+import type { BspWorld, DffModel, MtsInstances, PiTextureDictionary, RwsSoundDictionary } from "@mashed/assets";
 
-export type AssetKind = "dff" | "txd" | "bsp" | "rws";
+export type AssetKind = "dff" | "txd" | "bsp" | "rws" | "mts";
 
 export type LoadedAsset =
+  | { kind: "mts"; data: MtsInstances }
   | { kind: "dff"; data: DffModel }
   | { kind: "txd"; data: PiTextureDictionary }
   | { kind: "bsp"; data: BspWorld }

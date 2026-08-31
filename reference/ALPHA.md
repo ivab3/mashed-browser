@@ -207,13 +207,14 @@ in [AI_FOUNDATION.md](AI_FOUNDATION.md#slice-64b--admitted-track-navigation-gate
 
 ## Next slices
 
-Slice 6.8a starts [track events](TRACK_EVENTS.md) with a strict MTS reader, source explosive-pair
-metadata and a deterministic delayed-blast/chain timeline. Browser/physics/combat binding follows;
-this foundation alone does not satisfy the track-events requirement.
+Slices 6.8a–b implement [track events](TRACK_EVENTS.md): strict MTS/source explosive-pair metadata,
+93 original barrel instances, physical destruction, warning/blast/chain timeline and environmental
+damage. The source binding gate, 202 tests and browser hazard-death/reset/cache smoke pass. Original
+hut/animation/KTC behavior remains explicitly unsupported; final M2 regression acceptance follows.
 
 1. **6.6f+ track batches:** extend the playable track catalog in measured batches. Every admitted track
    keeps the load smoke, rules replay, and explicit unsupported-resource record.
-2. **6.8 track events:** connect traps/scripted track behavior, then repeat M2 acceptance.
+2. **6.8c acceptance hardening:** handle simultaneous no-survivor outcomes, then repeat M2 acceptance.
 
 This order may interleave a content batch after a new mode or weapon family so the abstractions are
 validated on more than Warzone before they spread across the full catalog.

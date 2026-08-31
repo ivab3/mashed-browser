@@ -66,6 +66,7 @@ pnpm build
 pnpm content:validate
 pnpm alpha:replay
 pnpm ai:tracks
+pnpm track-events:validate
 pnpm ai:lap
 pnpm vehicle:tune
 pnpm match:replay

@@ -178,6 +178,7 @@ export class RuntimeRenderer {
   readonly #vehicleProxy = new THREE.Group();
   readonly #demoRoot = new THREE.Group();
   readonly #sceneObjects = new Map<string, THREE.Object3D>();
+  readonly #trackObjectModels = new Map<string, { model: RenderWareModel; center: readonly [number, number, number] }>();
   readonly #combatPickups = new Map<string, THREE.Object3D>();
   readonly #combatProjectiles = new Map<number, THREE.Object3D>();
   readonly #modeObjective = new THREE.Group();
@@ -452,6 +453,19 @@ export class RuntimeRenderer {
     };
   }
 
+  setTrackObjectModels(sources: ReadonlyArray<{ id: string; model: RenderWareModel; center: readonly [number, number, number] }>): void {
+    for (const id of new Set([...this.#trackObjectModels.keys(), ...sources.map((source) => source.id)])) {
+      const object = this.#sceneObjects.get(id);
+      if (object) {
+        object.removeFromParent();
+        disposeRenderableRoot(object);
+        this.#sceneObjects.delete(id);
+      }
+    }
+    this.#trackObjectModels.clear();
+    for (const source of sources) this.#trackObjectModels.set(source.id, source);
+  }
+
   clearCourseModels(): void {
     if (!this.#courseRoot) {
       return;
@@ -707,14 +721,26 @@ export class RuntimeRenderer {
     }
     for (const [id, mesh] of this.#sceneObjects) {
       if (!present.has(id)) {
-        mesh.visible = false;
+        mesh.removeFromParent();
+        disposeRenderableRoot(mesh);
+        this.#sceneObjects.delete(id);
       }
     }
   }
 
   #createSceneObject(object: PhysicsSceneObject): THREE.Object3D {
+    const source = this.#trackObjectModels.get(object.id);
+    if (source) {
+      const built = buildRenderWareModel(source.model, this.#trackTextureMap);
+      built.root.position.set(-source.center[0], -source.center[1], -source.center[2]);
+      const root = new THREE.Group();
+      root.name = object.id;
+      root.add(built.root);
+      return root;
+    }
+    const extents = object.halfExtents;
     const geometry = object.kind === "barrel"
-      ? new THREE.CylinderGeometry(0.42, 0.42, 1.1, 18)
+      ? new THREE.CylinderGeometry(extents?.[0] ?? 0.42, extents?.[0] ?? 0.42, (extents?.[1] ?? 0.55) * 2, 18)
       : object.kind === "vehicle"
         ? new THREE.BoxGeometry(1.72, 0.5, 3.02)
       : object.kind === "block"

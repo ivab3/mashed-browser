@@ -13,6 +13,7 @@
     "asset-viewer": "pnpm --filter @mashed/asset-viewer dev",
     "ai:lap": "pnpm --filter @mashed/physics ai:lap",
     "ai:tracks": "pnpm --filter @mashed/physics ai:tracks",
+    "track-events:validate": "node --import tsx apps/web/src/track-events-cli.ts",
     "alpha:replay": "node --import tsx packages/replay/src/alpha-series-cli.ts",
     "lap:validate": "pnpm --filter @mashed/physics lap:validate",
     "m1:soak": "node --expose-gc --import tsx packages/replay/src/soak-cli.ts",

@@ -417,7 +417,10 @@ Arctic всё ещё требует много заднего хода, но п�
 traps/scripted events требуют дальнейшего среза; расширение
 трасс продолжается пакетами 6.6f+. Срез 6.8a добавляет strict MTS reader (188 файлов / 2 856 matrices
 локального корпуса), source explosive-pair registry и pure fixed-step warning/blast/chain timeline.
-Это ещё не runtime binding: подключение физики, урона и browser acceptance продолжается в 6.8b.
+Срез 6.8b связывает 93 source barrel instances с original mesh, physical cylinder, delayed explosion,
+chain reaction и environmental damage. `track-events:validate`, 202 теста и browser death/reset/cache
+smoke проходят. Не-barrel, ANM и KTC ресурсы остаются явно unsupported; M2 требует итоговой приёмки
+и hardening случая одновременной гибели всех участников.
 
 ### Этап 7. Beta: доставка, производительность и совместимость — 3–6 недель
 

@@ -27,6 +27,31 @@ function frames(p1Z = 0, p2Z = 20): CombatPlayerFrames {
 }
 
 describe("CombatSession", () => {
+  it("applies environmental damage in 3D without inventing a player owner", () => {
+    const combat = new CombatSession({ players, pickups: [{ id: "gun", weapon: "machine-gun", position: [0, 0, 0] }] });
+    combat.advance(1 / 60, frames());
+    const blast = { id: "barrel", position: [0, 0, 0] as const, radiusMeters: 5, damage: 55, knockbackImpulse: 9000 };
+    const first = combat.applyEnvironmentBlast(blast, { ...frames(), p2: { position: [0, 6, 0], headingRadians: 0 } });
+    expect(first).toEqual([{ type: "environment-damaged", playerId: "p1", hazardId: "barrel",
+      damage: 55, healthRemaining: 45, knockbackImpulse: [0, 1440, 9000] }]);
+    expect(combat.applyEnvironmentBlast(blast, frames())).toMatchObject([
+      { type: "environment-damaged", damage: 45, healthRemaining: 0 },
+      { type: "environment-destroyed", playerId: "p1", hazardId: "barrel" },
+    ]);
+    expect(combat.snapshot.players[0]).toMatchObject({ destroyed: true, inventory: null, effects: [] });
+    expect(combat.applyEnvironmentBlast(blast, frames())).toEqual([]);
+    expect(combat.snapshot.players[1]!.health).toBe(100);
+  });
+
+  it("validates an entire blast before mutating any player", () => {
+    const combat = new CombatSession({ players, pickups: [] });
+    const blast = { id: "barrel", position: [0, 0, 0] as const, radiusMeters: 5, damage: 55, knockbackImpulse: 9000 };
+    const before = combat.snapshot;
+    expect(() => combat.applyEnvironmentBlast({ ...blast, damage: Infinity }, frames())).toThrow();
+    expect(() => combat.applyEnvironmentBlast(blast, { ...frames(), p2: { position: [NaN, 0, 0], headingRadians: 0 } })).toThrow();
+    expect(() => combat.applyEnvironmentBlast(blast, { unknown: frames().p1 })).toThrow();
+    expect(combat.snapshot).toEqual(before);
+  });
   it("collects a stable pickup and respawns it on fixed-step time", () => {
     const combat = new CombatSession({
       players,

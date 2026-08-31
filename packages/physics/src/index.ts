@@ -80,6 +80,14 @@ export interface PhysicsSceneObject {
   destructible: boolean;
   active: boolean;
   history: PhysicsTransformHistory;
+  halfExtents?: readonly [number, number, number];
+}
+
+export interface TrackBarrelSpec {
+  id: string;
+  position: readonly [number, number, number];
+  rotation: readonly [number, number, number, number];
+  halfExtents: readonly [number, number, number];
 }
 
 export interface StaticCollisionSector {
@@ -130,6 +138,7 @@ interface ArenaObject {
   initialRotation: readonly [number, number, number, number];
   enabledOnReset: boolean;
   history: PhysicsTransformHistory;
+  halfExtents?: readonly [number, number, number];
 }
 
 interface ArenaObjectSpec {
@@ -140,6 +149,7 @@ interface ArenaObjectSpec {
   mass: number;
   destructible: boolean;
   breakForce: number;
+  rotation?: readonly [number, number, number, number];
 }
 
 interface VehicleControlState {
@@ -343,6 +353,7 @@ export class PhysicsRuntime {
   readonly #contacts = new Set<string>();
   readonly #arenaBodies: RapierRigidBody[] = [];
   readonly #arenaObjects: ArenaObject[] = [];
+  readonly #trackObjectIds = new Set<string>();
   readonly #collisionVehicles: CollisionVehicleRuntime[] = [];
   readonly #objectByCollider = new Map<number, ArenaObject>();
   readonly #trackBodies: RapierRigidBody[] = [];
@@ -531,6 +542,7 @@ export class PhysicsRuntime {
       kind: object.kind,
       destructible: object.destructible,
       active: object.active,
+      ...(object.halfExtents ? { halfExtents: [...object.halfExtents] as const } : {}),
       history: {
         previous: cloneTransform(object.history.previous),
         current: cloneTransform(object.history.current),
@@ -635,6 +647,38 @@ export class PhysicsRuntime {
       headingRadians: spawn.headingRadians,
     };
     this.resetDemo();
+  }
+
+  /** Replaces only the previous track props, after validating the complete new set. */
+  setTrackBarrels(specs: readonly TrackBarrelSpec[]): void {
+    const ids = new Set<string>();
+    for (const spec of specs) {
+      if (!spec.id.startsWith("track-barrel:") || ids.has(spec.id)
+        || spec.position.length !== 3 || spec.position.some((value) => !Number.isFinite(value))
+        || spec.rotation.length !== 4 || spec.rotation.some((value) => !Number.isFinite(value))
+        || Math.abs(Math.hypot(...spec.rotation) - 1) > 1e-4
+        || spec.halfExtents.length !== 3 || spec.halfExtents.some((value) => !Number.isFinite(value) || value <= 0)
+        || Math.abs(spec.halfExtents[0] - spec.halfExtents[2]) > 1e-4) {
+        throw new Error("Track barrel requires unique prefixed id, finite transform, unit rotation and cylindrical extents");
+      }
+      ids.add(spec.id);
+    }
+    for (let index = this.#arenaObjects.length - 1; index >= 0; index -= 1) {
+      const object = this.#arenaObjects[index]!;
+      if (!this.#trackObjectIds.has(object.id)) continue;
+      for (const key of this.#contacts) {
+        if (key.split(":").map(Number).includes(object.colliderHandle)) this.#contacts.delete(key);
+      }
+      this.#objectByCollider.delete(object.colliderHandle);
+      this.#world.removeRigidBody(object.body);
+      this.#arenaObjects.splice(index, 1);
+    }
+    this.#trackObjectIds.clear();
+    this.#createCollisionObjects(specs.map((spec) => ({
+      ...spec, position: [...spec.position], rotation: [...spec.rotation], halfExtents: [...spec.halfExtents],
+      kind: "barrel", mass: 32, destructible: true, breakForce: 7_000,
+    })));
+    for (const id of ids) this.#trackObjectIds.add(id);
   }
 
   setVehicleRoster(entries: readonly VehicleRosterEntry[]): void {
@@ -991,13 +1035,15 @@ export class PhysicsRuntime {
     this.#arenaBodies.forEach((body) => body.setEnabled(enabled));
   }
 
-  #createCollisionObjects(): void {
+  #createCollisionObjects(specs: readonly ArenaObjectSpec[] = ARENA_OBJECT_SPECS): void {
     const collisionEvents = this.#RAPIER.ActiveEvents.COLLISION_EVENTS;
     const contactEvents = this.#RAPIER.ActiveEvents.CONTACT_FORCE_EVENTS;
-    for (const spec of ARENA_OBJECT_SPECS) {
+    for (const spec of specs) {
+      const rotation = spec.rotation ?? [0, 0, 0, 1];
       const body = this.#world.createRigidBody(
         this.#RAPIER.RigidBodyDesc.dynamic()
           .setTranslation(...spec.position)
+          .setRotation({ x: rotation[0]!, y: rotation[1]!, z: rotation[2]!, w: rotation[3]! })
           .setLinearDamping(0.18)
           .setAngularDamping(0.28)
           .setCcdEnabled(true),
@@ -1026,7 +1072,8 @@ export class PhysicsRuntime {
         colliderHandle: collider.handle,
         body,
         initialPosition: spec.position,
-        initialRotation: [0, 0, 0, 1],
+        initialRotation: [rotation[0]!, rotation[1]!, rotation[2]!, rotation[3]!],
+        halfExtents: spec.halfExtents,
         enabledOnReset: true,
         history: { previous: cloneTransform(initial), current: initial },
       };
@@ -1449,3 +1496,4 @@ export async function createPhysicsRuntime(
   return new PhysicsRuntime(RAPIER, events, stepSeconds, config, options);
 }
 export * from "./ai-navigation.js";
+export * from "./track-hazard-runtime.js";
