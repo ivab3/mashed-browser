@@ -74,7 +74,7 @@ rules replay must never be described as successful autonomous vehicle navigation
 
 - `.AI` / `.LED`: structurally parsed; unconfirmed tables do not drive steering. `.AID`: deferred.
 - `.ANM`: authored object/camera/copter animation playback is absent.
-- `.MTS`: authored instance/template binding is absent; associated local DFFs may parse without placement.
+- `.MTS`: instance matrices parse strictly (6.8a); scene/physics binding is still absent.
 - `.UVA`: authored UV animation is absent. Arctic `.SPL` wave paths are deferred.
 - `KTCSCRIPT.LUA`: special Kill-the-Copter behavior is not executed; generic Lua execution is prohibited.
 - Source RWP objects, explosive-object placements, original lights, pickup meshes, ghost/debris variants

@@ -45,11 +45,31 @@ describe("COURSE.LUA metadata", () => {
         dffFileName: "Post_A.dff",
         mtsFileName: "Post_A.mts",
       }],
+      instanceFiles: [],
+      explosiveObjects: [],
     });
   });
 
   it("rejects unknown values in relevant calls", () => {
     expect(() => parseCourseLua("Course_Id(ID_FROM_CODE)"))
       .toThrow("unsupported value ID_FROM_CODE");
+  });
+
+  it("resolves explosive instance declarations and preserves optional profile identities", () => {
+    const source = `Course_Id(1)
+      local BARREL = 3
+      ExpObj_Clump_Mts_Pair(BARREL, 4, 0)
+      Clump_Filename(BARREL, "barrel.dff")
+      Mts_Filename(4, "barrel.mts")`;
+    expect(parseCourseLua(source)).toMatchObject({
+      instanceFiles: [{ index: 4, fileName: "barrel.mts" }],
+      explosiveObjects: [{ clumpIndex: 3, mtsIndex: 4, explosionProfileIndex: 0 }],
+    });
+    expect(parseCourseLua(source.replace(", 4, 0)", ", 4)" )).explosiveObjects[0])
+      .toEqual({ clumpIndex: 3, mtsIndex: 4 });
+    expect(() => parseCourseLua(source.replace('Mts_Filename(4, "barrel.mts")', "")))
+      .toThrow("unresolved");
+    expect(() => parseCourseLua(`${source}\nExpObj_Clump_Mts_Pair(3, 4)`)).toThrow("duplicated");
+    expect(() => parseCourseLua(`${source}\nMts_Filename(4, "other.mts")`)).toThrow("more than once");
   });
 });

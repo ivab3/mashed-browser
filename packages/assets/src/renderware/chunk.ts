@@ -12,6 +12,7 @@ export const RW_CHUNK_IDS = {
   atomicSector: 0x09,
   planeSector: 0x0a,
   world: 0x0b,
+  matrix: 0x0d,
   frameList: 0x0e,
   geometry: 0x0f,
   clump: 0x10,

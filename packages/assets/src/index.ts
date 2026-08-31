@@ -7,6 +7,7 @@ export * from "./renderware/conventions.js";
 export * from "./renderware/bsp.js";
 export * from "./renderware/dff.js";
 export * from "./renderware/material.js";
+export * from "./renderware/mts.js";
 export * from "./renderware/rws-audio.js";
 export * from "./renderware/txd.js";
 export * from "./track.js";

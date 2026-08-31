@@ -26,6 +26,12 @@ export interface CourseDefinition {
   skies: ReadonlyArray<{ index: number; fileName: string }>;
   clumps: readonly CourseClumpDefinition[];
   objectTemplates: readonly CourseObjectTemplate[];
+  instanceFiles: ReadonlyArray<{ index: number; fileName: string }>;
+  explosiveObjects: ReadonlyArray<{
+    clumpIndex: number;
+    mtsIndex: number;
+    explosionProfileIndex?: number;
+  }>;
 }
 
 type CourseArgument = number | string;
@@ -128,6 +134,8 @@ export function parseCourseLua(source: string): CourseDefinition {
   const excludedClumps = new Set<number>();
   const fades = new Map<number, NonNullable<CourseClumpDefinition["fade"]>>();
   const objectTemplates: CourseObjectTemplate[] = [];
+  const instanceFiles = new Map<number, string>();
+  const explosiveObjects: Array<CourseDefinition["explosiveObjects"][number]> = [];
 
   for (const line of lines) {
     const call = line.match(/^([A-Za-z_]\w*)\s*\((.*)\)\s*$/);
@@ -147,6 +155,8 @@ export function parseCourseLua(source: string): CourseDefinition {
       "Clump_Exclude_From_World",
       "ClumpFade",
       "RWP_Object",
+      "Mts_Filename",
+      "ExpObj_Clump_Mts_Pair",
     ]);
     if (!relevant.has(name)) {
       continue;
@@ -200,10 +210,36 @@ export function parseCourseLua(source: string): CourseDefinition {
           mtsFileName: stringAt(args, 3, name),
         });
         break;
+      case "Mts_Filename": {
+        const index = integerAt(args, 0, name);
+        if (instanceFiles.has(index)) {
+          throw new Error(`COURSE.LUA declares MTS ${index} more than once`);
+        }
+        instanceFiles.set(index, stringAt(args, 1, name));
+        break;
+      }
+      case "ExpObj_Clump_Mts_Pair":
+        if (args.length < 2 || args.length > 3) {
+          throw new Error(`${name} requires two or three arguments`);
+        }
+        explosiveObjects.push({
+          clumpIndex: integerAt(args, 0, name), mtsIndex: integerAt(args, 1, name),
+          ...(args.length === 3 ? { explosionProfileIndex: integerAt(args, 2, name) } : {}),
+        });
+        break;
     }
   }
   if (id === undefined) {
     throw new Error("COURSE.LUA is missing Course_Id");
+  }
+  const explosivePairs = new Set<string>();
+  for (const object of explosiveObjects) {
+    const key = `${object.clumpIndex}:${object.mtsIndex}`;
+    if (!clumpFiles.has(object.clumpIndex) || !instanceFiles.has(object.mtsIndex)
+      || explosivePairs.has(key)) {
+      throw new Error(`COURSE.LUA explosive pair ${key} is unresolved or duplicated`);
+    }
+    explosivePairs.add(key);
   }
   const clumps = [...clumpFiles.entries()]
     .sort(([left], [right]) => left - right)
@@ -223,5 +259,8 @@ export function parseCourseLua(source: string): CourseDefinition {
     skies: skies.sort((left, right) => left.index - right.index),
     clumps,
     objectTemplates: objectTemplates.sort((left, right) => left.index - right.index),
+    instanceFiles: [...instanceFiles].sort(([left], [right]) => left - right)
+      .map(([index, fileName]) => ({ index, fileName })),
+    explosiveObjects,
   };
 }

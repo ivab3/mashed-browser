@@ -415,7 +415,9 @@ reapproach/reverse steering и curvature speed cap. `ai:tracks` завершае
 для двух Hard seed, плюс settled-start P1, дважды каждый: 24 совпадающих физических круга без input/automatic recovery.
 Arctic всё ещё требует много заднего хода, но проходит весь круг. Suite — 187 тестов. M2 ещё не закрыт:
 traps/scripted events требуют дальнейшего среза; расширение
-трасс продолжается пакетами 6.6f+.
+трасс продолжается пакетами 6.6f+. Срез 6.8a добавляет strict MTS reader (188 файлов / 2 856 matrices
+локального корпуса), source explosive-pair registry и pure fixed-step warning/blast/chain timeline.
+Это ещё не runtime binding: подключение физики, урона и browser acceptance продолжается в 6.8b.
 
 ### Этап 7. Beta: доставка, производительность и совместимость — 3–6 недель
 

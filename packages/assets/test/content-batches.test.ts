@@ -57,11 +57,11 @@ describe("Stage 6 content admissions", () => {
     expect(deferred).toEqual(expect.arrayContaining([
       ".aid",
       ".anm",
-      ".mts",
       ".uva",
       "ktcscript.lua",
       "powerups_gold.dff",
     ]));
+    expect(boundaries.find((boundary) => boundary.suffix === ".mts")?.disposition).toBe("parsed-only");
   });
 
   it("admits the complete 15-vehicle numbered-skin roster without promoting inferred names", () => {

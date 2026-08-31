@@ -12,6 +12,7 @@ import {
   parseCourseLua,
   parseDff,
   parseLapDataLua,
+  parseMts,
   parsePiTextureDictionary,
   parsePowerupPlacementsLua,
   parseTrackPowerupLoadoutsLua,
@@ -138,6 +139,13 @@ async function validateTrack(contentRoot: string, admission: AlphaTrackAdmission
   const declaredModels = await Promise.all(declaredDffNames.map((name) => (
     loadFile(directory, name, acceptedNames).then(parseDff)
   )));
+  const mtsNames = (await readdir(directory)).filter((name) => /\.mts$/i.test(name));
+  const instanceStreams = await Promise.all(mtsNames.map((name) => (
+    loadFile(directory, name, acceptedNames).then(parseMts)
+  )));
+  for (const declared of course.instanceFiles) {
+    await actualFileName(directory, declared.fileName);
+  }
   const powerups = admission.powerupFileName
     ? parsePowerupPlacementsLua(
       (await loadFile(directory, admission.powerupFileName, acceptedNames)).toString("utf8"),
@@ -199,6 +207,11 @@ async function validateTrack(contentRoot: string, admission: AlphaTrackAdmission
     collisionTriangles: collision.header.triangleCount,
     textures: textureDictionary.textures.length,
     courseModels: dffMetrics(declaredModels),
+    instanceStreams: {
+      files: mtsNames.length,
+      matrices: instanceStreams.reduce((sum, stream) => sum + stream.matrices.length, 0),
+      explosivePairs: course.explosiveObjects.length,
+    },
     powerups: powerups.length,
     powerupLoadoutTypes: powerupLoadout?.powerups ?? [],
     routeReplay: {

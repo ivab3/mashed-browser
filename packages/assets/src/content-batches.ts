@@ -50,8 +50,8 @@ const CITY_RESOURCE_BOUNDARIES: readonly ContentResourceBoundary[] = Object.free
   },
   {
     suffix: ".mts",
-    disposition: "deferred",
-    reason: "Authored material/physics template binding is not implemented.",
+    disposition: "parsed-only",
+    reason: "Instance matrices parse; scene/physics binding remains incomplete.",
   },
   {
     suffix: ".uva",
@@ -250,8 +250,8 @@ export const ALPHA_CONTENT_BATCHES: readonly AlphaContentBatch[] = Object.freeze
           },
           {
             suffix: ".mts",
-            disposition: "deferred",
-            reason: "Authored material/physics template binding is not implemented.",
+            disposition: "parsed-only",
+            reason: "Instance matrices parse; scene/physics binding remains incomplete.",
           },
           {
             suffix: "powerups_gold.dff",
@@ -348,8 +348,8 @@ export const ALPHA_CONTENT_BATCHES: readonly AlphaContentBatch[] = Object.freeze
           },
           {
             suffix: ".mts",
-            disposition: "deferred",
-            reason: "Authored material/physics template binding is not implemented.",
+            disposition: "parsed-only",
+            reason: "Instance matrices parse; scene/physics binding remains incomplete.",
           },
           {
             suffix: ".uva",
@@ -467,8 +467,8 @@ export const ALPHA_CONTENT_BATCHES: readonly AlphaContentBatch[] = Object.freeze
           },
           {
             suffix: ".mts",
-            disposition: "deferred",
-            reason: "Authored material/physics template binding is not implemented.",
+            disposition: "parsed-only",
+            reason: "Instance matrices parse; scene/physics binding remains incomplete.",
           },
           {
             suffix: "powerups_gold.dff",

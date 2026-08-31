@@ -12,3 +12,4 @@ export * from "./random.js";
 export * from "./race-session.js";
 export * from "./state-machine.js";
 export * from "./transform.js";
+export * from "./track-hazards.js";
