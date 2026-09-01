@@ -232,20 +232,44 @@ export class RaceSession {
   }
 
   eliminatePlayer(playerId: string, reason: RaceEliminationReason): readonly RaceEvent[] {
-    const player = this.#players.find((candidate) => candidate.definition.id === playerId);
-    if (!player) {
-      throw new Error(`Unknown race player ${playerId}`);
+    return this.eliminatePlayers([playerId], reason);
+  }
+
+  /** Applies eliminations from one simulation step before deciding whether a survivor won. */
+  eliminatePlayers(
+    playerIds: readonly string[],
+    reason: RaceEliminationReason,
+  ): readonly RaceEvent[] {
+    const uniqueIds = new Set(playerIds);
+    if (uniqueIds.size !== playerIds.length) {
+      throw new Error("Race elimination playerIds contains duplicates");
     }
-    if (this.#phase !== "racing" || player.status !== "racing") {
+    const players = playerIds.map((playerId) => {
+      const player = this.#players.find((candidate) => candidate.definition.id === playerId);
+      if (!player) {
+        throw new Error(`Unknown race player ${playerId}`);
+      }
+      return player;
+    });
+    if (this.#phase !== "racing") {
       return [];
     }
 
-    player.status = "eliminated";
-    player.eliminationReason = reason;
-    player.eliminationTimeSeconds = this.#elapsedRaceSeconds;
-    player.terminalOrder = this.#terminalOrder;
-    this.#terminalOrder += 1;
-    const events: RaceEvent[] = [{ type: "player-eliminated", playerId, reason }];
+    const events: RaceEvent[] = [];
+    for (const player of players) {
+      if (player.status !== "racing") {
+        continue;
+      }
+      player.status = "eliminated";
+      player.eliminationReason = reason;
+      player.eliminationTimeSeconds = this.#elapsedRaceSeconds;
+      player.terminalOrder = this.#terminalOrder;
+      this.#terminalOrder += 1;
+      events.push({ type: "player-eliminated", playerId: player.definition.id, reason });
+    }
+    if (events.length === 0) {
+      return events;
+    }
     this.#awardLastPlayerStanding(events);
     this.#finishIfTerminal(events);
     return events;

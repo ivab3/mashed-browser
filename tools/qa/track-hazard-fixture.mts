@@ -4,7 +4,9 @@ import { resolve } from "node:path";
 // Generated QA placements only. No original model or source course is embedded here.
 const outputDirectory = process.argv[2];
 if (!outputDirectory) throw new Error("Pass an existing empty temporary output directory");
-const positions = [[-4, 5, -3], [-2, 0.16, -3]];
+// The default debug grid is centred at [-4, 1.05, -8]. One falling barrel arms on impact and
+// chains the grounded barrel; both two-player grid slots are inside both five-metre blasts.
+const positions = [[-4, 5, -8], [-2, 0.16, -8]];
 const bytes = new Uint8Array(4 + positions.length * 76);
 const view = new DataView(bytes.buffer);
 view.setUint32(0, positions.length, true);
@@ -23,4 +25,4 @@ Clump_Exclude_From_World(1)
 Mts_Filename(2, "RBarrel.mts")
 ExpObj_Clump_Mts_Pair(1, 2)
 `, { flag: "wx" });
-console.log(`Generated two synthetic barrel placements in ${resolve(outputDirectory)}. In a fresh browser tab, load these files plus your local RBARREL.DFF, then Start simulation.`);
+console.log(`Generated two synthetic starting-grid barrel placements in ${resolve(outputDirectory)}. In a fresh browser tab, load these files plus your local RBARREL.DFF, select two players, then Start simulation.`);

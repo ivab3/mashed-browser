@@ -1058,8 +1058,12 @@ function resolveMatchModeFromFinishedRace(
 ): string | undefined {
   const snapshot = matchModeSession?.snapshot;
   const winner = event.results.find((result) => result.status !== "eliminated");
-  if (!matchModeSession || snapshot?.phase !== "playing" || !winner) {
+  if (!matchModeSession || snapshot?.phase !== "playing") {
     return undefined;
+  }
+  if (!winner) {
+    fugitiveInterceptorId = undefined;
+    return handleMatchModeEvents(matchModeSession.advance(STEP_SECONDS, { activePlayerIds: [] }));
   }
   const activePlayerIds = [winner.playerId];
   let modeEvents: readonly MatchModeEvent[];
@@ -1193,6 +1197,7 @@ function explosiveCombatWeapon(weapon: CombatWeaponType): boolean {
 
 function handleCombatEvents(combatEvents: readonly CombatEvent[]): string | undefined {
   let finishReason: string | undefined;
+  const destroyedPlayerIds = new Set<string>();
   for (const event of combatEvents) {
     switch (event.type) {
       case "pickup-collected":
@@ -1311,14 +1316,7 @@ function handleCombatEvents(combatEvents: readonly CombatEvent[]): string | unde
             durationSeconds: 0.9,
           });
         }
-        const raceEvents = raceSession?.eliminatePlayer(event.playerId, "destroyed") ?? [];
-        if (!raceSession) {
-          physics?.deactivateVehicle(event.playerId);
-        }
-        const eventFinishReason = handleRaceEvents(raceEvents);
-        if (eventFinishReason) {
-          finishReason = eventFinishReason;
-        }
+        destroyedPlayerIds.add(event.playerId);
         break;
       }
       case "projectile-world-impact": {
@@ -1354,6 +1352,14 @@ function handleCombatEvents(combatEvents: readonly CombatEvent[]): string | unde
         break;
     }
   }
+  if (destroyedPlayerIds.size > 0) {
+    const playerIds = [...destroyedPlayerIds];
+    const raceEvents = raceSession?.eliminatePlayers(playerIds, "destroyed") ?? [];
+    if (!raceSession) {
+      playerIds.forEach((playerId) => physics?.deactivateVehicle(playerId));
+    }
+    finishReason = handleRaceEvents(raceEvents) ?? finishReason;
+  }
   applyCombatHud();
   return finishReason;
 }
@@ -1376,7 +1382,9 @@ function handleMatchModeEvents(modeEvents: readonly MatchModeEvent[]): string | 
         runtimeStatus.textContent = `${event.teamId ?? event.playerIds.join(" + ")} scores · ${event.score}`;
         break;
       case "round-completed":
-        resultReason = `${event.winnerIds.join(" + ")} wins round ${event.round}`;
+        resultReason = event.reason === "no-survivors"
+          ? `Round ${event.round} ended with no survivors`
+          : `${event.winnerIds.join(" + ")} wins round ${event.round}`;
         break;
       case "match-completed":
         resultReason = `${event.winnerIds.join(" + ")} wins the match ${event.score}`;
@@ -2175,14 +2183,10 @@ function updateCameraEliminations(
   const update = cameraElimination.update(stepSeconds, subjects);
   eliminationWarnings = update.warnings;
   applyEliminationWarning();
-  let finishReason: string | undefined;
-  for (const playerId of update.eliminatedPlayerIds) {
-    const eventReason = handleRaceEvents(raceSession.eliminatePlayer(playerId, "camera-distance"));
-    if (eventReason) {
-      finishReason = eventReason;
-    }
-  }
-  return finishReason;
+  return handleRaceEvents(raceSession.eliminatePlayers(
+    update.eliminatedPlayerIds,
+    "camera-distance",
+  ));
 }
 
 function sampleVehicleInputs(

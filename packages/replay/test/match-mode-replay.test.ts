@@ -69,4 +69,35 @@ describe("local match mode replay determinism", () => {
       reason,
     });
   });
+
+  it.each(["standard", "team", "hold-the-flag", "fugitive"] as const)(
+    "replays a scoreless %s draw identically at 30, 60, and 120 Hz",
+    (mode) => {
+      const recorder = new ReplayRecorder<MatchModeFrame>(0x6_8_2026, 1 / 60);
+      recorder.record({ activePlayerIds: [] });
+      const outcomes = [30, 60, 120].map((refreshRate) => (
+        runMatchModeReplay(definition(mode), recorder.finish(), refreshRate).outcome
+      ));
+
+      expect(outcomes[1]).toEqual(outcomes[0]);
+      expect(outcomes[2]).toEqual(outcomes[0]);
+      expect(outcomes[0]?.processedSteps).toBe(1);
+      expect(outcomes[0]?.snapshot).toMatchObject({
+        phase: "round-complete",
+        roundWinnerIds: [],
+        matchWinnerIds: [],
+      });
+      expect(outcomes[0]?.snapshot.players.every((player) => player.score === 0)).toBe(true);
+      expect(outcomes[0]?.snapshot.teams.every((team) => team.score === 0)).toBe(true);
+      expect(outcomes[0]?.events).toEqual([{
+        step: 0,
+        event: {
+          type: "round-completed",
+          round: 1,
+          winnerIds: [],
+          reason: "no-survivors",
+        },
+      }]);
+    },
+  );
 });

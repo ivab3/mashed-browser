@@ -64,7 +64,13 @@ export type MatchModeEvent =
       type: "round-completed";
       round: number;
       winnerIds: readonly string[];
-      reason: "last-player" | "last-team" | "flag-held" | "fugitive-survived" | "fugitive-intercepted";
+      reason:
+        | "last-player"
+        | "last-team"
+        | "flag-held"
+        | "fugitive-survived"
+        | "fugitive-intercepted"
+        | "no-survivors";
     }
   | { type: "match-completed"; winnerIds: readonly string[]; score: number };
 
@@ -206,6 +212,9 @@ export class MatchModeSession {
 
     this.#elapsedSeconds += stepSeconds;
     this.#roundElapsedSeconds += stepSeconds;
+    if (activeIds.size === 0) {
+      return this.#completeDrawRound();
+    }
     switch (this.#mode) {
       case "standard":
         return this.#advanceStandard(activeIds);
@@ -328,6 +337,24 @@ export class MatchModeSession {
       { type: "round-completed", round: this.#round, winnerIds: [...winnerIds], reason },
     ];
     return this.#finishOrPauseRound(winnerIds, score, events);
+  }
+
+  #completeDrawRound(): readonly MatchModeEvent[] {
+    const events: MatchModeEvent[] = [];
+    if (this.#flagHolderId) {
+      events.push({ type: "flag-dropped", playerId: this.#flagHolderId });
+      this.#flagHolderId = undefined;
+      this.#flagHoldSeconds = 0;
+    }
+    this.#roundWinnerIds = [];
+    this.#phase = "round-complete";
+    events.push({
+      type: "round-completed",
+      round: this.#round,
+      winnerIds: [],
+      reason: "no-survivors",
+    });
+    return events;
   }
 
   #finishOrPauseRound(

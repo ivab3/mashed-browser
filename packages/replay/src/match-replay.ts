@@ -113,9 +113,11 @@ export function runMatchReplay(
     if (cameraUpdate.warnings.length > 0 || cameraUpdate.eliminatedPlayerIds.length > 0) {
       events.push({ step, source: "camera", event: cameraUpdate });
     }
-    for (const playerId of cameraUpdate.eliminatedPlayerIds) {
-      appendRaceEvents(events, step, race.eliminatePlayer(playerId, "camera-distance"));
-    }
+    appendRaceEvents(
+      events,
+      step,
+      race.eliminatePlayers(cameraUpdate.eliminatedPlayerIds, "camera-distance"),
+    );
 
     const racingIds = new Set(
       race.snapshot.players
@@ -137,12 +139,14 @@ export function runMatchReplay(
       frame.useRequests,
       (segment) => frame.worldHits?.[segment.projectileId],
     );
+    const destroyedPlayerIds: string[] = [];
     for (const event of combatEvents) {
       events.push({ step, source: "combat", event });
       if (event.type === "player-destroyed") {
-        appendRaceEvents(events, step, race.eliminatePlayer(event.playerId, "destroyed"));
+        destroyedPlayerIds.push(event.playerId);
       }
     }
+    appendRaceEvents(events, step, race.eliminatePlayers(destroyedPlayerIds, "destroyed"));
   };
 
   clock.advance(0, simulate);

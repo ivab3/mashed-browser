@@ -419,8 +419,10 @@ traps/scripted events требуют дальнейшего среза; расш
 локального корпуса), source explosive-pair registry и pure fixed-step warning/blast/chain timeline.
 Срез 6.8b связывает 93 source barrel instances с original mesh, physical cylinder, delayed explosion,
 chain reaction и environmental damage. `track-events:validate`, 202 теста и browser death/reset/cache
-smoke проходят. Не-barrel, ANM и KTC ресурсы остаются явно unsupported; M2 требует итоговой приёмки
-и hardening случая одновременной гибели всех участников.
+smoke проходят. Срез 6.8c применяет все элиминации одного fixed step атомарно и завершает
+одновременную гибель всех участников явной ничьей без очков во всех четырёх режимах. Replay на
+30/60/120 Hz, 211 тестов и двухпользовательский browser draw/reset smoke проходят. Не-barrel, ANM и
+KTC ресурсы остаются явно unsupported; перед M2 остаётся итоговый полный gate.
 
 ### Этап 7. Beta: доставка, производительность и совместимость — 3–6 недель
 

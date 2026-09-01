@@ -207,14 +207,16 @@ in [AI_FOUNDATION.md](AI_FOUNDATION.md#slice-64b--admitted-track-navigation-gate
 
 ## Next slices
 
-Slices 6.8a–b implement [track events](TRACK_EVENTS.md): strict MTS/source explosive-pair metadata,
+Slices 6.8a–c implement [track events](TRACK_EVENTS.md): strict MTS/source explosive-pair metadata,
 93 original barrel instances, physical destruction, warning/blast/chain timeline and environmental
-damage. The source binding gate, 202 tests and browser hazard-death/reset/cache smoke pass. Original
+damage. Same-step eliminations are atomic and all four modes resolve no-survivor rounds as scoreless
+draws. The source binding gate, 211 tests and browser hazard-death/draw/reset/cache smoke pass. Original
 hut/animation/KTC behavior remains explicitly unsupported; final M2 regression acceptance follows.
 
 1. **6.6f+ track batches:** extend the playable track catalog in measured batches. Every admitted track
    keeps the load smoke, rules replay, and explicit unsupported-resource record.
-2. **6.8c acceptance hardening:** handle simultaneous no-survivor outcomes, then repeat M2 acceptance.
+2. **M2 acceptance:** repeat the complete reproducible gate and close the admitted Alpha boundary if it
+   remains green.
 
 This order may interleave a content batch after a new mode or weapon family so the abstractions are
 validated on more than Warzone before they spread across the full catalog.

@@ -91,6 +91,46 @@ describe("MatchModeSession", () => {
     })).toContainEqual(expect.objectContaining({ reason: "fugitive-intercepted", winnerIds: ["p3"] }));
   });
 
+  it.each(["standard", "team", "hold-the-flag", "fugitive"] as const)(
+    "ends a %s round as a scoreless draw when nobody survives",
+    (mode) => {
+      const session = new MatchModeSession({
+        mode,
+        players: players.map((player, index) => ({
+          ...player,
+          teamId: index % 2 === 0 ? "red" : "blue",
+        })),
+        pointsToWin: 1,
+      });
+      if (mode === "hold-the-flag") {
+        expect(session.advance(0.1, {
+          activePlayerIds: ["p1", "p2"],
+          flagCapturePlayerId: "p1",
+        })).toEqual([{ type: "flag-captured", playerId: "p1" }]);
+      }
+
+      expect(session.advance(1 / 60, { activePlayerIds: [] })).toEqual([
+        ...(mode === "hold-the-flag" ? [{ type: "flag-dropped" as const, playerId: "p1" }] : []),
+        {
+          type: "round-completed",
+          round: 1,
+          winnerIds: [],
+          reason: "no-survivors",
+        },
+      ]);
+      expect(session.snapshot).toMatchObject({
+        phase: "round-complete",
+        roundWinnerIds: [],
+        matchWinnerIds: [],
+        flagHolderId: null,
+      });
+      expect(session.snapshot.players.every((player) => player.score === 0)).toBe(true);
+      expect(session.snapshot.teams.every((team) => team.score === 0)).toBe(true);
+      expect(() => session.startNextRound()).not.toThrow();
+      expect(session.snapshot).toMatchObject({ phase: "playing", round: 2 });
+    },
+  );
+
   it("replays identical mode frames to an identical snapshot", () => {
     const run = () => {
       const session = new MatchModeSession({

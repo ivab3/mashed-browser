@@ -174,6 +174,32 @@ describe("RaceSession", () => {
     });
   });
 
+  it("applies same-step eliminations atomically without inventing a winner", () => {
+    const race = new RaceSession({
+      course,
+      players: [{ id: "p1" }, { id: "p2" }],
+      totalLaps: 1,
+      countdownSeconds: 0,
+      finishWhenOnePlayerRemains: true,
+    });
+
+    expect(race.eliminatePlayers(["p1", "p2"], "destroyed")).toEqual([
+      { type: "player-eliminated", playerId: "p1", reason: "destroyed" },
+      { type: "player-eliminated", playerId: "p2", reason: "destroyed" },
+      {
+        type: "race-finished",
+        results: [
+          expect.objectContaining({ playerId: "p2", status: "eliminated", rank: 1 }),
+          expect.objectContaining({ playerId: "p1", status: "eliminated", rank: 2 }),
+        ],
+      },
+    ]);
+    expect(race.snapshot.players.every((player) => player.status === "eliminated")).toBe(true);
+    expect(race.snapshot.results.every((result) => result.status === "eliminated")).toBe(true);
+    expect(() => race.eliminatePlayers(["p1", "p1"], "retired")).toThrow(/duplicates/);
+    expect(() => race.eliminatePlayers(["missing"], "retired")).toThrow(/Unknown/);
+  });
+
   it("replays the same multiplayer position tape to an identical snapshot", () => {
     const run = () => {
       const race = new RaceSession({

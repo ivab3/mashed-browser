@@ -1,7 +1,8 @@
 # M2 alpha acceptance and compatibility
 
-Status on 2026-08-31: **not yet feature-complete**. Slice 6.7c introduces a repeatable series gate
-and consolidates compatibility evidence. Passing this gate does not by itself accept M2.
+Status on 2026-09-01: **final gate pending**. Slice 6.7c introduced a repeatable series gate and
+consolidated compatibility evidence; slices 6.8a–c added source-positioned hazards and hardened
+simultaneous no-survivor rounds. M2 is accepted only after the complete gate below is repeated.
 
 ## Reproducible gates
 
@@ -43,6 +44,12 @@ Ranking policy has a dedicated regression test; prior v1 saves remain readable w
 historical results. A fresh page plus course reattachment restored the same final 15/7/6/5 table;
 `New championship` reset all four scores to zero and restarted event one. Original files still require
 reattachment after reload; asset caching belongs to Beta.
+
+The 6.8c browser regression loaded the synthetic two-barrel fixture with the user's original barrel
+mesh on the default two-player grid. Both vehicles were destroyed, the Standard round ended with no
+survivors, both scores remained zero and `Next round` restored 100 HP and both armed barrels. No
+warning/error was recorded. This validates the runtime event path; deterministic draw policy across
+all four modes is covered separately at 30/60/120 Hz.
 
 ## Roadmap coverage
 
@@ -89,5 +96,4 @@ alpha acceptance. Source-free production build still has the documented large-ch
 
 ## Remaining work before M2 sign-off
 
-1. Harden no-survivor round outcomes, now reachable through simultaneous environmental blasts.
-2. Repeat the final UI and regression gates after those changes; only then reassess feature completeness.
+1. Repeat every reproducible gate after 6.8c and record the final result.

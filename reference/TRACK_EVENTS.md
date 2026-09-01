@@ -70,3 +70,18 @@ Browser acceptance on 2026-08-31:
 The synthetic fixture generator is `tools/qa/track-hazard-fixture.mts`: pass an existing empty temporary
 directory, then attach its two generated files plus the user's `RBARREL.DFF` in a fresh tab. It embeds
 no original data, uses exclusive file creation and does not modify the source asset directory.
+
+## 6.8c — simultaneous elimination hardening
+
+Eliminations produced in one fixed simulation step are now committed to `RaceSession` as one validated
+batch. Last-player-standing is evaluated only after the full batch, so neither combat nor camera order
+can invent a survivor. When the active set is empty, every match mode finishes the round with the
+explicit `no-survivors` reason, empty winner lists and no score or championship advancement. The next
+round retries normally; Flag drops its holder and Fugitive rotates only when that retry starts.
+
+The four modes replay the draw identically at 30/60/120 Hz. Together with race batching regressions,
+the complete source-free suite has 211 tests. Browser acceptance used the synthetic fixture moved onto
+the default two-player grid: both original barrel meshes exploded in the same run, P1 and P2 became
+inactive, the result read `Round 1 ended with no survivors`, both scores stayed 0 / 8, and `Next round`
+restored 100 HP plus two armed / zero spent hazards for round 2. The paused reset frame reported zero
+dropped simulation time and the console contained no warning/error.
