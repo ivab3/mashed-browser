@@ -4,10 +4,10 @@ Clean-room browser reimplementation of _Mashed: Fully Loaded_. The repository co
 new code, schemas, documentation, and metadata. Original executable and game assets must come
 from a user-owned disc image or installed copy and are always kept below ignored `game-data/`.
 
-Milestones **M0: Asset feasibility** and **M1: public proof of concept** are complete. Stage 6 alpha
-work is underway with validated parsing of original per-course power-up loadouts, authored pickup
-positions and respawn timings, distinct deterministic rules for all nine base weapon types, and four
-multi-round local match modes with persistent scores and objectives. The first AI slice adds per-slot
+Milestones **M0: Asset feasibility**, **M1: public proof of concept**, and **M2: feature-complete alpha**
+are complete. The accepted Stage 6 boundary includes validated parsing of original per-course power-up
+loadouts, authored pickup positions and respawn timings, distinct deterministic rules for all nine base
+weapon types, and four multi-round local match modes with persistent scores and objectives. The first AI slice adds per-slot
 Human/Easy/Normal/Hard drivers, deterministic checkpoint steering, and structural readers for original
 `.AI`/`.LED` data. CPU item use respects each weapon's useful target arc/range, and the production Hard
 driver completes the 136-checkpoint Warzone gate without recovery. A clean-room three-event Alpha
@@ -15,7 +15,9 @@ Championship adds aggregate points, final medals, next-event flow, and a strict 
 that resumes after navigation. Measured content batches admit City, Neustein, Arctic, and Warzone behind
 deterministic full-route gates and cover the complete 15-vehicle, 90-skin roster with explicit
 source-free resource boundaries. Runtime-backed CPU, gamepad deadzone, audio, and graphics settings
-use a strictly validated versioned local save. Stage 1
+use a strictly validated versioned local save. Source-positioned barrel hazards add physical
+destruction, delayed chain blasts and scoreless simultaneous-elimination draws; deferred source
+families remain explicitly listed in the [M2 acceptance report](reference/M2_ACCEPTANCE.md). Stage 1
 provides a reproducible local extraction pipeline; Stage 2 provides RenderWare DFF/TXD readers, full
 graphical/collision BSP sector parsing, and a Three.js asset viewer. Stage 3 adds a deterministic
 fixed-step core, replay checks, Rapier/Three.js/Web Audio adapters, debug tooling, and the browser

@@ -1,8 +1,9 @@
 # M2 alpha acceptance and compatibility
 
-Status on 2026-09-01: **final gate pending**. Slice 6.7c introduced a repeatable series gate and
-consolidated compatibility evidence; slices 6.8a–c added source-positioned hazards and hardened
-simultaneous no-survivor rounds. M2 is accepted only after the complete gate below is repeated.
+Status on 2026-09-01: **M2 accepted**. Slice 6.7c introduced a repeatable series gate and consolidated
+compatibility evidence; slices 6.8a–c added source-positioned hazards and hardened simultaneous
+no-survivor rounds. The complete gate below passed after 6.8c. This accepts the explicitly admitted
+Alpha boundary, not deferred resources or Beta delivery work.
 
 ## Reproducible gates
 
@@ -94,6 +95,21 @@ rules replay must never be described as successful autonomous vehicle navigation
 Beta-only import/cache/offline delivery and a cross-browser matrix are not silently included in this
 alpha acceptance. Source-free production build still has the documented large-chunk warning.
 
-## Remaining work before M2 sign-off
+## Final gate result (2026-09-01)
 
-1. Repeat every reproducible gate after 6.8c and record the final result.
+- `pnpm test`: 211 tests passed across 57 test files.
+- `pnpm typecheck`: all 10 participating workspace projects passed.
+- `pnpm build`: both Vite applications built; the documented large-chunk warnings remain non-blocking.
+- `pnpm alpha:replay`: 36 series across four course identities, 2/3/4 entrants and 30/60/120 Hz were deterministic.
+- `pnpm content:validate`: all four admitted batches were accepted with every local resource classified.
+- `pnpm match:replay`: the full match stack matched at 30/60/120 Hz over 105 fixed steps.
+- `pnpm m1:soak`: 1,800.75 simulated seconds, 1,029 matches and 108,045 fixed steps passed finite-state,
+  legal-transition and deterministic-reset checks; measured heap growth was 429,040 bytes.
+- `pnpm ai:lap`: Hard completed Warzone's 136 checkpoints in 55.57 seconds without reverse or recovery.
+- `pnpm ai:tracks`: 12 track/seed/start configurations, each executed twice, completed all 24 physical
+  laps deterministically within 180 seconds without input or automatic recovery.
+- `pnpm track-events:validate`: all 93 admitted source barrels passed create, destroy, reset and removal;
+  Warzone's non-barrel hut stayed an explicit warning.
+
+The functional roadmap tasks, complete menu-to-championship-results loop, per-track load/replay evidence
+and incompatibility inventory therefore meet the Stage 6 readiness criteria. **Milestone M2 is closed.**
