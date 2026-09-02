@@ -5,6 +5,7 @@ import {
   buildRenderWareModel,
   DEFAULT_VEHICLE_MODEL_GROUND_Y,
   DEFAULT_VEHICLE_MODEL_LENGTH_METERS,
+  fittedVehicleCollisionHull,
   fitVehicleModelRoot,
   renderWareFrameMatrices,
   selectIntactVehicleAtomicIndices,
@@ -100,6 +101,49 @@ describe("RenderWare DFF model builder", () => {
     expect(forward.z).toBeCloseTo(1);
     expect(bounds.getCenter(new THREE.Vector3()).x).toBeCloseTo(0);
     expect(bounds.getCenter(new THREE.Vector3()).z).toBeCloseTo(0);
+  });
+
+  it("fits source collision parts into the visible model's body-local space", () => {
+    const vehicle = model(0);
+    const base = vehicle.geometries[0]!;
+    vehicle.geometries = [
+      {
+        ...base,
+        userData: [{ name: "0.tv_part_id", type: "int", values: [21] }],
+        materials: [{
+          color: [255, 255, 255, 255],
+          surfaceProperties: { specular: 0 },
+          texture: { name: "Body" },
+        }],
+      },
+      {
+        ...base,
+        vertexCount: 4,
+        morphTargets: [{
+          positions: new Float32Array([
+            0, 0, 0,
+            1, 0, 0,
+            0, 1, 0,
+            0, 0, 1,
+          ]),
+        }],
+        userData: [{ name: "0.tv_part_id", type: "int", values: [59] }],
+      },
+    ];
+    vehicle.atomics = [
+      { frameIndex: 1, geometryIndex: 0 },
+      { frameIndex: 1, geometryIndex: 1 },
+    ];
+    const visible = buildRenderWareModel(vehicle, new Map(), {
+      atomicIndices: selectIntactVehicleAtomicIndices(vehicle),
+    }).root;
+    fitVehicleModelRoot(visible);
+
+    const hull = fittedVehicleCollisionHull(vehicle, visible)!;
+    expect(hull).toHaveLength(12);
+    expect(Math.min(...hull.filter((_, index) => index % 3 === 2))).toBeCloseTo(-1.51);
+    expect(Math.max(...hull.filter((_, index) => index % 3 === 2))).toBeCloseTo(1.51);
+    expect(fittedVehicleCollisionHull(model(0), visible)).toBeUndefined();
   });
 
   it("rejects an invalid vehicle footprint", () => {

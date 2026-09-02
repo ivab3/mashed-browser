@@ -124,6 +124,11 @@ function vehiclePartId(geometry: RenderWareModelGeometry): number | undefined {
   return typeof value === "number" ? value : undefined;
 }
 
+function isVehicleCollisionPart(geometry: RenderWareModelGeometry): boolean {
+  const partId = vehiclePartId(geometry);
+  return partId !== undefined && partId >= 59 && partId <= 62;
+}
+
 /**
  * Selects the intact high-detail vehicle pieces used by Mashed DFFs. Parts 59–62 are
  * collision hulls, 100–103 are low-detail full-car shells, 77 is broken glass, and
@@ -275,4 +280,36 @@ export function fitVehicleModelRoot(
     scale,
     size: [size.x, size.y, size.z],
   };
+}
+
+/**
+ * Returns source collision-part vertices in the same body-local space as the fitted visible model.
+ * Physics keeps this authored X/Z footprint but normalizes its vertical span for the ray-cast chassis.
+ */
+export function fittedVehicleCollisionHull(
+  model: RenderWareModel,
+  fittedRoot: THREE.Group,
+): Float32Array | undefined {
+  fittedRoot.updateMatrix();
+  const rootMatrix = fittedRoot.matrix.clone();
+  const matrices = renderWareFrameMatrices(model.frames);
+  const point = new THREE.Vector3();
+  const points: number[] = [];
+
+  for (const atomic of model.atomics) {
+    const geometry = model.geometries[atomic.geometryIndex];
+    const positions = geometry?.morphTargets[0]?.positions;
+    const frame = matrices[atomic.frameIndex];
+    if (!geometry || !positions || !frame || !isVehicleCollisionPart(geometry)) {
+      continue;
+    }
+    const fittedMatrix = rootMatrix.clone().multiply(frame);
+    for (let offset = 0; offset < positions.length; offset += 3) {
+      point.set(positions[offset]!, positions[offset + 1]!, positions[offset + 2]!);
+      point.applyMatrix4(fittedMatrix);
+      points.push(point.x, point.y, point.z);
+    }
+  }
+
+  return points.length >= 12 ? new Float32Array(points) : undefined;
 }

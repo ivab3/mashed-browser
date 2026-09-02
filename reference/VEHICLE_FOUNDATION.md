@@ -209,6 +209,20 @@ the upright dot above `0.995`, and planar drift below one centimeter. Separate 1
 smokes with the debug proxy and Crusader DFF both held `4/4`, `0 km/h`, asphalt, 60 FPS, zero dropped
 time, and a clean console.
 
+### Source-fitted vehicle collision hulls
+
+Loaded vehicle models now replace the oversized generic two-box proxy with the source DFF collision
+parts (`tv_part_id` 59–62), transformed by the same scale, centering, and grounding fit as the visible
+car. Physics preserves the authored horizontal footprint and normalizes only its vertical span to the
+ray-cast chassis height, preventing the fitted hull from catching on the road. Models without usable
+source collision parts retain the generic proxy as a safe fallback.
+
+The deterministic vehicle-pair regression holds two visible-length hulls 3.15 m apart and verifies
+that they remain separated while the old 3.34 m compound proxies already overlap. Multiple collider
+pairs beginning contact in one fixed step are also coalesced into one impact sound and flash. A
+browser smoke with two Wildfire models replaced four generic colliders with two fitted convex hulls,
+reported no parked contacts or dropped time, and produced no console warnings or errors.
+
 ## Gate C acceptance
 
 The product owner accepted each tuning block after hands-on A/B testing: mass, acceleration,

@@ -21,6 +21,7 @@ import {
 } from "./renderware-track.js";
 import {
   buildRenderWareModel,
+  fittedVehicleCollisionHull,
   fitVehicleModelRoot,
   selectIntactVehicleAtomicIndices,
   type RenderWareModel,
@@ -170,6 +171,7 @@ function combatProjectileGeometry(weapon: CombatWeaponType): THREE.BufferGeometr
 }
 
 export class RuntimeRenderer {
+  readonly #events: RuntimeEventBus;
   readonly #renderer: THREE.WebGLRenderer;
   readonly #scene = new THREE.Scene();
   readonly #camera = new THREE.PerspectiveCamera(48, 1, 0.05, 500);
@@ -201,6 +203,7 @@ export class RuntimeRenderer {
   #trackRoute: THREE.LineLoop | undefined;
 
   constructor(viewport: HTMLElement, events: RuntimeEventBus) {
+    this.#events = events;
     this.#renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: "high-performance" });
     this.#renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     this.#renderer.outputColorSpace = THREE.SRGBColorSpace;
@@ -495,6 +498,7 @@ export class RuntimeRenderer {
     const atomicIndices = selectIntactVehicleAtomicIndices(model);
     const built = buildRenderWareModel(model, textureSet.byName, { atomicIndices });
     const fit = fitVehicleModelRoot(built.root);
+    const collisionHull = fittedVehicleCollisionHull(model, built.root);
     built.root.name = `loaded-vehicle-model-${vehicleId}`;
     this.#vehicleModelRoots.set(vehicleId, built.root);
     this.#vehicleTextureSets.set(vehicleId, textureSet.owned);
@@ -507,6 +511,11 @@ export class RuntimeRenderer {
       this.#sceneObjects.set(vehicleId, built.root);
       this.#scene.add(built.root);
     }
+    this.#events.emit({
+      type: "vehicle:collision-hull-fitted",
+      vehicleId,
+      ...(collisionHull ? { points: collisionHull } : {}),
+    });
     return {
       atomics: built.atomics,
       triangles: built.triangles,
@@ -527,6 +536,7 @@ export class RuntimeRenderer {
       root.removeFromParent();
       disposeRenderableRoot(root);
       this.#vehicleModelRoots.delete(vehicleId);
+      this.#events.emit({ type: "vehicle:collision-hull-fitted", vehicleId });
     }
     this.#vehicleTextureSets.get(vehicleId)?.forEach((texture) => texture.dispose());
     this.#vehicleTextureSets.delete(vehicleId);

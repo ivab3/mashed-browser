@@ -41,6 +41,11 @@ export type RuntimeEvent =
       position: readonly [number, number, number];
     }
   | {
+      type: "vehicle:collision-hull-fitted";
+      vehicleId: string;
+      points?: Float32Array;
+    }
+  | {
       type: "audio:cue";
       cue: AudioCue;
       gain: number;

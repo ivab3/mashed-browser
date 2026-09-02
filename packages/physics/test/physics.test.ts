@@ -187,6 +187,62 @@ describe("PhysicsRuntime", () => {
     }
   });
 
+  it("uses fitted source hulls instead of early compound-box contacts", async () => {
+    const options = {
+      collisionObjects: false,
+      collisionVehicle: {
+        id: "vehicle-two",
+        spawn: { position: [-4, 1.05, -4.85] as const, headingRadians: Math.PI },
+      },
+    };
+    const defaultEvents = new RuntimeEventBus();
+    const fittedEvents = new RuntimeEventBus();
+    const defaultStarted: RuntimeEvent[] = [];
+    const fittedStarted: RuntimeEvent[] = [];
+    defaultEvents.subscribe((event) => {
+      if ((event.type === "physics:contact" && event.started) || (event.type === "audio:cue" && event.cue === "impact")) {
+        defaultStarted.push(event);
+      }
+    });
+    fittedEvents.subscribe((event) => {
+      if ((event.type === "physics:contact" && event.started) || (event.type === "audio:cue" && event.cue === "impact")) {
+        fittedStarted.push(event);
+      }
+    });
+    const defaults = await createPhysicsRuntime(defaultEvents, 1 / 60, DEFAULT_VEHICLE_CONFIG, options);
+    const fitted = await createPhysicsRuntime(fittedEvents, 1 / 60, DEFAULT_VEHICLE_CONFIG, options);
+    const fittedHull = new Float32Array([
+      -0.66, -0.45, -1.48, 0.66, -0.45, -1.48,
+      -0.66, 0.45, -1.48, 0.66, 0.45, -1.48,
+      -0.66, -0.45, 1.48, 0.66, -0.45, 1.48,
+      -0.66, 0.45, 1.48, 0.66, 0.45, 1.48,
+    ]);
+    try {
+      fittedEvents.emit({
+        type: "vehicle:collision-hull-fitted",
+        vehicleId: PRIMARY_VEHICLE_ID,
+        points: fittedHull,
+      });
+      fittedEvents.emit({
+        type: "vehicle:collision-hull-fitted",
+        vehicleId: "vehicle-two",
+        points: fittedHull,
+      });
+      defaults.step(1 / 60);
+      fitted.step(1 / 60);
+
+      expect(defaultStarted).toContainEqual(expect.objectContaining({ type: "physics:contact", started: true }));
+      expect(defaultStarted.filter((event) => event.type === "audio:cue")).toHaveLength(1);
+      expect(fittedStarted).toEqual([]);
+      expect(() => fitted.setVehicleCollisionHull("missing", fittedHull)).toThrow(/Unknown/);
+      expect(() => fitted.setVehicleCollisionHull(PRIMARY_VEHICLE_ID, new Float32Array([0, 0, 0])))
+        .toThrow(/at least four/);
+    } finally {
+      defaults.dispose();
+      fitted.dispose();
+    }
+  });
+
   it("drives and reports the second vehicle through an independent input stream", async () => {
     const spawn = { position: [4, 1.05, -8] as const, headingRadians: 0 };
     const physics = await createPhysicsRuntime(

@@ -37,6 +37,7 @@ type RapierWorld = import("@dimforge/rapier3d-compat").World;
 type RapierRigidBody = import("@dimforge/rapier3d-compat").RigidBody;
 type RapierEventQueue = import("@dimforge/rapier3d-compat").EventQueue;
 type RapierVehicleController = import("@dimforge/rapier3d-compat").DynamicRayCastVehicleController;
+type RapierColliderDesc = import("@dimforge/rapier3d-compat").ColliderDesc;
 type RapierVector = import("@dimforge/rapier3d-compat").Vector;
 type RapierRotation = import("@dimforge/rapier3d-compat").Rotation;
 
@@ -350,6 +351,7 @@ export class PhysicsRuntime {
   readonly #vehicle: RapierVehicleController;
   readonly #config: VehicleConfig;
   readonly #sourceHandling: { grip: number; handling: number };
+  readonly #unsubscribeEvents: () => void;
   readonly #contacts = new Set<string>();
   readonly #arenaBodies: RapierRigidBody[] = [];
   readonly #arenaObjects: ArenaObject[] = [];
@@ -408,6 +410,11 @@ export class PhysicsRuntime {
     }
     const initial = transformOf(this.#body);
     this.#history = { previous: cloneTransform(initial), current: initial };
+    this.#unsubscribeEvents = events.subscribe((event) => {
+      if (event.type === "vehicle:collision-hull-fitted") {
+        this.setVehicleCollisionHull(event.vehicleId, event.points);
+      }
+    });
   }
 
   #createVehicleController(body: RapierRigidBody): RapierVehicleController {
@@ -461,27 +468,79 @@ export class PhysicsRuntime {
         .setCcdEnabled(true)
         .setCanSleep(true),
     );
-    const collisionEvents = RAPIER.ActiveEvents.COLLISION_EVENTS;
-    const collider = this.#world.createCollider(
-      RAPIER.ColliderDesc.cuboid(...chassis.halfExtents)
-        .setMass(0)
-        .setFriction(0)
-        .setFrictionCombineRule(RAPIER.CoefficientCombineRule.Min)
-        .setRestitution(this.#config.collisionResponse.chassisRestitution)
-        .setActiveEvents(collisionEvents),
-      body,
+    const colliders = this.#defaultVehicleColliderDescriptors().map((descriptor) => (
+      this.#world.createCollider(descriptor, body)
+    ));
+    return { body, colliderHandle: colliders[0]!.handle };
+  }
+
+  #configureVehicleCollider(
+    descriptor: RapierColliderDesc,
+    restitution: number,
+  ): RapierColliderDesc {
+    return descriptor
+      .setMass(0)
+      .setFriction(0)
+      .setFrictionCombineRule(this.#RAPIER.CoefficientCombineRule.Min)
+      .setRestitution(restitution)
+      .setActiveEvents(this.#RAPIER.ActiveEvents.COLLISION_EVENTS);
+  }
+
+  #defaultVehicleColliderDescriptors(): readonly RapierColliderDesc[] {
+    const chassis = this.#config.chassis;
+    return [
+      this.#configureVehicleCollider(
+        this.#RAPIER.ColliderDesc.cuboid(...chassis.halfExtents),
+        this.#config.collisionResponse.chassisRestitution,
+      ),
+      this.#configureVehicleCollider(
+        this.#RAPIER.ColliderDesc.cuboid(...chassis.noseHalfExtents)
+          .setTranslation(...chassis.noseOffset),
+        this.#config.collisionResponse.noseRestitution,
+      ),
+    ];
+  }
+
+  #fittedVehicleColliderDescriptor(points: Float32Array): RapierColliderDesc {
+    if (points.length < 12 || points.length % 3 !== 0) {
+      throw new Error("Vehicle collision hull needs at least four 3D points");
+    }
+    const minimum = [Number.POSITIVE_INFINITY, Number.POSITIVE_INFINITY, Number.POSITIVE_INFINITY];
+    const maximum = [Number.NEGATIVE_INFINITY, Number.NEGATIVE_INFINITY, Number.NEGATIVE_INFINITY];
+    for (let offset = 0; offset < points.length; offset += 3) {
+      for (let axis = 0; axis < 3; axis += 1) {
+        const value = points[offset + axis]!;
+        if (!Number.isFinite(value) || Math.abs(value) > 10) {
+          throw new Error("Vehicle collision hull contains an invalid coordinate");
+        }
+        minimum[axis] = Math.min(minimum[axis]!, value);
+        maximum[axis] = Math.max(maximum[axis]!, value);
+      }
+    }
+    const spans = minimum.map((value, axis) => maximum[axis]! - value);
+    if (spans.some((span) => span < 0.1)) {
+      throw new Error("Vehicle collision hull must span three dimensions");
+    }
+
+    // Source parts include the wheel/grounding height. Preserve their authored X/Z silhouette while
+    // mapping Y into the existing ray-cast chassis height so the hull cannot catch on the road.
+    const normalized = new Float32Array(points.length);
+    const halfHeight = this.#config.chassis.halfExtents[1];
+    for (let offset = 0; offset < points.length; offset += 3) {
+      normalized[offset] = points[offset]!;
+      normalized[offset + 1] = (
+        ((points[offset + 1]! - minimum[1]!) / spans[1]!) * 2 - 1
+      ) * halfHeight;
+      normalized[offset + 2] = points[offset + 2]!;
+    }
+    const descriptor = this.#RAPIER.ColliderDesc.convexHull(normalized);
+    if (!descriptor) {
+      throw new Error("Vehicle collision hull could not form a convex shape");
+    }
+    return this.#configureVehicleCollider(
+      descriptor,
+      this.#config.collisionResponse.chassisRestitution,
     );
-    this.#world.createCollider(
-      RAPIER.ColliderDesc.cuboid(...chassis.noseHalfExtents)
-        .setTranslation(...chassis.noseOffset)
-        .setMass(0)
-        .setFriction(0)
-        .setFrictionCombineRule(RAPIER.CoefficientCombineRule.Min)
-        .setRestitution(this.#config.collisionResponse.noseRestitution)
-        .setActiveEvents(collisionEvents),
-      body,
-    );
-    return { body, colliderHandle: collider.handle };
   }
 
   get transformHistory(): PhysicsTransformHistory {
@@ -726,6 +785,38 @@ export class PhysicsRuntime {
     }
     this.#vehicleRosterIds = entries.map((entry) => entry.id);
     this.resetDemo();
+  }
+
+  /** Replaces the debug compound boxes with a fitted source-model hull for one vehicle. */
+  setVehicleCollisionHull(id: string, points?: Float32Array): void {
+    const body = id === PRIMARY_VEHICLE_ID
+      ? this.#body
+      : this.#collisionVehicles.find((vehicle) => vehicle.id === id)?.body;
+    if (!body) {
+      throw new Error(`Unknown vehicle collision hull target ${id}`);
+    }
+    const descriptors = points
+      ? [this.#fittedVehicleColliderDescriptor(points)]
+      : this.#defaultVehicleColliderDescriptors();
+    const previousColliders = Array.from(
+      { length: body.numColliders() },
+      (_, index) => body.collider(index),
+    );
+    const previousHandles = new Set(previousColliders.map((collider) => collider.handle));
+    for (const collider of previousColliders) {
+      this.#world.removeCollider(collider, false);
+    }
+    const colliders = descriptors.map((descriptor) => this.#world.createCollider(descriptor, body));
+    for (const key of [...this.#contacts]) {
+      if (key.split(":").map(Number).some((handle) => previousHandles.has(handle))) {
+        this.#contacts.delete(key);
+      }
+    }
+    this.#eventQueue.clear();
+    const collisionVehicle = this.#collisionVehicles.find((vehicle) => vehicle.id === id);
+    if (collisionVehicle) {
+      collisionVehicle.object.colliderHandle = colliders[0]!.handle;
+    }
   }
 
   deactivateVehicle(id: string): void {
@@ -981,6 +1072,7 @@ export class PhysicsRuntime {
   }
 
   dispose(): void {
+    this.#unsubscribeEvents();
     this.#world.removeVehicleController(this.#vehicle);
     for (const collisionVehicle of this.#collisionVehicles) {
       this.#world.removeVehicleController(collisionVehicle.controller);
@@ -1372,6 +1464,7 @@ export class PhysicsRuntime {
   }
 
   #drainEvents(): void {
+    let startedContact = false;
     this.#eventQueue.drainCollisionEvents((colliderA, colliderB, started) => {
       const key = contactKey(colliderA, colliderB);
       if (started) {
@@ -1381,10 +1474,13 @@ export class PhysicsRuntime {
       }
       this.#events.emit({ type: "physics:contact", colliderA, colliderB, started });
       if (started) {
-        this.#events.emit({ type: "audio:cue", cue: "impact", gain: 0.12 });
-        this.#events.emit({ type: "renderer:flash", color: 0xff7a42, durationSeconds: 0.12 });
+        startedContact = true;
       }
     });
+    if (startedContact) {
+      this.#events.emit({ type: "audio:cue", cue: "impact", gain: 0.12 });
+      this.#events.emit({ type: "renderer:flash", color: 0xff7a42, durationSeconds: 0.12 });
+    }
     const impacts = new Map<ArenaObject, number>();
     this.#eventQueue.drainContactForceEvents((event) => {
       const first = this.#objectByCollider.get(event.collider1());
