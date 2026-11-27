@@ -41,6 +41,41 @@ production-browser gate at a 2560×1440 WebGL buffer with no post-load asset req
 [ADR-0001](./reference/ADR-0001-runtime-asset-loading.md) selects direct runtime
 parsing in a loading Worker instead of mandatory pre-conversion.
 
+## Stage 7: import a local library and play offline
+
+Beta delivery slices 7.1–7.2 import an **installed game folder**, extracted `game-data`, or the
+reference **Fully Loaded Europe CUE/BIN disc image** directly in the browser. Click **Import game
+folder** to select a directory, or **Import disc image** and select the matching `.cue` and `.bin`
+files together. Then choose a track and vehicle after import. The production build requires no extractor, Node server,
+or `/__mashed` endpoint for game data. A static HTTP host is sufficient; use HTTPS outside localhost.
+
+MODE1/ISO 9660, InstallShield v6, PIZ extraction and resource validation run in a Worker. Resources stay on this device in IndexedDB,
+separate from settings and championship saves, and restore automatically on later visits to the
+same origin/browser profile. The import shows progress and can be cancelled. After cancellation or
+closing the tab, select the same folder or CUE/BIN pair again to resume. Disc extraction restarts,
+then saved resource payloads are reused after SHA-256 verification. A new library becomes active only when all selected supported resources validate.
+
+The current admission covers four tracks, 15 vehicles and 90 paints. Unsupported content is not
+silently enabled. Browser storage eviction can require reimport.
+
+For offline play (slice 7.3), open the production build once while online. After import,
+wait for **Ready to play offline.** in **Local game content**. You can now close the browser
+and reopen the same URL offline. To launch it in its own window, use the browser's install
+command where available. Installation is optional.
+
+To try the production build locally:
+
+```bash
+pnpm --filter @mashed/web build
+pnpm --filter @mashed/web exec vite preview --port 4173 --strictPort
+```
+
+Open `http://localhost:4173/`. To reuse a previously imported library, serve the build on
+the same protocol, hostname and port and use the same browser profile as for the import.
+See [Beta delivery verification](reference/BETA_IMPORT.md) for the cold-start check.
+
+Development mode retains the existing local `game-data/` catalog when no browser library exists.
+
 ## Requirements
 
 - Node.js 20 or newer;
@@ -66,6 +101,7 @@ pnpm typecheck
 pnpm test
 pnpm build
 pnpm content:validate
+pnpm import:validate
 pnpm alpha:replay
 pnpm ai:tracks
 pnpm track-events:validate
@@ -126,12 +162,15 @@ pnpm web
 The shell demonstrates the `boot → loading → menu → race ⇄ paused → results` flow, a 60 Hz fixed simulation
 clock with interpolated presentation transforms, a live telemetry overlay, an orbit debug camera,
 Rapier collider lines, and the first fixed-step race-rules slice. A loaded track route adds a
-three-second countdown, ordered one-lap finish, and final-time banner. Local DFF/TXD/BSP/RWS files can
-be parsed through the loading Worker; original
-bytes remain local and parsed typed arrays are transferred back without cloning. See
+three-second countdown, ordered one-lap finish, and final-time banner. The local dev server discovers
+the admitted content in the ignored `game-data/` tree. Choose a track or vehicle from the in-app
+visual catalog instead of opening a native file picker; previews come from the original local
+`TRACKIMAGES.TXD`, and the complete track bundle or selected vehicle paint loads automatically.
+DFF/TXD/BSP/RWS files are parsed through the loading Worker; original bytes remain local and parsed
+typed arrays are transferred back without cloning. See
 [`reference/RUNTIME_FOUNDATION.md`](./reference/RUNTIME_FOUNDATION.md) for runtime contracts and
 acceptance evidence. Loading a numbered vehicle DFF such as `CRUSADER0.DFF` together with its shared
-`CRUSADER.TXD` adds it to the local roster selectors.
+`CRUSADER.TXD` is now handled by the catalog when that vehicle and paint are selected.
 Measured track admissions currently cover City (course 26), Neustein (course 39), Arctic (course 0),
 and Warzone (course 33). The vehicle registry covers all 15 source archives and all 90 intact numbered skins.
 `pnpm content:validate` checks every admitted local bundle, runs each track's 30/60/120 Hz route-rules

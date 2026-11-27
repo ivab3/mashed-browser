@@ -23,7 +23,9 @@
     "build": "pnpm -r --if-present build",
     "content:validate": "pnpm --filter @mashed/physics content:validate",
     "typecheck": "pnpm -r typecheck",
-    "test": "pnpm -r test"
+    "test": "pnpm -r test",
+    "import:validate": "node --import tsx apps/web/src/import-validation-cli.ts",
+    "disc:validate": "node --import tsx apps/web/src/disc-validation-cli.ts"
   },
   "devDependencies": {
     "@types/node": "^20.17.0",

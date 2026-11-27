@@ -1,3 +1,6 @@
+import { ContentStore, readCachedContentFile, type StoredContent } from "./content-store.js";
+import { importGameSource } from "./import-client.js";
+import { prepareOfflineLaunch } from "./offline-launch.js";
 import { AudioRuntime } from "@mashed/audio";
 import {
   admittedTrackByCourseId,
@@ -96,6 +99,12 @@ import {
   type ControlBindingsV1,
 } from "./control-bindings.js";
 import type { LoadedAsset } from "./loading-protocol.js";
+import type {
+  LocalContentCatalog,
+  LocalContentFile,
+  LocalTrackCatalogEntry,
+  LocalVehicleCatalogEntry,
+} from "./local-content-catalog.js";
 import {
   evaluateM1Evidence,
   M1EvidenceCollector,
@@ -110,13 +119,6 @@ function element<T extends HTMLElement>(id: string): T {
     throw new Error(`Missing #${id}`);
   }
   return result;
-}
-
-function formatBytes(bytes: number): string {
-  if (bytes < 1024) {
-    return `${bytes} B`;
-  }
-  return `${(bytes / (1024 * 1024)).toFixed(2)} MB`;
 }
 
 function assetSummary(asset: LoadedAsset): string {
@@ -163,7 +165,6 @@ const viewport = element<HTMLElement>("viewport");
 const stateBadge = element<HTMLElement>("state-badge");
 const runtimeStatus = element<HTMLElement>("runtime-status");
 const assetStatus = element<HTMLElement>("asset-status");
-const assetInput = element<HTMLInputElement>("asset-files");
 const startButton = element<HTMLButtonElement>("start-race");
 const pauseButton = element<HTMLButtonElement>("pause-race");
 const finishButton = element<HTMLButtonElement>("finish-race");
@@ -197,6 +198,7 @@ const raceResults = element<HTMLOListElement>("race-results");
 const eliminationWarning = element<HTMLElement>("elimination-warning");
 const pauseOverlay = element<HTMLElement>("pause-overlay");
 const m1EvidencePanel = element<HTMLElement>("m1-evidence-panel");
+const m1EvidenceLoad = element<HTMLButtonElement>("m1-evidence-load");
 const m1EvidenceReset = element<HTMLButtonElement>("m1-evidence-reset");
 const m1EvidenceCapture = element<HTMLButtonElement>("m1-evidence-capture");
 const m1EvidenceOutput = element<HTMLElement>("m1-evidence-output");
@@ -225,6 +227,27 @@ const championshipHud = element<HTMLElement>("championship-hud");
 const championshipHudTitle = element<HTMLElement>("championship-hud-title");
 const championshipHudEvent = element<HTMLElement>("championship-hud-event");
 const championshipHudStandings = element<HTMLOListElement>("championship-hud-standings");
+const localContentCount = element<HTMLElement>("local-content-count");
+const localContentStatus = element<HTMLElement>("local-content-status");
+const importFolderButton = element<HTMLButtonElement>("import-folder");
+const importDiscButton = element<HTMLButtonElement>("import-disc");
+const importDiscInput = element<HTMLInputElement>("import-disc-input");
+const importFolderInput = element<HTMLInputElement>("import-folder-input");
+const importCancelButton = element<HTMLButtonElement>("import-cancel");
+const importProgress = element<HTMLProgressElement>("import-progress");
+const importStatus = element<HTMLElement>("import-status");
+const trackSelect = element<HTMLButtonElement>("track-select");
+const trackSelectImage = element<HTMLImageElement>("track-select-image");
+const trackSelectName = element<HTMLElement>("track-select-name");
+const trackSelectDetail = element<HTMLElement>("track-select-detail");
+const contentCatalogDialog = element<HTMLDialogElement>("content-catalog");
+const contentCatalogKicker = element<HTMLElement>("content-catalog-kicker");
+const contentCatalogTitle = element<HTMLElement>("content-catalog-title");
+const contentCatalogDescription = element<HTMLElement>("content-catalog-description");
+const contentCatalogGrid = element<HTMLElement>("content-catalog-grid");
+const contentCatalogFooter = element<HTMLElement>("content-catalog-footer");
+const vehicleVariantList = element<HTMLElement>("vehicle-variant-list");
+const vehicleCatalogConfirm = element<HTMLButtonElement>("vehicle-catalog-confirm");
 const vehicleSelectRows = [
   element<HTMLElement>("vehicle-select-row-one"),
   element<HTMLElement>("vehicle-select-row-two"),
@@ -232,10 +255,10 @@ const vehicleSelectRows = [
   element<HTMLElement>("vehicle-select-row-four"),
 ];
 const vehicleSelects = [
-  element<HTMLSelectElement>("vehicle-select-one"),
-  element<HTMLSelectElement>("vehicle-select-two"),
-  element<HTMLSelectElement>("vehicle-select-three"),
-  element<HTMLSelectElement>("vehicle-select-four"),
+  element<HTMLButtonElement>("vehicle-select-one"),
+  element<HTMLButtonElement>("vehicle-select-two"),
+  element<HTMLButtonElement>("vehicle-select-three"),
+  element<HTMLButtonElement>("vehicle-select-four"),
 ];
 const driverSelectRows = [
   element<HTMLElement>("driver-select-row-one"),
@@ -331,6 +354,23 @@ let vehicleInputs: BrowserVehicleInput[] = [];
 let aiDrivers = new Map<string, AiRouteDriver>();
 let latestVehicleInputs: VehicleInputById = {};
 let vehicleCatalog: readonly VehicleAssetPair[] = [];
+let localContentCatalog: LocalContentCatalog | undefined;
+let storedContent: StoredContent | undefined;
+let contentCatalogInitializing = true;
+let offlineShellReady = false;
+
+function showOfflineReadiness(): void {
+  if (!offlineShellReady || contentCatalogInitializing) return;
+  element<HTMLElement>("offline-status").textContent = storedContent
+    ? "Ready to play offline."
+    : "Game cached. Import your library to play offline.";
+}
+let cancelContentImport: (() => void) | undefined;
+let localPreviewImages = new Map<string, string>();
+let selectedTrackCatalogId: string | undefined;
+let vehicleCatalogTarget = 0;
+let pendingVehicleCatalogId: string | undefined;
+let pendingVehicleVariant = 0;
 let animationFrame = 0;
 let lastRenderTimestamp: number | undefined;
 let smoothedFps = 60;
@@ -717,6 +757,8 @@ function applyState(next: RuntimeState): void {
   stateBadge.textContent = next;
   stateBadge.dataset["state"] = next;
   startButton.disabled = next !== "menu" && next !== "results";
+  importFolderButton.disabled = contentCatalogInitializing || next === "loading" || matchActive;
+  importDiscButton.disabled = importFolderButton.disabled;
   const championshipPhase = championshipSession?.snapshot.phase;
   startButton.textContent = championshipPhase === "event-complete"
     ? "Next event"
@@ -734,7 +776,8 @@ function applyState(next: RuntimeState): void {
   finishButton.textContent = matchModeSession ? "Finish round" : "Finish race";
   menuButton.disabled = !matchActive && next !== "results";
   resetButton.disabled = next === "paused";
-  assetInput.disabled = next === "loading" || matchActive;
+  trackSelect.disabled = localContentCatalog === undefined || next === "loading" || matchActive;
+  m1EvidenceLoad.disabled = localContentCatalog === undefined || next === "loading" || matchActive;
   playerCountSelect.disabled = next === "loading" || matchActive;
   gameFlowSelect.disabled = next === "loading" || matchActive;
   matchModeSelect.disabled = next === "loading"
@@ -1779,11 +1822,9 @@ driverSelects.forEach((select, index) => {
   });
 });
 vehicleSelects.forEach((select) => {
-  select.addEventListener("change", () => {
-    const bound = bindVehicleModels();
-    runtimeStatus.textContent = bound.length > 0
-      ? `${bound.length} original vehicle model${bound.length === 1 ? "" : "s"} bound`
-      : "Debug vehicle proxies selected";
+  select.addEventListener("click", () => {
+    vehicleCatalogTarget = vehicleSelects.indexOf(select);
+    openVehicleCatalog(vehicleCatalogTarget);
   });
 });
 
@@ -1828,7 +1869,30 @@ function vehiclePairKey(pair: VehicleAssetPair): string {
 
 function vehicleDisplayName(assetName: string): string {
   const admission = admittedVehicleByAssetName(assetName);
-  return admission?.nameMapping === "exact-name" ? admission.displayName : assetName;
+  return admission?.displayName ?? assetName;
+}
+
+function localVehicleByAssetName(assetName: string): LocalVehicleCatalogEntry | undefined {
+  const normalized = assetName.toLocaleUpperCase("en-US");
+  return localContentCatalog?.vehicles.find((vehicle) => (
+    vehicle.assetBaseName.toLocaleUpperCase("en-US") === normalized
+  ));
+}
+
+function updateVehicleChoice(button: HTMLButtonElement, pair: VehicleAssetPair | undefined): void {
+  const image = button.querySelector<HTMLImageElement>("img");
+  const name = button.querySelector<HTMLElement>("span");
+  const detail = button.querySelector<HTMLElement>("small");
+  if (!image || !name || !detail) {
+    return;
+  }
+  const localVehicle = pair ? localVehicleByAssetName(pair.vehicleName) : undefined;
+  const preview = localVehicle ? localPreviewImages.get(localVehicle.previewTextureName) : undefined;
+  image.hidden = preview === undefined;
+  image.src = preview ?? "";
+  image.alt = pair ? `${vehicleDisplayName(pair.vehicleName)} preview` : "";
+  name.textContent = pair ? vehicleDisplayName(pair.vehicleName) : "Choose vehicle";
+  detail.textContent = pair ? `Paint ${pair.variant + 1}` : "Debug proxy";
 }
 
 function refreshVehicleCatalog(): void {
@@ -1836,20 +1900,11 @@ function refreshVehicleCatalog(): void {
   const availableKeys = new Set(vehicleCatalog.map(vehiclePairKey));
   vehicleSelects.forEach((select, index) => {
     const previousValue = select.value;
-    const proxy = document.createElement("option");
-    proxy.value = "";
-    proxy.textContent = "Debug proxy";
-    const options = vehicleCatalog.map((pair) => {
-      const option = document.createElement("option");
-      option.value = vehiclePairKey(pair);
-      option.textContent = `${vehicleDisplayName(pair.vehicleName)} · skin ${pair.variant}`;
-      return option;
-    });
-    select.replaceChildren(proxy, ...options);
     const defaultPair = vehicleCatalog[index % Math.max(1, vehicleCatalog.length)];
     select.value = availableKeys.has(previousValue)
       ? previousValue
       : defaultPair ? vehiclePairKey(defaultPair) : "";
+    updateVehicleChoice(select, vehicleCatalog.find((pair) => vehiclePairKey(pair) === select.value));
   });
 }
 
@@ -1938,125 +1993,476 @@ function bindTrackParts(): string[] {
   return bound;
 }
 
-assetInput.addEventListener("change", () => {
-  const files = [...(assetInput.files ?? [])];
-  if (files.length === 0 || (state.state !== "menu" && state.state !== "results")) {
+function clearTrackContent(): void {
+  const vehicleTextureNames = new Set([...loadedDffs.keys()].flatMap((fileName) => {
+    const vehicle = parseVehicleDffName(fileName);
+    return vehicle ? [vehicle.textureDictionaryFileName.toLocaleLowerCase("en-US")] : [];
+  }));
+  for (const fileName of [...loadedDffs.keys()]) {
+    if (!parseVehicleDffName(fileName)) {
+      loadedDffs.delete(fileName);
+    }
+  }
+  for (const fileName of [...loadedTextureDictionaries.keys()]) {
+    if (!vehicleTextureNames.has(fileName)) {
+      loadedTextureDictionaries.delete(fileName);
+    }
+  }
+  for (const [fileName, asset] of [...loadedAssets]) {
+    const keepVehicleModel = asset.kind === "dff" && parseVehicleDffName(fileName) !== undefined;
+    const keepVehicleTextures = asset.kind === "txd" && vehicleTextureNames.has(fileName);
+    const keepAudio = asset.kind === "rws";
+    if (!keepVehicleModel && !keepVehicleTextures && !keepAudio) {
+      loadedAssets.delete(fileName);
+    }
+  }
+  for (const key of Object.keys(trackParts) as (keyof typeof trackParts)[]) {
+    delete trackParts[key];
+  }
+  trackDefinition = undefined;
+  trackHazards = undefined;
+  trackHazardAssets.clear();
+  physics?.clearTrackCollision();
+  physics?.setTrackBarrels([]);
+  renderer.clearTrackGeometry();
+  renderer.setTrackRoute([]);
+  renderer.setTrackObjectModels([]);
+  metricTrack.textContent = "0";
+}
+
+function resetSessionsForContentLoad(): void {
+  raceSession = undefined;
+  combatSession = undefined;
+  championshipSession = undefined;
+  matchModeSession = undefined;
+  matchModeSignature = undefined;
+  aiDrivers.clear();
+  latestVehicleInputs = {};
+  applyRaceBanner();
+  applyCombatHud();
+}
+
+async function fetchLocalContentFile(source: LocalContentFile): Promise<File> {
+  if (source.url.startsWith("cache:")) {
+    if (!storedContent) throw new Error("Saved library is unavailable. Import your game folder again.");
+    return readCachedContentFile(storedContent, source.url.slice(6), source.name);
+  }
+  const response = await fetch(source.url);
+  if (!response.ok) {
+    throw new Error(`Could not read ${source.name} (${response.status})`);
+  }
+  return new File([await response.blob()], source.name);
+}
+
+async function loadContentFiles(
+  sources: readonly LocalContentFile[],
+  label: string,
+  options: { resetTrack?: boolean } = {},
+): Promise<boolean> {
+  if (sources.length === 0 || (state.state !== "menu" && state.state !== "results")) {
+    return false;
+  }
+  resetSessionsForContentLoad();
+  if (options.resetTrack) {
+    clearTrackContent();
+  }
+  state.transition("loading", `Reading ${label} from your local library…`);
+  assetStatus.textContent = `Reading ${sources.length} local file${sources.length === 1 ? "" : "s"} for ${label}…`;
+  try {
+    const files = await Promise.all(sources.map(fetchLocalContentFile));
+    const summaries: string[] = [];
+    for (const file of files) {
+      const normalizedName = file.name.toLocaleLowerCase("en-US");
+      if (normalizedName.endsWith(".ai")) {
+        const startedAt = performance.now();
+        trackParts.sourceAi = parseAiData(await file.arrayBuffer());
+        const occupiedCells = trackParts.sourceAi.grid.cells.reduce((sum, value) => (
+          sum + Number(value !== 0xff)
+        ), 0);
+        summaries.push(`${file.name}: ${occupiedCells.toLocaleString()} AI cells, ${(performance.now() - startedAt).toFixed(1)} ms`);
+        continue;
+      }
+      if (normalizedName.endsWith(".led")) {
+        const startedAt = performance.now();
+        trackParts.sourceLed = parseLedData(await file.arrayBuffer());
+        summaries.push(`${file.name}: ${trackParts.sourceLed.entries.length} LED entries, ${(performance.now() - startedAt).toFixed(1)} ms`);
+        continue;
+      }
+      if (normalizedName.endsWith(".lua")) {
+        if (/lapdata/i.test(file.name)) {
+          trackParts.lapData = parseLapDataLua(await file.text());
+          summaries.push(`${file.name}: ${trackParts.lapData.line.length} route anchors`);
+        } else if (/course/i.test(file.name)) {
+          trackParts.course = parseCourseLua(await file.text());
+          summaries.push(`${file.name}: course ${trackParts.course.id}`);
+        } else if (/powerups?_gold/i.test(file.name)) {
+          trackParts.powerupPlacements = parsePowerupPlacementsLua(await file.text());
+          const playable = trackParts.powerupPlacements.filter((placement) => (
+            combatWeaponForPowerup(placement.type) !== undefined
+          )).length;
+          summaries.push(`${file.name}: ${playable} playable pickups`);
+        } else if (/powerups?_all/i.test(file.name)) {
+          trackParts.powerupLoadouts = parseTrackPowerupLoadoutsLua(await file.text());
+          summaries.push(`${file.name}: ${trackParts.powerupLoadouts.length} power-up loadouts`);
+        }
+        continue;
+      }
+      const result = await assetLoader.load(file);
+      trackHazardAssets.remember(file.name, result.asset);
+      loadedAssets.set(normalizedName, result.asset);
+      let role: string | undefined;
+      if (result.asset.kind === "bsp") {
+        role = rememberBsp(file.name, result.asset.data);
+      } else if (result.asset.kind === "txd") {
+        loadedTextureDictionaries.set(normalizedName, result.asset.data);
+        role = "textures";
+      } else if (result.asset.kind === "dff") {
+        loadedDffs.set(normalizedName, result.asset.data);
+        role = parseVehicleDffName(file.name) ? "vehicle" : "course model";
+      } else if (result.asset.kind === "rws") {
+        role = `${audio.addSampleBank(result.asset.data.sounds)} original sounds`;
+      }
+      summaries.push(
+        `${file.name}: ${assetSummary(result.asset)}, ${result.parseMilliseconds.toFixed(1)} ms${role ? ` · ${role}` : ""}`,
+      );
+    }
+    const bound = bindTrackParts();
+    assetStatus.textContent = [
+      `${label}: ${files.length} local files loaded`,
+      ...summaries.slice(0, 6),
+      ...(summaries.length > 6 ? [`+ ${summaries.length - 6} more parsed files`] : []),
+      ...(bound.length > 0 ? [`Bound: ${bound.join(" · ")}`] : []),
+    ].join(" · ");
+    const championshipStatus = selectedGameFlow() === "championship"
+      ? prepareChampionshipSession()
+      : undefined;
+    state.transition(
+      "menu",
+      `${trackDefinition
+        ? `Playable track ready · ${trackDefinition.checkpoints.length} checkpoints`
+        : `${loadedAssets.size} asset${loadedAssets.size === 1 ? "" : "s"} cached in memory`}${championshipStatus ? ` · ${championshipStatus}` : ""}`,
+    );
+    return true;
+  } catch (error) {
+    assetStatus.textContent = error instanceof Error ? error.message : String(error);
+    if (selectedGameFlow() === "championship") {
+      prepareChampionshipSession();
+    }
+    state.transition("menu", "Local content loading failed; runtime remains available");
+    return false;
+  }
+}
+
+function texturePreviewUrl(dictionary: PiTextureDictionary, textureName: string): string | undefined {
+  const image = dictionary.textures.find((texture) => texture.name === textureName)?.mipmaps[0];
+  if (!image) {
+    return undefined;
+  }
+  const canvas = document.createElement("canvas");
+  canvas.width = image.width;
+  canvas.height = image.height;
+  const context = canvas.getContext("2d");
+  if (!context) {
+    return undefined;
+  }
+  context.putImageData(new ImageData(new Uint8ClampedArray(image.rgba), image.width, image.height), 0, 0);
+  return canvas.toDataURL("image/jpeg", 0.88);
+}
+
+function catalogCard(
+  title: string,
+  detail: string,
+  previewTextureName: string,
+  available: boolean,
+  selected: boolean,
+): HTMLButtonElement {
+  const button = document.createElement("button");
+  button.type = "button";
+  button.className = "catalog-card";
+  button.disabled = !available;
+  button.dataset["selected"] = String(selected);
+  const image = document.createElement("img");
+  image.alt = `${title} preview`;
+  image.src = localPreviewImages.get(previewTextureName) ?? "";
+  const copy = document.createElement("span");
+  const strong = document.createElement("strong");
+  strong.textContent = title;
+  const small = document.createElement("small");
+  small.textContent = available ? detail : "Files missing";
+  copy.append(strong, small);
+  button.append(image, copy);
+  return button;
+}
+
+function showCatalogDialog(): void {
+  if (!contentCatalogDialog.open) {
+    contentCatalogDialog.showModal();
+  }
+}
+
+function openTrackCatalog(): void {
+  if (!localContentCatalog) {
     return;
   }
-  void (async () => {
-    raceSession = undefined;
-    combatSession = undefined;
-    championshipSession = undefined;
-    aiDrivers.clear();
-    latestVehicleInputs = {};
-    applyRaceBanner();
-    applyCombatHud();
-    state.transition("loading", `Parsing ${files.length} local asset${files.length === 1 ? "" : "s"}…`);
+  contentCatalogKicker.textContent = "Stage 6 tracks";
+  contentCatalogTitle.textContent = "Choose a track";
+  contentCatalogDescription.textContent = "The full route, world, collision, hazards, power-ups, AI data, and audio load as one local bundle.";
+  contentCatalogFooter.hidden = true;
+  contentCatalogGrid.dataset["kind"] = "track";
+  const cards = localContentCatalog.tracks.map((track) => {
+    const card = catalogCard(
+      track.displayName,
+      `Course ${track.courseId} · ${track.files.length} files`,
+      track.previewTextureName,
+      track.available,
+      track.id === selectedTrackCatalogId,
+    );
+    card.addEventListener("click", () => {
+      contentCatalogDialog.close();
+      void selectCatalogTrack(track);
+    });
+    return card;
+  });
+  contentCatalogGrid.replaceChildren(...cards);
+  showCatalogDialog();
+}
+
+function renderVehicleVariants(vehicle: LocalVehicleCatalogEntry): void {
+  const variants = vehicle.variants.map(({ variant }) => {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.textContent = String(variant + 1);
+    button.dataset["selected"] = String(variant === pendingVehicleVariant);
+    button.setAttribute("aria-label", `Choose paint ${variant + 1}`);
+    button.addEventListener("click", () => {
+      pendingVehicleVariant = variant;
+      renderVehicleVariants(vehicle);
+    });
+    return button;
+  });
+  vehicleVariantList.replaceChildren(...variants);
+}
+
+function renderVehicleCatalog(): void {
+  if (!localContentCatalog) {
+    return;
+  }
+  const cards = localContentCatalog.vehicles.map((vehicle) => {
+    const card = catalogCard(
+      vehicle.displayName,
+      `${vehicle.variants.length} paints`,
+      vehicle.previewTextureName,
+      vehicle.available,
+      vehicle.id === pendingVehicleCatalogId,
+    );
+    card.addEventListener("click", () => {
+      pendingVehicleCatalogId = vehicle.id;
+      if (!vehicle.variants.some(({ variant }) => variant === pendingVehicleVariant)) {
+        pendingVehicleVariant = vehicle.variants[0]?.variant ?? 0;
+      }
+      renderVehicleCatalog();
+    });
+    return card;
+  });
+  contentCatalogGrid.replaceChildren(...cards);
+  const selected = localContentCatalog.vehicles.find((vehicle) => vehicle.id === pendingVehicleCatalogId);
+  if (selected) {
+    renderVehicleVariants(selected);
+  } else {
+    vehicleVariantList.replaceChildren();
+  }
+  vehicleCatalogConfirm.disabled = selected === undefined || !selected.available;
+}
+
+function openVehicleCatalog(target: number): void {
+  if (!localContentCatalog || target < 0 || target >= selectedPlayerCount()) {
+    return;
+  }
+  vehicleCatalogTarget = target;
+  const currentPair = vehicleCatalog.find((pair) => vehiclePairKey(pair) === vehicleSelects[target]?.value);
+  const currentLocalVehicle = currentPair ? localVehicleByAssetName(currentPair.vehicleName) : undefined;
+  const firstAvailable = localContentCatalog.vehicles.find((vehicle) => vehicle.available);
+  pendingVehicleCatalogId = currentLocalVehicle?.id ?? firstAvailable?.id;
+  pendingVehicleVariant = currentPair?.variant ?? firstAvailable?.variants[0]?.variant ?? 0;
+  contentCatalogKicker.textContent = `Garage · ${LOCAL_PLAYER_SLOTS[target]!.label}`;
+  contentCatalogTitle.textContent = "Choose a vehicle";
+  contentCatalogDescription.textContent = "Pick a car from the extracted roster, then choose one of its six original paint variants.";
+  contentCatalogFooter.hidden = false;
+  contentCatalogGrid.dataset["kind"] = "vehicle";
+  renderVehicleCatalog();
+  showCatalogDialog();
+}
+
+async function selectCatalogTrack(track: LocalTrackCatalogEntry): Promise<void> {
+  const loaded = await loadContentFiles(track.files, track.displayName, { resetTrack: true });
+  if (!loaded) {
+    return;
+  }
+  selectedTrackCatalogId = track.id;
+  const preview = localPreviewImages.get(track.previewTextureName);
+  trackSelectImage.hidden = preview === undefined;
+  trackSelectImage.src = preview ?? "";
+  trackSelectImage.alt = `${track.displayName} preview`;
+  trackSelectName.textContent = track.displayName;
+  trackSelectDetail.textContent = `Course ${track.courseId} · ${trackDefinition?.checkpoints.length ?? 0} checkpoints`;
+  localContentStatus.textContent = `${track.displayName} is loaded from ${storedContent ? "browser storage" : "local game-data"}.`;
+}
+
+async function selectCatalogVehicle(): Promise<void> {
+  const vehicle = localContentCatalog?.vehicles.find((entry) => entry.id === pendingVehicleCatalogId);
+  const variant = vehicle?.variants.find((entry) => entry.variant === pendingVehicleVariant);
+  if (!vehicle?.texture || !variant) {
+    return;
+  }
+  contentCatalogDialog.close();
+  const modelKey = variant.model.name.toLocaleLowerCase("en-US");
+  const textureKey = vehicle.texture.name.toLocaleLowerCase("en-US");
+  const missingFiles = [
+    ...(loadedTextureDictionaries.has(textureKey) ? [] : [vehicle.texture]),
+    ...(loadedDffs.has(modelKey) ? [] : [variant.model]),
+  ];
+  if (missingFiles.length > 0) {
+    const loaded = await loadContentFiles(missingFiles, `${vehicle.displayName} paint ${variant.variant + 1}`);
+    if (!loaded) {
+      return;
+    }
+  }
+  const target = vehicleSelects[vehicleCatalogTarget];
+  if (!target) {
+    return;
+  }
+  target.value = modelKey;
+  refreshVehicleCatalog();
+  const bound = bindVehicleModels();
+  runtimeStatus.textContent = bound.length > 0
+    ? `${LOCAL_PLAYER_SLOTS[vehicleCatalogTarget]!.label} uses ${vehicle.displayName} · paint ${variant.variant + 1}`
+    : "Vehicle model could not be bound";
+}
+
+async function initializeLocalContentCatalog(): Promise<void> {
+  let storageWarning = "";
+  try {
+    const store = await ContentStore.open();
     try {
-      const summaries: string[] = [];
-      if (files.some((file) => file.name.toLowerCase() === "course.lua")) {
-        trackHazardAssets.clear();
-        trackHazards = undefined;
-        physics?.setTrackBarrels([]);
-        renderer.setTrackObjectModels([]);
+      storedContent = await store.manifest("active");
+      const pending = await store.manifest("pending");
+      if (pending) importStatus.textContent = `Unfinished import: ${Object.keys(pending.hashes).length}/${pending.total} files saved. Select the same folder or CUE/BIN pair to resume.`;
+    } finally { store.close(); }
+  } catch (error) {
+    storageWarning = error instanceof Error ? error.message : String(error);
+    importStatus.textContent = `Storage unavailable: ${storageWarning}. You can retry the import.`;
+  }
+  try {
+    let catalog: LocalContentCatalog;
+    if (storedContent) catalog = storedContent.catalog;
+    else if (import.meta.env.DEV) {
+      const response = await fetch("/__mashed/catalog.json");
+      if (!response.ok) throw new Error(`catalog returned ${response.status}`);
+      catalog = await response.json() as LocalContentCatalog;
+    } else {
+      localContentCount.textContent = "No library yet";
+      localContentStatus.textContent = "Import a game folder or CUE/BIN image to choose tracks and vehicles.";
+      return;
+    }
+    if (catalog.version !== 1) throw new Error("unsupported catalog version");
+    if (catalog.previewDictionary) {
+      // Thumbnails are optional: a missing cache entry must not lock the import UI.
+      try {
+        const previewFile = await fetchLocalContentFile(catalog.previewDictionary);
+        const result = await assetLoader.load(previewFile);
+        if (result.asset.kind !== "txd") throw new Error("preview dictionary is not a TXD");
+        const dictionary = result.asset.data;
+        const names = new Set([
+          ...catalog.tracks.map((track) => track.previewTextureName),
+          ...catalog.vehicles.map((vehicle) => vehicle.previewTextureName),
+        ]);
+        localPreviewImages = new Map([...names].flatMap((name) => {
+          const preview = texturePreviewUrl(dictionary, name);
+          return preview ? [[name, preview] as const] : [];
+        }));
+      } catch (error) {
+        importStatus.textContent = `Previews unavailable: ${error instanceof Error ? error.message : String(error)}. Import the folder again to repair saved data.`;
       }
-      matchModeSession = undefined;
-      matchModeSignature = undefined;
-      for (const file of files) {
-        const normalizedName = file.name.toLocaleLowerCase("en-US");
-        if (normalizedName.endsWith(".ai")) {
-          const startedAt = performance.now();
-          trackParts.sourceAi = parseAiData(await file.arrayBuffer());
-          const occupiedCells = trackParts.sourceAi.grid.cells.reduce((sum, value) => (
-            sum + Number(value !== 0xff)
-          ), 0);
-          summaries.push(
-            `${file.name}: ${occupiedCells.toLocaleString()} occupied grid cells · declared ${trackParts.sourceAi.declaredEntryCount} · 2×${trackParts.sourceAi.tableA.length} entries, ${(performance.now() - startedAt).toFixed(1)} ms`,
-          );
-          continue;
-        }
-        if (normalizedName.endsWith(".led")) {
-          const startedAt = performance.now();
-          trackParts.sourceLed = parseLedData(await file.arrayBuffer());
-          summaries.push(
-            `${file.name}: ${trackParts.sourceLed.entries.length} float triplets, ${(performance.now() - startedAt).toFixed(1)} ms`,
-          );
-          continue;
-        }
-        if (normalizedName.endsWith(".lua")) {
-          if (/lapdata/i.test(file.name)) {
-            const startedAt = performance.now();
-            trackParts.lapData = parseLapDataLua(await file.text());
-            summaries.push(
-              `${file.name}: ${trackParts.lapData.line.length} line anchors · ${trackParts.lapData.splitCheckpointIds.length} splits, ${(performance.now() - startedAt).toFixed(1)} ms`,
-            );
-          } else if (/course/i.test(file.name)) {
-            const startedAt = performance.now();
-            trackParts.course = parseCourseLua(await file.text());
-            summaries.push(
-              `${file.name}: course ${trackParts.course.id} · ${trackParts.course.clumps.length} clumps · ${trackParts.course.objectTemplates.length} object templates, ${(performance.now() - startedAt).toFixed(1)} ms`,
-            );
-          } else if (/powerups?_gold/i.test(file.name)) {
-            const startedAt = performance.now();
-            trackParts.powerupPlacements = parsePowerupPlacementsLua(await file.text());
-            const playable = trackParts.powerupPlacements.filter((placement) => (
-              combatWeaponForPowerup(placement.type) !== undefined
-            )).length;
-            summaries.push(
-              `${file.name}: ${trackParts.powerupPlacements.length} source placements · ${playable} currently playable, ${(performance.now() - startedAt).toFixed(1)} ms`,
-            );
-          } else if (/powerups?_all/i.test(file.name)) {
-            const startedAt = performance.now();
-            trackParts.powerupLoadouts = parseTrackPowerupLoadoutsLua(await file.text());
-            summaries.push(
-              `${file.name}: ${trackParts.powerupLoadouts.length} course loadouts, ${(performance.now() - startedAt).toFixed(1)} ms`,
-            );
-          } else {
-            summaries.push(`${file.name}: ignored (supported metadata: COURSE, LAPDATA, POWERUPS_GOLD, POWERUPS_ALL)`);
-          }
-          continue;
-        }
-        const result = await assetLoader.load(file);
-        trackHazardAssets.remember(file.name, result.asset);
-        loadedAssets.set(file.name.toLocaleLowerCase("en-US"), result.asset);
-        let role: string | undefined;
-        if (result.asset.kind === "bsp") {
-          role = rememberBsp(file.name, result.asset.data);
-        } else if (result.asset.kind === "txd") {
-          loadedTextureDictionaries.set(file.name.toLocaleLowerCase("en-US"), result.asset.data);
-          role = "texture dictionary candidate";
-        } else if (result.asset.kind === "dff") {
-          loadedDffs.set(file.name.toLocaleLowerCase("en-US"), result.asset.data);
-          role = parseVehicleDffName(file.name) ? "vehicle skin candidate" : "course model candidate";
-        } else if (result.asset.kind === "rws") {
-          const accepted = audio.addSampleBank(result.asset.data.sounds);
-          role = `${accepted} PCM samples accepted · ${audio.originalSampleCount} total ready`;
-        }
-        summaries.push(
-          `${file.name}: ${assetSummary(result.asset)}, ${result.parseMilliseconds.toFixed(1)} ms, ${formatBytes(result.transferredBytes)} transferred${role ? ` · ${role}` : ""}`,
-        );
-      }
-      const bound = bindTrackParts();
-      assetStatus.textContent = [...summaries, ...(bound.length > 0 ? [`Track bound: ${bound.join(" · ")}`] : [])].join(" · ");
-      const championshipStatus = selectedGameFlow() === "championship"
-        ? prepareChampionshipSession()
-        : undefined;
-      state.transition(
-        "menu",
-        `${trackDefinition
-          ? `Playable track ready · ${trackDefinition.checkpoints.length} checkpoints`
-          : `${loadedAssets.size} asset${loadedAssets.size === 1 ? "" : "s"} cached in memory`}${championshipStatus ? ` · ${championshipStatus}` : ""}`,
-      );
+    }
+    localContentCatalog = catalog;
+    const trackCount = catalog.tracks.filter((track) => track.available).length;
+    const vehicleCount = catalog.vehicles.filter((vehicle) => vehicle.available).length;
+    localContentCount.textContent = `${trackCount} tracks · ${vehicleCount} vehicles`;
+    localContentStatus.textContent = storedContent
+      ? `Saved library ready · ${(storedContent.bytes / 1024 / 1024).toFixed(1)} MB. No folder selection needed on restart.`
+      : trackCount > 0 ? "Development library ready. Import a folder to keep a copy in this browser."
+        : "No local library found. Import your installed game folder.";
+    refreshVehicleCatalog();
+  } catch (error) {
+    localContentCount.textContent = "Import needed";
+    localContentStatus.textContent = `Library unavailable: ${error instanceof Error ? error.message : String(error)}`;
+  } finally {
+    contentCatalogInitializing = false;
+    showOfflineReadiness();
+    applyState(state.state);
+  }
+}
+
+importFolderButton.addEventListener("click", () => {
+  if (state.state !== "menu" && state.state !== "results") return;
+  importFolderInput.value = "";
+  importFolderInput.click();
+});
+importDiscButton.addEventListener("click", () => {
+  if (state.state !== "menu" && state.state !== "results") return;
+  importDiscInput.value = "";
+  importDiscInput.click();
+});
+importCancelButton.addEventListener("click", () => {
+  cancelContentImport?.();
+  importCancelButton.disabled = true;
+  importStatus.textContent = "Cancelling… Saved progress will be kept.";
+});
+function startContentImport(input: HTMLInputElement, sourceKind: "folder" | "disc"): void {
+  const files = [...(input.files ?? [])];
+  if (!files.length || (state.state !== "menu" && state.state !== "results")) return;
+  void (async () => {
+    state.transition("loading", sourceKind === "disc" ? "Importing your disc image…" : "Importing your game folder…");
+    importProgress.hidden = false;
+    importProgress.removeAttribute("value");
+    importCancelButton.hidden = false;
+    importCancelButton.disabled = false;
+    importStatus.textContent = "Reading selected source. Keep this tab open; you can cancel and retry later.";
+    try {
+      const job = importGameSource(files, sourceKind, (progress) => {
+        if (importCancelButton.disabled) return;
+        importProgress.max = Math.max(1, progress.total);
+        importProgress.value = progress.completed;
+        importStatus.textContent = progress.unit === "bytes" ? progress.label
+          : `${progress.label} · ${progress.completed}/${progress.total}`;
+      }, () => {
+        importCancelButton.disabled = true;
+        importStatus.textContent = "Finishing import…";
+      });
+      cancelContentImport = job.cancel;
+      await job.result;
+      importProgress.value = importProgress.max;
+      importStatus.textContent = "Library saved. Reloading the game…";
+      // Start cleanly: no in-memory track, car or sound from the previous library may leak in.
+      window.location.reload();
     } catch (error) {
-      assetStatus.textContent = error instanceof Error ? error.message : String(error);
-      if (selectedGameFlow() === "championship") {
-        prepareChampionshipSession();
-      }
-      state.transition("menu", "Asset parsing failed; runtime remains available");
+      importStatus.textContent = error instanceof Error ? error.message : String(error);
+      state.transition("menu", "Import stopped; your previous library is still available");
     } finally {
-      assetInput.value = "";
+      cancelContentImport = undefined;
+      input.value = "";
+      importCancelButton.hidden = true;
+      importProgress.hidden = true;
     }
   })();
+}
+importFolderInput.addEventListener("change", () => startContentImport(importFolderInput, "folder"));
+importDiscInput.addEventListener("change", () => startContentImport(importDiscInput, "disc"));
+
+trackSelect.addEventListener("click", openTrackCatalog);
+m1EvidenceLoad.addEventListener("click", openTrackCatalog);
+vehicleCatalogConfirm.addEventListener("click", () => {
+  void selectCatalogVehicle();
 });
 
 function resetPresentationClock(): void {
@@ -2472,4 +2878,16 @@ window.addEventListener("pagehide", () => {
   void audio.dispose();
 }, { once: true });
 
+void initializeLocalContentCatalog();
+if (import.meta.env.PROD) {
+  const offlineStatus = element<HTMLElement>("offline-status");
+  offlineStatus.hidden = false;
+  offlineStatus.textContent = "Preparing offline launch…";
+  void prepareOfflineLaunch().then(() => {
+    offlineShellReady = true;
+    showOfflineReadiness();
+  }).catch((error: unknown) => {
+    offlineStatus.textContent = `Offline launch unavailable. ${error instanceof Error ? error.message : String(error)}`;
+  });
+}
 void boot();

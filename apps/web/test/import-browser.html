@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8" />
+<title>Local import acceptance</title>
+<style>body{font:16px system-ui;max-width:850px;margin:48px auto;background:#16191d;color:#eee}button{font:inherit;padding:12px;margin:6px}pre{white-space:pre-wrap}a{color:#aee}</style>
+<h1>Local import acceptance</h1>
+<p>Development-only fixture driver. Uses the user's ignored local archives and the production import Worker. No resources are uploaded.</p>
+<button id="run">Import / resume</button><button id="cancel">Cancel after five saved files</button>
+<button id="interrupt">Reload after five saved files</button><button id="invalid">Reject damaged archive</button>
+<p><a href="/">Open game with saved library</a></p>
+<pre id="status" role="status">Reading saved state…</pre>
+<pre id="saved"></pre>
+<script type="module">
+import { LOCAL_TRACK_SOURCES, LOCAL_VEHICLE_SOURCES } from "../src/local-content-catalog.ts";
+import { importGameFolder } from "../src/import-client.ts";
+import { ContentStore } from "../src/content-store.ts";
+const status = document.querySelector("#status");
+async function saved() {
+  const store = await ContentStore.open();
+  try {
+    const active = await store.manifest("active"), pending = await store.manifest("pending");
+    document.querySelector("#saved").textContent = JSON.stringify({
+      active: active ? {files:Object.keys(active.hashes).length,bytes:active.bytes,tracks:active.catalog.tracks.filter(t=>t.available).length,vehicles:active.catalog.vehicles.filter(v=>v.available).length} : null,
+      pending: pending ? {files:Object.keys(pending.hashes).length,total:pending.total} : null
+    }, null, 2);
+  } finally { store.close(); }
+}
+await saved(); status.textContent = "Ready";
+for (const button of document.querySelectorAll("button")) button.onclick = async () => {
+  document.querySelectorAll("button").forEach(b => b.disabled = true);
+  status.textContent = "Reading local fixture archives…";
+  try {
+    const paths = [
+      ...LOCAL_TRACK_SOURCES.map(t=>`TOASTART/TRACKS/${t.directoryName}.piz`),
+      ...LOCAL_VEHICLE_SOURCES.map(v=>`TOASTART/VEHICLES/${v.directoryName}.piz`),
+      "TOASTART/Common/AI.piz", "TOASTART/Common/LED.piz", "TOASTART/Common/SFX.piz",
+      "TOASTART/Common/POWERUPS/Powerups.piz", "toastaudio/pc/audio/pcdics/permdict.rws"
+    ];
+    const files = await Promise.all(paths.map(async path => {
+      const response = await fetch(`/__mashed/game-data/files/${path}`);
+      if (!response.ok) throw new Error(`Missing local fixture: ${path}`);
+      const file = new File([button.id === "invalid" && path.endsWith("City.piz") ? new Blob(["invalid PIZ"]) : await response.blob()], path.split("/").at(-1));
+      Object.defineProperty(file, "webkitRelativePath", { value: `Game/${path}` });
+      return file;
+    }));
+    let acted = false;
+    const job = importGameFolder(files, progress => {
+      status.textContent = JSON.stringify(progress);
+      if (!acted && progress.label.startsWith("Checking") && progress.completed >= 5) {
+        acted = true;
+        if (button.id === "cancel") job.cancel();
+        if (button.id === "interrupt") location.reload();
+      }
+    }, () => status.textContent = "Committing…");
+    const manifest = await job.result;
+    status.textContent = `PASS: imported ${manifest.total} files (${manifest.bytes} bytes)`;
+  } catch(error) { status.textContent = `${error.name}: ${error.message}`; }
+  await saved();
+  document.querySelectorAll("button").forEach(b => b.disabled = false);
+};
+</script>
+</html>

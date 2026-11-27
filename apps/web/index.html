@@ -4,6 +4,9 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="theme-color" content="#091018" />
+    <link rel="manifest" href="./manifest.webmanifest" />
+    <link rel="icon" type="image/png" href="./icon-192.png" />
+    <link rel="apple-touch-icon" href="./icon-192.png" />
     <title>Mashed Browser Runtime</title>
   </head>
   <body>
@@ -11,8 +14,8 @@
       <section id="viewport" class="viewport" aria-label="Runtime viewport" tabindex="0">
         <header class="topbar">
           <div>
-            <span class="eyebrow">Mashed · Feature alpha</span>
-            <h1>Stage 06</h1>
+            <span class="eyebrow">Mashed · Beta foundation</span>
+            <h1>Stage 07</h1>
           </div>
           <div id="state-badge" class="state-badge" data-state="boot">boot</div>
         </header>
@@ -75,14 +78,14 @@
         <aside id="m1-evidence-panel" class="m1-evidence-panel" aria-label="M1 evidence" hidden>
           <div>
             <strong>M1 browser evidence</strong>
-            <label class="m1-evidence-load" for="asset-files">Load bundle</label>
+            <button id="m1-evidence-load" type="button">Choose track</button>
             <button id="m1-evidence-reset" type="button">Reset sample</button>
             <button id="m1-evidence-capture" type="button">Capture report</button>
           </div>
           <pre id="m1-evidence-output">Start the four-player match, reset the sample, then capture after 5+ seconds.</pre>
         </aside>
 
-        <div class="hint">Load the track bundle; add COURSE.LUA/world DFFs and NAME0.DFF + NAME.TXD for an original vehicle.</div>
+        <div class="hint">Import your game files once, then choose a track and vehicle from your saved library.</div>
       </section>
 
       <aside class="control-panel">
@@ -100,6 +103,33 @@
           <button id="finish-race" type="button" disabled>Finish race</button>
           <button id="back-menu" type="button" disabled>Back to menu</button>
           <button id="reset-demo" type="button">Reset vehicle</button>
+        </section>
+
+        <section class="content-selection" aria-label="Local game content">
+          <div class="content-selection-heading">
+            <span class="section-label">Local game content</span>
+            <span id="local-content-count">Scanning…</span>
+          </div>
+          <button id="track-select" class="track-choice" type="button" disabled>
+            <span class="choice-preview"><img id="track-select-image" alt="" hidden /></span>
+            <span>
+              <small>Track</small>
+              <strong id="track-select-name">Choose a track</strong>
+              <em id="track-select-detail">Your local game library</em>
+            </span>
+            <b aria-hidden="true">›</b>
+          </button>
+          <p id="local-content-status" role="status">Looking for your saved game library…</p>
+          <p id="offline-status" role="status" hidden></p>
+          <div class="import-actions">
+            <button id="import-folder" type="button" disabled>Import game folder</button>
+            <button id="import-disc" type="button" disabled>Import disc image</button>
+            <input id="import-disc-input" type="file" accept=".cue,.bin" multiple hidden aria-label="CUE and BIN disc image files" />
+            <button id="import-cancel" type="button" hidden>Cancel import</button>
+            <input id="import-folder-input" type="file" webkitdirectory multiple hidden aria-label="Installed game folder" />
+          </div>
+          <progress id="import-progress" hidden aria-label="Game import progress"></progress>
+          <p id="import-status" role="status" aria-live="polite">Choose a game folder, or select both the .cue and .bin files together. Files stay in this browser and are never uploaded.</p>
         </section>
 
         <section class="roster-config" aria-label="Local player roster">
@@ -130,7 +160,9 @@
           </label>
           <div id="vehicle-select-row-one" class="vehicle-select-row">
             <label for="vehicle-select-one">P1 vehicle</label>
-            <select id="vehicle-select-one"><option value="">Debug proxy</option></select>
+            <button id="vehicle-select-one" class="vehicle-choice" type="button" value="">
+              <img alt="" hidden /><span>Choose vehicle</span><small>Debug proxy</small>
+            </button>
           </div>
           <div id="driver-select-row-one" class="vehicle-select-row">
             <label for="driver-select-one">P1 driver</label>
@@ -143,7 +175,9 @@
           </div>
           <div id="vehicle-select-row-two" class="vehicle-select-row" hidden>
             <label for="vehicle-select-two">P2 vehicle</label>
-            <select id="vehicle-select-two"><option value="">Debug proxy</option></select>
+            <button id="vehicle-select-two" class="vehicle-choice" type="button" value="">
+              <img alt="" hidden /><span>Choose vehicle</span><small>Debug proxy</small>
+            </button>
           </div>
           <div id="driver-select-row-two" class="vehicle-select-row" hidden>
             <label for="driver-select-two">P2 driver</label>
@@ -156,7 +190,9 @@
           </div>
           <div id="vehicle-select-row-three" class="vehicle-select-row" hidden>
             <label for="vehicle-select-three">P3 vehicle</label>
-            <select id="vehicle-select-three"><option value="">Debug proxy</option></select>
+            <button id="vehicle-select-three" class="vehicle-choice" type="button" value="">
+              <img alt="" hidden /><span>Choose vehicle</span><small>Debug proxy</small>
+            </button>
           </div>
           <div id="driver-select-row-three" class="vehicle-select-row" hidden>
             <label for="driver-select-three">P3 driver</label>
@@ -169,7 +205,9 @@
           </div>
           <div id="vehicle-select-row-four" class="vehicle-select-row" hidden>
             <label for="vehicle-select-four">P4 vehicle</label>
-            <select id="vehicle-select-four"><option value="">Debug proxy</option></select>
+            <button id="vehicle-select-four" class="vehicle-choice" type="button" value="">
+              <img alt="" hidden /><span>Choose vehicle</span><small>Debug proxy</small>
+            </button>
           </div>
           <div id="driver-select-row-four" class="vehicle-select-row" hidden>
             <label for="driver-select-four">P4 driver</label>
@@ -248,14 +286,9 @@
           <label><input id="debug-colliders" type="checkbox" /> Rapier colliders</label>
         </section>
 
-        <section class="asset-loader">
-          <div class="section-label">Playable track bundle</div>
-          <label class="file-picker">
-            <span>Load track, vehicles + RWS audio</span>
-            <input id="asset-files" type="file" accept=".dff,.txd,.bsp,.lua,.rws,.ai,.led,.mts" multiple />
-          </label>
-          <p id="asset-status">Core: GRAPHICS, track TXD, COLLIDE, AI1, LAPDATA. Optional: COURSE, POWERUPS_GOLD/ALL, source AI/LED data, world DFFs, vehicle NAME0.DFF + NAME.TXD, and PERMDICT.RWS.</p>
-          <p>Track hazards: attach COURSE + RBARREL.DFF + RBARREL.MTS together. Explosion rules are alpha tuning.</p>
+        <section class="asset-loader" aria-label="Asset loading status">
+          <div class="section-label">Loading details</div>
+          <p id="asset-status">Choose a track above. Its route, world, collision, hazards, power-ups, AI data, and original audio will load together.</p>
         </section>
 
         <footer>
@@ -264,6 +297,27 @@
         </footer>
       </aside>
     </main>
+
+    <dialog id="content-catalog" class="content-catalog" aria-labelledby="content-catalog-title">
+      <form method="dialog" class="catalog-shell">
+        <header>
+          <div>
+            <span class="section-label" id="content-catalog-kicker">Local content</span>
+            <h3 id="content-catalog-title">Choose a track</h3>
+            <p id="content-catalog-description">Only the four Stage 6 tracks that passed the runtime gates are shown.</p>
+          </div>
+          <button class="catalog-close" value="cancel" aria-label="Close content catalog" type="submit">×</button>
+        </header>
+        <div id="content-catalog-grid" class="catalog-grid"></div>
+        <footer id="content-catalog-footer" class="catalog-footer" hidden>
+          <div>
+            <span>Paint</span>
+            <div id="vehicle-variant-list" class="vehicle-variant-list"></div>
+          </div>
+          <button id="vehicle-catalog-confirm" class="primary" value="confirm" type="button">Use vehicle</button>
+        </footer>
+      </form>
+    </dialog>
     <script type="module" src="/src/main.ts"></script>
   </body>
 </html>
