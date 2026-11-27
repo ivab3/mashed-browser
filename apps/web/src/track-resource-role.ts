@@ -1,4 +1,5 @@
 import type { CourseDefinition } from "@mashed/assets";
+import type { LocalContentFile } from "./local-content-catalog.js";
 
 export type TrackBspRole = "ai" | "collision" | "graphics";
 
@@ -28,14 +29,38 @@ export function trackBspRole(fileName: string, course?: CourseDefinition): Track
   if (declared) {
     return declared.role;
   }
-  if (/^ai\d*\.bsp$/.test(normalized)) {
+  if (!course?.aiBspFileName && /^ai\d*\.bsp$/.test(normalized)) {
     return "ai";
   }
-  if (/collid/.test(normalized)) {
+  if (!course?.collisionBspFileName && /collid/.test(normalized)) {
     return "collision";
   }
-  if (/graphics|world/.test(normalized)) {
+  if (!course?.worldBspFileName && /graphics|world/.test(normalized)) {
     return "graphics";
   }
   return undefined;
+}
+
+export function courseModelNames(course: CourseDefinition): Set<string> {
+  return new Set([
+    ...course.clumps.map((clump) => clump.fileName),
+    ...course.skies.map((sky) => sky.fileName),
+    ...(course.lightsFileName ? [course.lightsFileName] : []),
+  ].map((name) => name.toLowerCase()));
+}
+
+/** COURSE.LUA has already been read. Request only files the current track runtime consumes. */
+export function playableTrackFiles(files: readonly LocalContentFile[], course?: CourseDefinition): LocalContentFile[] {
+  const models = course && courseModelNames(course);
+  const instances = course && new Set(course.explosiveObjects.map(({ mtsIndex }) =>
+    course.instanceFiles.find((entry) => entry.index === mtsIndex)?.fileName.toLowerCase()
+  ));
+  return files.filter(({ name }) => {
+    const key = name.toLowerCase();
+    if (key.endsWith(".dff")) return !models || models.has(key);
+    if (key.endsWith(".mts")) return !instances || instances.has(key);
+    if (key.endsWith(".bsp")) return trackBspRole(name, course) !== undefined;
+    if (key.endsWith(".txd")) return !course?.textureDictionaryFileName || key === course.textureDictionaryFileName.toLowerCase();
+    return /\.(ai|led)$/.test(key) || /^(lapdata|powerups?_(gold|all))\.lua$/.test(key);
+  });
 }

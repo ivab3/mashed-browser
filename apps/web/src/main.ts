@@ -11,7 +11,6 @@ import {
   parseLedData,
   parsePowerupPlacementsLua,
   parseTrackPowerupLoadoutsLua,
-  parseVehicleDffName,
   parseCourseLua,
   parseLapDataLua,
   type AiDataFile,
@@ -110,7 +109,7 @@ import {
   M1EvidenceCollector,
   type M1EvidenceReport,
 } from "./m1-evidence.js";
-import { declaredTrackBsps, trackBspRole, type TrackBspRole } from "./track-resource-role.js";
+import { courseModelNames, playableTrackFiles, trackBspRole, type TrackBspRole } from "./track-resource-role.js";
 import "./style.css";
 
 function element<T extends HTMLElement>(id: string): T {
@@ -322,7 +321,7 @@ const controlBindingsLoad = controlBindingsStorage.load();
 let controlBindings: ControlBindingsV1 = controlBindingsLoad.bindings;
 audio.setMasterVolume(alphaSettings.muted ? 0 : alphaSettings.masterVolume);
 renderer.setGraphicsQuality(alphaSettings.graphicsQuality);
-const loadedAssets = new Map<string, LoadedAsset>();
+const trackAssets = new Map<string, LoadedAsset>();
 const trackHazardAssets = new TrackHazardAssets();
 let trackHazards: TrackHazardRuntime | undefined;
 const trackParts: {
@@ -336,8 +335,8 @@ const trackParts: {
   sourceAi?: AiDataFile;
   sourceLed?: LedDataFile;
 } = {};
-const loadedDffs = new Map<string, DffModel>();
-const loadedTextureDictionaries = new Map<string, PiTextureDictionary>();
+const vehicleModels = new Map<string, DffModel>();
+const vehicleTextures = new Map<string, PiTextureDictionary>();
 let physics: PhysicsRuntime | undefined;
 let trackDefinition: DerivedTrackDefinition | undefined;
 let raceSession: RaceSession | undefined;
@@ -367,7 +366,8 @@ function showOfflineReadiness(): void {
 }
 let cancelContentImport: (() => void) | undefined;
 let localPreviewImages = new Map<string, string>();
-let selectedTrackCatalogId: string | undefined;
+let selectedTrack: LocalTrackCatalogEntry | undefined;
+let sharedBankLoad: Promise<void> | undefined;
 let vehicleCatalogTarget = 0;
 let pendingVehicleCatalogId: string | undefined;
 let pendingVehicleVariant = 0;
@@ -494,7 +494,11 @@ function applyAlphaSettings(
     matchModeSession = undefined;
     matchModeSignature = undefined;
   }
+  const wasSilent = audio.masterVolume === 0;
   audio.setMasterVolume(alphaSettings.muted ? 0 : alphaSettings.masterVolume);
+  if (wasSilent && (state.state === "race" || state.state === "paused")) {
+    void prepareRaceAudio();
+  }
   renderer.setGraphicsQuality(alphaSettings.graphicsQuality);
   syncAlphaSettingsControls();
   if (options.rebuildInputs) {
@@ -585,7 +589,7 @@ function currentM1EvidenceReport(): M1EvidenceReport {
   return m1Evidence.report({
     state: state.state,
     playerCount: selectedPlayerCount(),
-    loadedAssetCount: loadedAssets.size,
+    loadedAssetCount: trackAssets.size + vehicleModels.size + vehicleTextures.size,
     windowWidth: window.innerWidth,
     windowHeight: window.innerHeight,
     viewportWidth: viewport.clientWidth,
@@ -1506,7 +1510,14 @@ async function startRace(): Promise<void> {
   if (!physics || (state.state !== "menu" && state.state !== "results")) {
     return;
   }
-  await audio.unlock();
+  state.transition("loading", "Preparing race audio…");
+  try {
+    await audio.unlock();
+    await prepareRaceAudio();
+  } catch (error) {
+    assetStatus.textContent = `Audio unavailable: ${error instanceof Error ? error.message : String(error)}`;
+  }
+  state.transition("menu", "Race ready");
   if (selectedGameFlow() === "championship") {
     if (!championshipSession) {
       prepareChampionshipSession();
@@ -1838,29 +1849,14 @@ function assignTrackBsp(role: TrackBspRole, world: BspWorld): string {
   return role === "ai" ? "AI route" : role;
 }
 
-function resolveDeclaredTrackBsps(): void {
-  if (!trackParts.course) {
-    return;
-  }
-  for (const declared of declaredTrackBsps(trackParts.course)) {
-    const asset = loadedAssets.get(declared.fileName.toLocaleLowerCase("en-US"));
-    if (asset?.kind === "bsp") {
-      assignTrackBsp(declared.role, asset.data);
-    }
-  }
-}
-
 function trackTextureDictionary(): PiTextureDictionary | undefined {
   const declaredName = trackParts.course?.textureDictionaryFileName?.toLocaleLowerCase("en-US");
   if (declaredName) {
-    return loadedTextureDictionaries.get(declaredName);
+    const asset = trackAssets.get(declaredName);
+    return asset?.kind === "txd" ? asset.data : undefined;
   }
-  const vehicleTextureNames = new Set([...loadedDffs.keys()].flatMap((fileName) => {
-    const vehicle = parseVehicleDffName(fileName);
-    return vehicle ? [vehicle.textureDictionaryFileName.toLocaleLowerCase("en-US")] : [];
-  }));
-  const candidates = [...loadedTextureDictionaries].filter(([fileName]) => !vehicleTextureNames.has(fileName));
-  return candidates.length === 1 ? candidates[0]![1] : undefined;
+  const candidates = [...trackAssets.values()].filter((asset) => asset.kind === "txd");
+  return candidates.length === 1 ? candidates[0]!.data : undefined;
 }
 
 function vehiclePairKey(pair: VehicleAssetPair): string {
@@ -1896,7 +1892,7 @@ function updateVehicleChoice(button: HTMLButtonElement, pair: VehicleAssetPair |
 }
 
 function refreshVehicleCatalog(): void {
-  vehicleCatalog = listVehicleAssetPairs(loadedDffs.keys(), loadedTextureDictionaries.keys());
+  vehicleCatalog = listVehicleAssetPairs(vehicleModels.keys(), vehicleTextures.keys());
   const availableKeys = new Set(vehicleCatalog.map(vehiclePairKey));
   vehicleSelects.forEach((select, index) => {
     const previousValue = select.value;
@@ -1918,8 +1914,8 @@ function bindVehicleModels(): string[] {
       renderer.clearVehicleModelFor(slot.id);
       return;
     }
-    const model = loadedDffs.get(pair.fileName.toLocaleLowerCase("en-US"));
-    const textures = loadedTextureDictionaries.get(pair.textureFileName.toLocaleLowerCase("en-US"));
+    const model = vehicleModels.get(pair.fileName.toLocaleLowerCase("en-US"));
+    const textures = vehicleTextures.get(pair.textureFileName.toLocaleLowerCase("en-US"));
     if (!model || !textures) {
       renderer.clearVehicleModelFor(slot.id);
       return;
@@ -1933,7 +1929,6 @@ function bindVehicleModels(): string[] {
 }
 
 function bindTrackParts(): string[] {
-  resolveDeclaredTrackBsps();
   const bound: string[] = [];
   if (trackParts.ai && trackParts.lapData && physics) {
     trackDefinition = deriveTrackDefinition(trackParts.ai, trackParts.lapData);
@@ -1959,17 +1954,9 @@ function bindTrackParts(): string[] {
     if (admittedTrack) {
       bound.push(`${admittedTrack.displayName} · admitted content batch`);
     }
-    const courseNames = new Map<string, string>();
-    for (const asset of [
-      ...trackParts.course.clumps.map((clump) => clump.fileName),
-      ...trackParts.course.skies.map((sky) => sky.fileName),
-      ...(trackParts.course.lightsFileName ? [trackParts.course.lightsFileName] : []),
-    ]) {
-      courseNames.set(asset.toLocaleLowerCase("en-US"), asset);
-    }
-    const models = [...courseNames].flatMap(([normalized, name]) => {
-      const model = loadedDffs.get(normalized);
-      return model ? [{ name, model }] : [];
+    const models = [...courseModelNames(trackParts.course)].flatMap((name) => {
+      const asset = trackAssets.get(name);
+      return asset?.kind === "dff" ? [{ name, model: asset.data }] : [];
     });
     const rendered = renderer.setCourseModels(models);
     if (models.length > 0) {
@@ -1994,28 +1981,7 @@ function bindTrackParts(): string[] {
 }
 
 function clearTrackContent(): void {
-  const vehicleTextureNames = new Set([...loadedDffs.keys()].flatMap((fileName) => {
-    const vehicle = parseVehicleDffName(fileName);
-    return vehicle ? [vehicle.textureDictionaryFileName.toLocaleLowerCase("en-US")] : [];
-  }));
-  for (const fileName of [...loadedDffs.keys()]) {
-    if (!parseVehicleDffName(fileName)) {
-      loadedDffs.delete(fileName);
-    }
-  }
-  for (const fileName of [...loadedTextureDictionaries.keys()]) {
-    if (!vehicleTextureNames.has(fileName)) {
-      loadedTextureDictionaries.delete(fileName);
-    }
-  }
-  for (const [fileName, asset] of [...loadedAssets]) {
-    const keepVehicleModel = asset.kind === "dff" && parseVehicleDffName(fileName) !== undefined;
-    const keepVehicleTextures = asset.kind === "txd" && vehicleTextureNames.has(fileName);
-    const keepAudio = asset.kind === "rws";
-    if (!keepVehicleModel && !keepVehicleTextures && !keepAudio) {
-      loadedAssets.delete(fileName);
-    }
-  }
+  trackAssets.clear();
   for (const key of Object.keys(trackParts) as (keyof typeof trackParts)[]) {
     delete trackParts[key];
   }
@@ -2054,6 +2020,24 @@ async function fetchLocalContentFile(source: LocalContentFile): Promise<File> {
   return new File([await response.blob()], source.name);
 }
 
+/** All admitted tracks share the same optional permanent bank for the lifetime of the library. */
+function prepareRaceAudio(): Promise<void> | undefined {
+  if (audio.masterVolume === 0) return;
+  const bank = selectedTrack?.files.find((source) => source.name.toLowerCase().endsWith(".rws"));
+  if (!bank) return;
+  sharedBankLoad ??= fetchLocalContentFile(bank)
+    .then((file) => assetLoader.load(file))
+    .then(({ asset }) => {
+      if (asset.kind !== "rws") throw new Error(`Invalid sound bank ${bank.name}`);
+      audio.addSampleBank(asset.data.sounds);
+    })
+    .catch((error: unknown) => {
+      sharedBankLoad = undefined;
+      assetStatus.textContent = `Using synthesized audio. ${error instanceof Error ? error.message : String(error)}`;
+    });
+  return sharedBankLoad;
+}
+
 async function loadContentFiles(
   sources: readonly LocalContentFile[],
   label: string,
@@ -2067,11 +2051,20 @@ async function loadContentFiles(
     clearTrackContent();
   }
   state.transition("loading", `Reading ${label} from your local library…`);
-  assetStatus.textContent = `Reading ${sources.length} local file${sources.length === 1 ? "" : "s"} for ${label}…`;
+  assetStatus.textContent = `Reading ${label}…`;
   try {
-    const files = await Promise.all(sources.map(fetchLocalContentFile));
     const summaries: string[] = [];
-    for (const file of files) {
+    let files = sources;
+    if (options.resetTrack) {
+      const descriptor = sources.find(({ name }) => name.toLowerCase() === "course.lua");
+      if (descriptor) {
+        trackParts.course = parseCourseLua(await (await fetchLocalContentFile(descriptor)).text());
+        summaries.push(`${descriptor.name}: course ${trackParts.course.id}`);
+      }
+      files = playableTrackFiles(sources, trackParts.course);
+    }
+    for (const source of files) {
+      const file = await fetchLocalContentFile(source);
       const normalizedName = file.name.toLocaleLowerCase("en-US");
       if (normalizedName.endsWith(".ai")) {
         const startedAt = performance.now();
@@ -2092,9 +2085,6 @@ async function loadContentFiles(
         if (/lapdata/i.test(file.name)) {
           trackParts.lapData = parseLapDataLua(await file.text());
           summaries.push(`${file.name}: ${trackParts.lapData.line.length} route anchors`);
-        } else if (/course/i.test(file.name)) {
-          trackParts.course = parseCourseLua(await file.text());
-          summaries.push(`${file.name}: course ${trackParts.course.id}`);
         } else if (/powerups?_gold/i.test(file.name)) {
           trackParts.powerupPlacements = parsePowerupPlacementsLua(await file.text());
           const playable = trackParts.powerupPlacements.filter((placement) => (
@@ -2108,27 +2098,28 @@ async function loadContentFiles(
         continue;
       }
       const result = await assetLoader.load(file);
-      trackHazardAssets.remember(file.name, result.asset);
-      loadedAssets.set(normalizedName, result.asset);
+      if (options.resetTrack) {
+        trackAssets.set(normalizedName, result.asset);
+        trackHazardAssets.remember(file.name, result.asset);
+      }
       let role: string | undefined;
       if (result.asset.kind === "bsp") {
         role = rememberBsp(file.name, result.asset.data);
       } else if (result.asset.kind === "txd") {
-        loadedTextureDictionaries.set(normalizedName, result.asset.data);
+        if (!options.resetTrack) vehicleTextures.set(normalizedName, result.asset.data);
         role = "textures";
       } else if (result.asset.kind === "dff") {
-        loadedDffs.set(normalizedName, result.asset.data);
-        role = parseVehicleDffName(file.name) ? "vehicle" : "course model";
-      } else if (result.asset.kind === "rws") {
-        role = `${audio.addSampleBank(result.asset.data.sounds)} original sounds`;
+        if (!options.resetTrack) vehicleModels.set(normalizedName, result.asset.data);
+        role = options.resetTrack ? "course model" : "vehicle";
       }
       summaries.push(
         `${file.name}: ${assetSummary(result.asset)}, ${result.parseMilliseconds.toFixed(1)} ms${role ? ` · ${role}` : ""}`,
       );
     }
-    const bound = bindTrackParts();
+    const bound = options.resetTrack ? bindTrackParts() : [];
+    if (!options.resetTrack) refreshVehicleCatalog();
     assetStatus.textContent = [
-      `${label}: ${files.length} local files loaded`,
+      `${label}: ${summaries.length} local files loaded`,
       ...summaries.slice(0, 6),
       ...(summaries.length > 6 ? [`+ ${summaries.length - 6} more parsed files`] : []),
       ...(bound.length > 0 ? [`Bound: ${bound.join(" · ")}`] : []),
@@ -2140,10 +2131,18 @@ async function loadContentFiles(
       "menu",
       `${trackDefinition
         ? `Playable track ready · ${trackDefinition.checkpoints.length} checkpoints`
-        : `${loadedAssets.size} asset${loadedAssets.size === 1 ? "" : "s"} cached in memory`}${championshipStatus ? ` · ${championshipStatus}` : ""}`,
+        : `${label} ready`}${championshipStatus ? ` · ${championshipStatus}` : ""}`,
     );
     return true;
   } catch (error) {
+    if (options.resetTrack) {
+      clearTrackContent();
+      selectedTrack = undefined;
+      trackSelectName.textContent = "Choose a track";
+      trackSelectDetail.textContent = "Your local game library";
+      trackSelectImage.hidden = true;
+      localContentStatus.textContent = `Could not load ${label}. Choose a track to retry.`;
+    }
     assetStatus.textContent = error instanceof Error ? error.message : String(error);
     if (selectedGameFlow() === "championship") {
       prepareChampionshipSession();
@@ -2206,7 +2205,7 @@ function openTrackCatalog(): void {
   }
   contentCatalogKicker.textContent = "Stage 6 tracks";
   contentCatalogTitle.textContent = "Choose a track";
-  contentCatalogDescription.textContent = "The full route, world, collision, hazards, power-ups, AI data, and audio load as one local bundle.";
+  contentCatalogDescription.textContent = "Choose a course to load its route, scenery and hazards.";
   contentCatalogFooter.hidden = true;
   contentCatalogGrid.dataset["kind"] = "track";
   const cards = localContentCatalog.tracks.map((track) => {
@@ -2215,7 +2214,7 @@ function openTrackCatalog(): void {
       `Course ${track.courseId} · ${track.files.length} files`,
       track.previewTextureName,
       track.available,
-      track.id === selectedTrackCatalogId,
+      track.id === selectedTrack?.id,
     );
     card.addEventListener("click", () => {
       contentCatalogDialog.close();
@@ -2294,11 +2293,12 @@ function openVehicleCatalog(target: number): void {
 }
 
 async function selectCatalogTrack(track: LocalTrackCatalogEntry): Promise<void> {
+  if (track.id === selectedTrack?.id) return;
   const loaded = await loadContentFiles(track.files, track.displayName, { resetTrack: true });
   if (!loaded) {
     return;
   }
-  selectedTrackCatalogId = track.id;
+  selectedTrack = track;
   const preview = localPreviewImages.get(track.previewTextureName);
   trackSelectImage.hidden = preview === undefined;
   trackSelectImage.src = preview ?? "";
@@ -2318,8 +2318,8 @@ async function selectCatalogVehicle(): Promise<void> {
   const modelKey = variant.model.name.toLocaleLowerCase("en-US");
   const textureKey = vehicle.texture.name.toLocaleLowerCase("en-US");
   const missingFiles = [
-    ...(loadedTextureDictionaries.has(textureKey) ? [] : [vehicle.texture]),
-    ...(loadedDffs.has(modelKey) ? [] : [variant.model]),
+    ...(vehicleTextures.has(textureKey) ? [] : [vehicle.texture]),
+    ...(vehicleModels.has(modelKey) ? [] : [variant.model]),
   ];
   if (missingFiles.length > 0) {
     const loaded = await loadContentFiles(missingFiles, `${vehicle.displayName} paint ${variant.variant + 1}`);

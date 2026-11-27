@@ -63,6 +63,10 @@ wait for **Ready to play offline.** in **Local game content**. You can now close
 and reopen the same URL offline. To launch it in its own window, use the browser's install
 command where available. Installation is optional.
 
+Since slice 7.4 the catalog reads track data when you choose a course. Starting the first
+race with sound enabled loads the shared original sound bank. You can also turn sound on during
+a muted race. Existing imported libraries support this without another import.
+
 To try the production build locally:
 
 ```bash
@@ -165,7 +169,8 @@ Rapier collider lines, and the first fixed-step race-rules slice. A loaded track
 three-second countdown, ordered one-lap finish, and final-time banner. The local dev server discovers
 the admitted content in the ignored `game-data/` tree. Choose a track or vehicle from the in-app
 visual catalog instead of opening a native file picker; previews come from the original local
-`TRACKIMAGES.TXD`, and the complete track bundle or selected vehicle paint loads automatically.
+`TRACKIMAGES.TXD`. Choosing a track reads its course definition and playable assets. Choosing
+a vehicle reads the selected paint and shared texture dictionary.
 DFF/TXD/BSP/RWS files are parsed through the loading Worker; original bytes remain local and parsed
 typed arrays are transferred back without cloning. See
 [`reference/RUNTIME_FOUNDATION.md`](./reference/RUNTIME_FOUNDATION.md) for runtime contracts and
@@ -207,8 +212,9 @@ Each roster slot can use a Human, Easy, Normal, or Hard CPU driver once a track 
 cars submit the same fixed-step vehicle inputs as human adapters; source `.AI`/`.LED` files can be
 loaded for validated structural inspection while their still-unconfirmed tables remain out of rules.
 Moving projectiles stop on track/scenery, explosives splash from the world hit, and explosive prop
-hits use the same destruction/reset flow. Load the extracted `PERMDICT.RWS` alongside the track bundle to replace
-fallback tones with the original engine, weapon, collision, explosion, race, and menu samples.
+hits use the same destruction/reset flow. When the local library includes `PERMDICT.RWS`,
+the first race with sound enabled gains original engine, weapon, collision, explosion, race and menu samples.
+Libraries without the optional bank use synthesized sounds.
 Pause with the HUD button or `Escape`; losing page focus pauses automatically. Physics, race, combat,
 and elimination steps remain frozen while paused, and resume continues from the same simulation step
 without catching up hidden time. Per-player engine pitch tracks speed and throttle with or without the

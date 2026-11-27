@@ -1,4 +1,4 @@
-# Stage 7.1–7.3 — local import and offline play
+# Stage 7.1–7.4 — local import, offline play and on-demand loading
 
 Folder and disc import landed on 2026-11-07. Offline delivery followed on 2026-11-28. M3 remains open.
 
@@ -191,10 +191,50 @@ load from IndexedDB. The development server uses live Vite modules.
 - All 237 workspace tests, typechecks and both production builds passed. The browser check used
   headless Chrome with software WebGL. OS launcher installation and Firefox/Safari remain untested.
 
+## Slice 7.4 — on-demand tracks and audio
+
+Opening the catalog reads its shared preview dictionary. Choosing a track reads `COURSE.LUA`
+first, then the world, textures, models, explosive-object placements and gameplay files used by
+that course. Selecting the active track again reuses it. Switching tracks releases the previous
+track's parsed resources and keeps the garage models and textures. Changes of vehicle paint
+no longer rebuild the track geometry or collision.
+
+The first race with audible volume reads the optional `PERMDICT.RWS` through the loading Worker.
+Starting muted defers that read until sound is enabled. Tracks and subsequent races share one
+successful bank load per page session. Web Audio allocates buffers as individual samples are
+used and reuses them on resume. A missing or unreadable bank allows play with synthesized audio.
+After a read error the next audible start or unmute retries. These changes work with the v1
+catalog already in IndexedDB. Import still validates the full library before activation.
+
+### 7.4 verification
+
+On macOS, headless Chrome imported the reference CUE/BIN into a clean profile. A second Chrome
+process opened the production build offline with the static server stopped. Instrumenting IndexedDB
+blob reads showed one preview dictionary read at startup. The following counts include the course
+descriptor and shared gameplay files.
+
+| Selected track | Files listed in v1 catalog | Blobs read on selection | Checkpoints |
+| --- | ---: | ---: | ---: |
+| City | 41 | 20 | 117 |
+| Neustein | 36 | 21 | 72 |
+| Arctic | 33 | 19 | 94 |
+| Warzone | 68 | 45 | 136 |
+
+Choosing Warzone again added zero reads. Choosing Wildfire added two for the selected paint and
+texture dictionary. The Hard CPU passed a Warzone checkpoint with sound muted and the bank unread.
+An injected missing bank at unmute kept the race running with synthesized sounds. Restoring the
+blob and toggling sound on loaded original samples. A subsequent City race reused the bank.
+After a page reload, the first audible race read the bank exactly once. A missing lap file on a
+track switch cleared the failed selection. Restoring the file allowed City to load and race again.
+
+All 239 workspace tests, typechecks and both production builds passed. The browser check used
+software WebGL and observed Web Audio buffer creation. Listening quality, Firefox/Safari and
+hardware frame-time measurements remain unverified.
+
 ## Next slices
 
-- Subsequent Beta: expanded lazy loading and compression, gamepad
-  mapping/reconnect, browser/OS matrix and performance acceptance.
+- Remaining Beta work includes texture and audio compression (KTX2/Basis and Opus), gamepad
+  mapping/reconnect, the browser/OS matrix and performance acceptance.
 
 Platform references: [directory inputs](https://developer.mozilla.org/en-US/docs/Web/API/HTMLInputElement/webkitdirectory)
 and [IndexedDB transactions](https://developer.mozilla.org/en-US/docs/Web/API/IndexedDB_API/Using_IndexedDB).

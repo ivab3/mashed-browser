@@ -101,6 +101,7 @@ export class AudioRuntime {
 
   addSampleBank(samples: readonly Pcm16AudioSample[]): number {
     let accepted = 0;
+    const updated = new Set<string>();
     for (const sample of samples) {
       const name = normalizedSampleName(sample.name);
       if (
@@ -116,9 +117,17 @@ export class AudioRuntime {
         continue;
       }
       this.#samples.set(name, { ...sample, name });
+      this.#buffers.delete(name);
+      updated.add(name);
       accepted += 1;
     }
-    this.#rebuildBuffers();
+    // A bank can arrive while fallback engines are running after unmute.
+    for (const [id, voice] of this.#engineVoices) {
+      if (updated.has(ENGINE_SAMPLE_BY_VEHICLE[id] ?? "eng1")) {
+        this.#stopVoice(voice, this.#context!.currentTime);
+        this.#engineVoices.delete(id);
+      }
+    }
     return accepted;
   }
 
@@ -154,6 +163,7 @@ export class AudioRuntime {
       present.add(voice.id);
       let nodes = this.#engineVoices.get(voice.id);
       if (!nodes) {
+        if (this.#masterVolume === 0) continue;
         nodes = this.#createEngineVoice(voice.id, context);
         this.#engineVoices.set(voice.id, nodes);
       }
@@ -188,7 +198,6 @@ export class AudioRuntime {
       this.#masterGain.gain.value = this.#masterVolume;
       this.#masterGain.connect(this.#context.destination);
     }
-    this.#rebuildBuffers();
     if (this.#context.state === "suspended") {
       await this.#context.resume();
     }
@@ -198,7 +207,7 @@ export class AudioRuntime {
     const gain = context.createGain();
     gain.gain.value = 0;
     const sampleName = ENGINE_SAMPLE_BY_VEHICLE[id] ?? "eng1";
-    const buffer = this.#buffers.get(sampleName);
+    const buffer = this.#bufferFor(sampleName, context);
     if (buffer) {
       const source = context.createBufferSource();
       source.buffer = buffer;
@@ -221,33 +230,27 @@ export class AudioRuntime {
     nodes.source.stop(now + 0.12);
   }
 
-  #rebuildBuffers(): void {
-    const context = this.#context;
-    if (!context) {
-      return;
-    }
-    this.#buffers.clear();
-    for (const [name, sample] of this.#samples) {
-      const frameCount = sample.pcm16.length / sample.channelCount;
-      const buffer = context.createBuffer(sample.channelCount, frameCount, sample.sampleRate);
-      for (let channel = 0; channel < sample.channelCount; channel += 1) {
-        const target = buffer.getChannelData(channel);
-        for (let frame = 0; frame < frameCount; frame += 1) {
-          target[frame] = sample.pcm16[frame * sample.channelCount + channel]! / 32_768;
-        }
+  #bufferFor(name: string, context: AudioContext): AudioBuffer | undefined {
+    const cached = this.#buffers.get(name);
+    if (cached) return cached;
+    const sample = this.#samples.get(name);
+    if (!sample) return undefined;
+    const frameCount = sample.pcm16.length / sample.channelCount;
+    const buffer = context.createBuffer(sample.channelCount, frameCount, sample.sampleRate);
+    for (let channel = 0; channel < sample.channelCount; channel += 1) {
+      const target = buffer.getChannelData(channel);
+      for (let frame = 0; frame < frameCount; frame += 1) {
+        target[frame] = sample.pcm16[frame * sample.channelCount + channel]! / 32_768;
       }
-      this.#buffers.set(name, buffer);
     }
-    for (const voice of this.#engineVoices.values()) {
-      voice.source.stop();
-    }
-    this.#engineVoices.clear();
+    this.#buffers.set(name, buffer);
+    return buffer;
   }
 
-  #findBuffer(cue: AudioCue, requestedName: string | undefined): AudioBuffer | undefined {
+  #findBuffer(context: AudioContext, cue: AudioCue, requestedName: string | undefined): AudioBuffer | undefined {
     const names = requestedName ? [requestedName] : CUE_SAMPLE_NAMES[cue];
     for (const name of names) {
-      const buffer = this.#buffers.get(normalizedSampleName(name));
+      const buffer = this.#bufferFor(normalizedSampleName(name), context);
       if (buffer) {
         return buffer;
       }
@@ -263,7 +266,7 @@ export class AudioRuntime {
     }
     const gain = context.createGain();
     const now = context.currentTime;
-    const originalBuffer = this.#findBuffer(cue, requestedName);
+    const originalBuffer = this.#findBuffer(context, cue, requestedName);
     if (originalBuffer) {
       const source = context.createBufferSource();
       source.buffer = originalBuffer;

@@ -48,6 +48,31 @@ function createRuntime() {
 }
 
 describe("AudioRuntime master volume", () => {
+  it("allocates each requested sample once and invalidates only replaced samples", async () => {
+    const { context, events, runtime } = createRuntime();
+    const allocate = vi.spyOn(context, "createBuffer");
+    const sample = { name: "menu navigation", sampleRate: 22050, channelCount: 1, pcm16: new Int16Array(4) };
+    runtime.addSampleBank([sample, { ...sample, name: "eng1" }, { ...sample, name: "go" }]);
+    await runtime.unlock();
+    expect(allocate).not.toHaveBeenCalled();
+    const cue = () => events.emit({ type: "audio:cue", cue: "menu", gain: 0.1 });
+    cue();
+    cue();
+    const voices = [{ id: "vehicle-one", normalizedSpeed: 0, throttle: 1 }];
+    runtime.setEngineVoices(voices);
+    await runtime.unlock();
+    runtime.setEngineVoices(voices);
+    expect(allocate).toHaveBeenCalledTimes(2);
+    const engine = context.sources.at(-1)!;
+    runtime.addSampleBank([{ ...sample, pcm16: new Int16Array(8) }]);
+    cue();
+    expect(allocate).toHaveBeenLastCalledWith(1, 8, 22050);
+    runtime.setEngineVoices(voices);
+    expect(engine.stop).not.toHaveBeenCalled();
+    expect(allocate).toHaveBeenCalledTimes(3);
+    await runtime.dispose();
+  });
+
   it("stores a safe normalized gain before the browser audio context is unlocked", async () => {
     const runtime = new AudioRuntime(new RuntimeEventBus());
     runtime.setMasterVolume(0.35);
